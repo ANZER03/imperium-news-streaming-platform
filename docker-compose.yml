@@ -1,0 +1,47 @@
+name: imperium-news-streaming-platform
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - imperium-net
+
+services:
+  foundation-shell:
+    <<: *service-defaults
+    image: alpine:3.20
+    container_name: imperium-foundation-shell
+    profiles:
+      - foundation
+    command: ["sh", "-c", "trap : TERM INT; sleep infinity & wait"]
+    env_file:
+      - ${ENV_FILE:-.env}
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /etc/alpine-release"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - foundation-shell-data:/workspace
+
+networks:
+  imperium-net:
+    name: imperium-net
+    driver: bridge
+
+volumes:
+  foundation-shell-data:
+    name: imperium-foundation-shell-data
+  kafka-1-data:
+    name: imperium-kafka-1-data
+  kafka-2-data:
+    name: imperium-kafka-2-data
+  connect-data:
+    name: imperium-connect-data
+  redis-data:
+    name: imperium-redis-data
+  qdrant-data:
+    name: imperium-qdrant-data
+  spark-master-data:
+    name: imperium-spark-master-data
+  spark-worker-1-data:
+    name: imperium-spark-worker-1-data
