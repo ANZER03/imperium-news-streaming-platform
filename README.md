@@ -13,6 +13,8 @@ Current scope:
 - healthcheck/dependency conventions for upcoming services
 - Kafka + Karapace backbone profile
 - Debezium Connect + Spark processing profile
+- Redis + Qdrant serving profile
+- Optional Kafka UI profile
 
 The actual Phase 1 services are added slice-by-slice in follow-up issues.
 
@@ -35,6 +37,18 @@ Start the processing substrate after the backbone is up:
 
 ```bash
 docker-compose --env-file .env --profile backbone --profile processing up -d
+```
+
+Start the serving substrate:
+
+```bash
+docker-compose --env-file .env --profile serving up -d
+```
+
+Start the optional Kafka UI after backbone + processing are up:
+
+```bash
+docker-compose --env-file .env --profile backbone --profile processing --profile ui up -d kafka-ui
 ```
 
 Inspect foundation logs:
@@ -61,5 +75,7 @@ make infra-config ENV_FILE=.env.example
 - Host ports use a high prefixed pattern to reduce conflicts.
 - The `backbone` profile currently starts Kafka broker 1, Kafka broker 2, and Karapace.
 - The `processing` profile currently starts Debezium Connect, Spark master, and one Spark worker.
+- The `serving` profile currently starts Redis and Qdrant.
+- The `ui` profile currently starts Kafka UI as an optional inspection tool.
 - Phase 1 currently excludes source PostgreSQL, connector configs, topic
   bootstrap, and schema bootstrap.
