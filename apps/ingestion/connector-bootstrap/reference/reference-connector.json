@@ -1,0 +1,23 @@
+{
+  "name": "${REFERENCE_CDC_CONNECTOR_NAME}",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "topic.prefix": "${REFERENCE_CDC_TOPIC_PREFIX}",
+    "database.hostname": "${SOURCE_PG_HOST}",
+    "database.port": "${SOURCE_PG_PORT}",
+    "database.user": "${SOURCE_PG_USER}",
+    "database.password": "${SOURCE_PG_PASSWORD}",
+    "database.dbname": "${SOURCE_PG_DATABASE}",
+    "plugin.name": "pgoutput",
+    "slot.name": "${REFERENCE_CDC_SLOT_NAME}",
+    "publication.name": "${REFERENCE_CDC_PUBLICATION_NAME}",
+    "publication.autocreate.mode": "disabled",
+    "table.include.list": "${REFERENCE_CDC_TABLES}",
+    "snapshot.mode": "initial_only",
+    "tombstones.on.delete": "false",
+    "heartbeat.interval.ms": "10000",
+    "schema.history.internal.kafka.bootstrap.servers": "${KAFKA_BOOTSTRAP_SERVERS}",
+    "schema.history.internal.kafka.topic": "${REFERENCE_CDC_SCHEMA_HISTORY_TOPIC}"
+  }
+}

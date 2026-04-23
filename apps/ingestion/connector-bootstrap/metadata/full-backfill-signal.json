@@ -1,0 +1,8 @@
+{
+  "id": "${CDC_SIGNAL_ID}",
+  "type": "execute-snapshot",
+  "data": {
+    "data-collections": ["public.table_authority", "public.table_links"],
+    "type": "INCREMENTAL"
+  }
+}

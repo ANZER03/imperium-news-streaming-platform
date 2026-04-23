@@ -100,12 +100,11 @@ services:
 
   schema-registry:
     <<: *service-defaults
-    image: ${KARAPACE_IMAGE}
+    image: ${SCHEMA_REGISTRY_IMAGE}
     container_name: imperium-schema-registry
     hostname: schema-registry
     profiles:
       - backbone
-    command: ["python3", "-m", "karapace"]
     depends_on:
       kafka:
         condition: service_healthy
@@ -113,6 +112,11 @@ services:
         condition: service_healthy
     ports:
       - "${SCHEMA_REGISTRY_EXTERNAL_PORT:-48081}:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092,PLAINTEXT://kafka-broker-2:29092
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: ${SCHEMA_REGISTRY_COMPATIBILITY:-BACKWARD}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects > /dev/null"]
       interval: 15s
@@ -136,6 +140,8 @@ services:
       kafka-broker-2:
         condition: service_healthy
       schema-registry:
+        condition: service_healthy
+      postgres-source:
         condition: service_healthy
     ports:
       - "${CONNECT_EXTERNAL_PORT:-48083}:8083"
@@ -278,6 +284,30 @@ services:
       timeout: 10s
       retries: 10
 
+  postgres-source:
+    <<: *service-defaults
+    image: postgres:13
+    container_name: imperium-news-source-db
+    hostname: postgres-source
+    profiles:
+      - source
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=10"]
+    ports:
+      - "${SOURCE_PG_EXTERNAL_PORT:-35432}:5432"
+    environment:
+      POSTGRES_DB: ${SOURCE_PG_DATABASE:-imperium-news-source}
+      POSTGRES_USER: ${SOURCE_PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${SOURCE_PG_PASSWORD:-postgres}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SOURCE_PG_USER:-postgres} -d ${SOURCE_PG_DATABASE:-imperium-news-source}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - pfe-project-postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/initdb:/docker-entrypoint-initdb.d:ro
+
 networks:
   imperium-net:
     name: imperium-net
@@ -300,3 +330,6 @@ volumes:
     name: imperium-spark-master-data
   spark-worker-1-data:
     name: imperium-spark-worker-1-data
+  pfe-project-postgres-data:
+    external: true
+    name: pfe-project_postgres_data

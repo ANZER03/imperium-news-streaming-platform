@@ -1,0 +1,9 @@
+{
+  "id": "${CDC_SIGNAL_ID}",
+  "type": "execute-snapshot",
+  "data": {
+    "data-collections": ["${NEWS_CDC_TABLE}"],
+    "type": "INCREMENTAL",
+    "additional-condition": "added_in >= NOW() - INTERVAL '${NEWS_CDC_BACKFILL_WINDOW_DAYS} days'"
+  }
+}

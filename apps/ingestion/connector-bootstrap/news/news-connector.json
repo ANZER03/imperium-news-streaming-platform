@@ -1,0 +1,27 @@
+{
+  "name": "${NEWS_CDC_CONNECTOR_NAME}",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "topic.prefix": "${NEWS_CDC_TOPIC_PREFIX}",
+    "database.hostname": "${SOURCE_PG_HOST}",
+    "database.port": "${SOURCE_PG_PORT}",
+    "database.user": "${SOURCE_PG_USER}",
+    "database.password": "${SOURCE_PG_PASSWORD}",
+    "database.dbname": "${SOURCE_PG_DATABASE}",
+    "plugin.name": "pgoutput",
+    "slot.name": "${NEWS_CDC_SLOT_NAME}",
+    "publication.name": "${NEWS_CDC_PUBLICATION_NAME}",
+    "publication.autocreate.mode": "disabled",
+    "table.include.list": "${NEWS_CDC_TABLE}",
+    "snapshot.mode": "never",
+    "signal.enabled.channels": "source,kafka",
+    "signal.data.collection": "public.debezium_signal",
+    "signal.kafka.bootstrap.servers": "${KAFKA_BOOTSTRAP_SERVERS}",
+    "signal.kafka.topic": "${NEWS_CDC_SIGNAL_TOPIC}",
+    "tombstones.on.delete": "false",
+    "heartbeat.interval.ms": "10000",
+    "schema.history.internal.kafka.bootstrap.servers": "${KAFKA_BOOTSTRAP_SERVERS}",
+    "schema.history.internal.kafka.topic": "${NEWS_CDC_SCHEMA_HISTORY_TOPIC}"
+  }
+}

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092,kafka-broker-2:29092}"
+KAFKA_REPLICATION_FACTOR="${KAFKA_REPLICATION_FACTOR:-2}"
+NEWS_CDC_TOPIC_PARTITIONS="${NEWS_CDC_TOPIC_PARTITIONS:-1}"
+NEWS_CDC_SCHEMA_HISTORY_TOPIC="${NEWS_CDC_SCHEMA_HISTORY_TOPIC:-imperium.news.schema-history}"
+NEWS_CDC_SIGNAL_TOPIC="${NEWS_CDC_SIGNAL_TOPIC:-imperium.news.signals}"
+
+kafka-topics \
+  --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
+  --create \
+  --if-not-exists \
+  --topic "imperium.news.public.table_news" \
+  --partitions "$NEWS_CDC_TOPIC_PARTITIONS" \
+  --replication-factor "$KAFKA_REPLICATION_FACTOR"
+
+for topic in "$NEWS_CDC_SCHEMA_HISTORY_TOPIC" "$NEWS_CDC_SIGNAL_TOPIC"; do
+  kafka-topics \
+    --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
+    --create \
+    --if-not-exists \
+    --topic "$topic" \
+    --partitions 1 \
+    --replication-factor "$KAFKA_REPLICATION_FACTOR" \
+    --config cleanup.policy=compact
+done

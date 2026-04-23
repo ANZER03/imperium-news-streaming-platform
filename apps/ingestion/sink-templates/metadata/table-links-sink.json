@@ -1,0 +1,17 @@
+{
+  "name": "${METADATA_SINK_LINKS_NAME}",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics": "imperium.metadata.public.table_links",
+    "connection.url": "jdbc:postgresql://${TARGET_PG_HOST}:${TARGET_PG_PORT}/${TARGET_PG_DATABASE}",
+    "connection.user": "${TARGET_PG_USER}",
+    "connection.password": "${TARGET_PG_PASSWORD}",
+    "auto.create": "false",
+    "auto.evolve": "false",
+    "insert.mode": "upsert",
+    "pk.mode": "record_key",
+    "delete.enabled": "false",
+    "table.name.format": "public.table_links"
+  }
+}
