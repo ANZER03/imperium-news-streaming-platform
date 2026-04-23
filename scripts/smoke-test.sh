@@ -12,13 +12,13 @@ REDIS_CONTAINER="${REDIS_CONTAINER:-imperium-redis}"
 QDRANT_CONTAINER="${QDRANT_CONTAINER:-imperium-qdrant}"
 
 KAFKA_URL="${KAFKA_URL:-localhost:49092}"
-SCHEMA_REGISTRY_URL="${SCHEMA_REGISTRY_URL:-http://localhost:48081}"
-CONNECT_URL="${CONNECT_URL:-http://localhost:48083}"
-SPARK_MASTER_URL="${SPARK_MASTER_URL:-http://localhost:48080}"
-SPARK_WORKER_URL="${SPARK_WORKER_URL:-http://localhost:48091}"
-REDIS_HOST="${REDIS_HOST:-localhost}"
+SCHEMA_REGISTRY_URL="${SCHEMA_REGISTRY_URL:-http://127.0.0.1:48081}"
+CONNECT_URL="${CONNECT_URL:-http://127.0.0.1:48083}"
+SPARK_MASTER_URL="${SPARK_MASTER_URL:-http://127.0.0.1:48080}"
+SPARK_WORKER_URL="${SPARK_WORKER_URL:-http://127.0.0.1:48091}"
+REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
 REDIS_PORT="${REDIS_PORT:-46379}"
-QDRANT_URL="${QDRANT_URL:-http://localhost:46333}"
+QDRANT_URL="${QDRANT_URL:-http://127.0.0.1:46333}"
 
 PASS=0
 FAIL=0
@@ -47,8 +47,16 @@ docker_healthy() {
 http_ok() {
     local url="$1"
     local code
-    code=$(curl -sf -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
-    [[ "$code" == "200" ]] && echo "ok" || echo "http_$code"
+    local attempt
+    for attempt in 1 2 3 4 5; do
+        code=$(curl -sf -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+        if [[ "$code" == "200" ]]; then
+            echo "ok"
+            return 0
+        fi
+        sleep 2
+    done
+    echo "http_$code"
 }
 
 json_contains() {
@@ -99,6 +107,14 @@ kafka_metadata_ready() {
     fi
 }
 
+schema_registry_ready() {
+    if docker exec "$SCHEMA_REGISTRY_CONTAINER" sh -lc 'curl -sf http://localhost:8081/subjects > /dev/null' 2>/dev/null; then
+        echo "ok"
+    else
+        echo "failed"
+    fi
+}
+
 echo "============================================================"
 echo " Phase 1 Smoke Test — $(date '+%Y-%m-%d %H:%M:%S')"
 echo "============================================================"
@@ -116,7 +132,7 @@ check "Qdrant" "$(docker_healthy "$QDRANT_CONTAINER")"
 echo ""
 echo "--- Core readiness ---"
 check "Kafka metadata" "$(kafka_metadata_ready)"
-check "Schema Registry API" "$(http_ok "$SCHEMA_REGISTRY_URL/subjects")"
+check "Schema Registry API" "$(schema_registry_ready)"
 check "Kafka Connect API" "$(http_ok "$CONNECT_URL/connectors")"
 check "Connect plugins" "$(connect_plugins_ready)" "expected Debezium plugins missing"
 check "Avro converter jars" "$(avro_converter_ready)" "expected Avro converter jars missing"

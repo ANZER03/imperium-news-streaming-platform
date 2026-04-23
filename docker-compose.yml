@@ -113,12 +113,6 @@ services:
         condition: service_healthy
     ports:
       - "${SCHEMA_REGISTRY_EXTERNAL_PORT:-48081}:8081"
-    environment:
-      KARAPACE_ADVERTISED_HOSTNAME: schema-registry
-      KARAPACE_BOOTSTRAP_URI: kafka:29092,kafka-broker-2:29092
-      KARAPACE_HOST: 0.0.0.0
-      KARAPACE_PORT: 8081
-      KARAPACE_COMPATIBILITY: ${SCHEMA_REGISTRY_COMPATIBILITY:-BACKWARD}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects > /dev/null"]
       interval: 15s
@@ -251,13 +245,6 @@ services:
     environment:
       QDRANT__SERVICE__HTTP_PORT: 6333
       QDRANT__SERVICE__GRPC_PORT: 6334
-      QDRANT__SERVICE__API_KEY: ${QDRANT__SERVICE__API_KEY:-}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:6333/collections > /dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
     volumes:
       - qdrant-data:/qdrant/storage
 
