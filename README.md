@@ -51,6 +51,12 @@ Start the optional Kafka UI after backbone + processing are up:
 docker-compose --env-file .env --profile backbone --profile processing --profile ui up -d kafka-ui
 ```
 
+Run the Phase 1 smoke test after core profiles are up:
+
+```bash
+make smoke-test
+```
+
 Inspect foundation logs:
 
 ```bash
@@ -79,3 +85,13 @@ make infra-config ENV_FILE=.env.example
 - The `ui` profile currently starts Kafka UI as an optional inspection tool.
 - Phase 1 currently excludes source PostgreSQL, connector configs, topic
   bootstrap, and schema bootstrap.
+
+## Validation workflow
+
+1. Copy `.env.example` to `.env`
+2. Start the core profiles you want to validate:
+   - `backbone`
+   - `processing`
+   - `serving`
+3. Run `make smoke-test`
+4. Treat optional UI failures as non-blocking for Phase 1 acceptance
