@@ -1,0 +1,25 @@
+{
+  "name": "${TEMP_SINK_NEWS_NAME}",
+  "config": {
+    "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics": "imperium.news.public.table_news",
+    "connection.url": "jdbc:postgresql://${TARGET_PG_HOST}:${TARGET_PG_PORT}/${TARGET_PG_DATABASE}",
+    "connection.username": "${TARGET_PG_USER}",
+    "connection.password": "${TARGET_PG_PASSWORD}",
+    "insert.mode": "upsert",
+    "primary.key.mode": "record_key",
+    "primary.key.fields": "id",
+    "delete.enabled": "false",
+    "schema.evolution": "none",
+    "table.name.format": "sink_news",
+    "quote.identifiers": "false",
+    "consumer.override.auto.offset.reset": "latest",
+    "transforms": "unwrap,project",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "true",
+    "transforms.unwrap.delete.handling.mode": "drop",
+    "transforms.project.type": "org.apache.kafka.connect.transforms.ReplaceField$$Value",
+    "transforms.project.include": "id,added_in,link_id,authority_id,rubrique_id,langue_id,more_title,more_url,pubdate,crawl_date,valide,indexed"
+  }
+}
