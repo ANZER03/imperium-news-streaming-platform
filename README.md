@@ -11,6 +11,7 @@ Current scope:
 - shared network/volume conventions
 - salted high-port host mapping conventions
 - healthcheck/dependency conventions for upcoming services
+- Kafka + Karapace backbone profile
 
 The actual Phase 1 services are added slice-by-slice in follow-up issues.
 
@@ -20,6 +21,13 @@ The actual Phase 1 services are added slice-by-slice in follow-up issues.
 cp .env.example .env
 make infra-config
 make foundation-up
+```
+
+Start the Kafka + Karapace backbone:
+
+```bash
+cp .env.example .env
+docker-compose --env-file .env --profile backbone up -d
 ```
 
 Inspect foundation logs:
@@ -44,5 +52,6 @@ make infra-config ENV_FILE=.env.example
 
 - Service-specific assets live under `infrastructure/`.
 - Host ports use a high prefixed pattern to reduce conflicts.
+- The `backbone` profile currently starts Kafka broker 1, Kafka broker 2, and Karapace.
 - Phase 1 currently excludes source PostgreSQL, connector configs, topic
   bootstrap, and schema bootstrap.
