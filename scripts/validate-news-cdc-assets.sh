@@ -34,8 +34,10 @@ grep -q 'CDC_SIGNAL_ID' "$SIGNAL_SCRIPT" || fail "news signal emitter must gener
 
 for topic in \
   'imperium.news.public.table_news' \
+  'imperium.news.public.debezium_signal' \
   'imperium.news.schema-history' \
-  'imperium.news.signals'; do
+  'imperium.news.signals' \
+  '__debezium-heartbeat.imperium.news'; do
   grep -q "$topic" "$TOPIC_SCRIPT" || fail "news topic bootstrap missing $topic"
 done
 

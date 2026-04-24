@@ -7,10 +7,12 @@ KAFKA_REPLICATION_FACTOR="${KAFKA_REPLICATION_FACTOR:-2}"
 METADATA_CDC_TOPIC_PARTITIONS="${METADATA_CDC_TOPIC_PARTITIONS:-1}"
 METADATA_CDC_SCHEMA_HISTORY_TOPIC="${METADATA_CDC_SCHEMA_HISTORY_TOPIC:-imperium.metadata.schema-history}"
 METADATA_CDC_SIGNAL_TOPIC="${METADATA_CDC_SIGNAL_TOPIC:-imperium.metadata.signals}"
+METADATA_CDC_HEARTBEAT_TOPIC="${METADATA_CDC_HEARTBEAT_TOPIC:-__debezium-heartbeat.imperium.metadata}"
 
 topics=(
   "imperium.metadata.public.table_authority"
   "imperium.metadata.public.table_links"
+  "imperium.metadata.public.debezium_signal"
 )
 
 for topic in "${topics[@]}"; do
@@ -23,7 +25,7 @@ for topic in "${topics[@]}"; do
     --replication-factor "$KAFKA_REPLICATION_FACTOR"
 done
 
-for topic in "$METADATA_CDC_SCHEMA_HISTORY_TOPIC" "$METADATA_CDC_SIGNAL_TOPIC"; do
+for topic in "$METADATA_CDC_SCHEMA_HISTORY_TOPIC" "$METADATA_CDC_SIGNAL_TOPIC" "$METADATA_CDC_HEARTBEAT_TOPIC"; do
   kafka-topics \
     --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
     --create \

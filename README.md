@@ -89,6 +89,8 @@ make infra-config ENV_FILE=.env.example
 - Phase 2 planning lives in `docs/product/phase-2-cdc-decision.md`.
 - The source CDC readiness runbook lives in
   `docs/operations/source-cdc-readiness-runbook.md`.
+- The mutable CDC signal guide lives in
+  `docs/operations/cdc-signal-operations-guide.md`.
 - Mutable CDC signal hygiene is enforced by the connector bootstrap scripts and
   documented in `docs/operations/phase-2-cdc-verification-report.md`.
 
@@ -111,3 +113,4 @@ registration:
 
 - `docs/product/phase-2-cdc-decision.md`
 - `docs/operations/source-cdc-readiness-runbook.md`
+- `docs/operations/cdc-signal-operations-guide.md`

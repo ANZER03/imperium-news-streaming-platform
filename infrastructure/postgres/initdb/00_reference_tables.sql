@@ -1,16 +1,16 @@
 CREATE TABLE IF NOT EXISTS public.table_pays
 (
     id integer NOT NULL,
-    pays character varying(200) COLLATE pg_catalog."fr_FR.utf8" NOT NULL,
-    abr character varying(200) COLLATE pg_catalog."fr_FR.utf8" NOT NULL,
+    pays character varying(200) NOT NULL,
+    abr character varying(200) NOT NULL,
     CONSTRAINT table_pays_pk PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS public.table_langue
 (
     id integer NOT NULL,
-    langue character varying(200) COLLATE pg_catalog."fr_FR.utf8" NOT NULL,
-    abr character varying(200) COLLATE pg_catalog."fr_FR.utf8" NOT NULL,
+    langue character varying(200) NOT NULL,
+    abr character varying(200) NOT NULL,
     CONSTRAINT table_langue_pk PRIMARY KEY (id)
 );
 
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.table_authority
     domain character varying(100),
     news boolean NOT NULL DEFAULT false,
     pub boolean NOT NULL DEFAULT false,
-    authority character varying(100) COLLATE pg_catalog."fr_FR.utf8" NOT NULL,
+    authority character varying(100) NOT NULL,
     actif boolean NOT NULL DEFAULT true,
     pool_rdp_id_old integer NOT NULL DEFAULT 0,
     pool_adconcept_id integer NOT NULL DEFAULT 0,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.table_authority
     added_by integer NOT NULL DEFAULT 0,
     added_by_app_id integer NOT NULL DEFAULT 0,
     added_in timestamp without time zone NOT NULL DEFAULT now(),
-    title text COLLATE pg_catalog."fr_FR.utf8" NOT NULL DEFAULT ''::text,
+    title text NOT NULL DEFAULT ''::text,
     pays_id integer NOT NULL DEFAULT 0,
     sedition_webtv_id integer,
     crawl_proxy boolean,
@@ -53,11 +53,11 @@ CREATE TABLE IF NOT EXISTS public.table_sedition
 (
     id integer NOT NULL,
     support_id integer NOT NULL,
-    definition_se character varying(200) COLLATE pg_catalog."fr_FR.utf8" NOT NULL DEFAULT ''::character varying,
+    definition_se character varying(200) NOT NULL DEFAULT ''::character varying,
     langue_id integer NOT NULL,
     media_id integer NOT NULL,
     pays_id integer NOT NULL,
-    sedition character varying(200) COLLATE pg_catalog."fr_FR.utf8" DEFAULT ''::character varying,
+    sedition character varying(200) DEFAULT ''::character varying,
     periodicite_id integer NOT NULL DEFAULT 0,
     media_type_id integer NOT NULL DEFAULT 0,
     up_kiosque_bench boolean,

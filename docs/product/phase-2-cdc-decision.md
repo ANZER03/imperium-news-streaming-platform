@@ -32,6 +32,7 @@ Out of scope:
 ## Documentation pointers
 
 - Readiness workflow: [`../operations/source-cdc-readiness-runbook.md`](../operations/source-cdc-readiness-runbook.md)
+- Signal operations guide: [`../operations/cdc-signal-operations-guide.md`](../operations/cdc-signal-operations-guide.md)
 - Issue group: [Phase 2 parent issue #8](https://github.com/ANZER03/imperium-news-streaming-platform/issues/8)
 
 ## Reference CDC assets
@@ -48,6 +49,7 @@ Out of scope:
 - Topic bootstrap script: `apps/ingestion/topic-bootstrap/metadata/`
 - Metadata signal emitter: `apps/ingestion/connector-bootstrap/metadata/emit-full-backfill-signal.sh`
 - Sink templates: `apps/ingestion/sink-templates/metadata/`
+- Incremental snapshot throughput is tuned via `METADATA_CDC_INCREMENTAL_SNAPSHOT_CHUNK_SIZE` in the connector manifest.
 - Asset validation: `scripts/validate-metadata-cdc-assets.sh`
 
 ## News CDC assets

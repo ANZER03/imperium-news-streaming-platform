@@ -95,6 +95,7 @@ Record one of these outcomes:
 ## Next phase links
 
 - Phase 2 decision note: [`../product/phase-2-cdc-decision.md`](../product/phase-2-cdc-decision.md)
+- Signal operations guide: [`./cdc-signal-operations-guide.md`](./cdc-signal-operations-guide.md)
 - Issue group: [Phase 2 parent issue #8](https://github.com/ANZER03/imperium-news-streaming-platform/issues/8)
 
 ## News backfill policy

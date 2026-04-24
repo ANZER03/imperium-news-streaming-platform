@@ -305,7 +305,7 @@ services:
       retries: 10
       start_period: 20s
     volumes:
-      - pfe-project-postgres-data:/var/lib/postgresql/data
+      - source-db:/var/lib/postgresql/data
       - ./infrastructure/postgres/initdb:/docker-entrypoint-initdb.d:ro
 
 networks:
@@ -330,6 +330,6 @@ volumes:
     name: imperium-spark-master-data
   spark-worker-1-data:
     name: imperium-spark-worker-1-data
-  pfe-project-postgres-data:
+  source-db:
     external: true
-    name: pfe-project_postgres_data
+    name: source-db

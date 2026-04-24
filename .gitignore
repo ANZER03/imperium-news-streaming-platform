@@ -13,8 +13,12 @@ Thumbs.db
 
 # Environment files
 .env
+.env.prod
 .env.local
 .env.*.local
+.codex
+.jsonl
+pi-session-*.html
 
 # Build artifacts
 dist/
@@ -22,6 +26,10 @@ build/
 out/
 target/
 SOURCE-TABLES-SCHEMAS.md
+infra/source-db-clone/.state/
+infra/source-db-clone/.tmp/
+infra/source-db-clone/exports/
+infra/source-db-clone/*.csv
 
 # Dependency caches
 node_modules/

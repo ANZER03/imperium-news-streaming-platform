@@ -15,6 +15,7 @@
     "publication.autocreate.mode": "disabled",
     "table.include.list": "${METADATA_CDC_TABLES}",
     "snapshot.mode": "never",
+    "incremental.snapshot.chunk.size": "${METADATA_CDC_INCREMENTAL_SNAPSHOT_CHUNK_SIZE}",
     "signal.enabled.channels": "source,kafka",
     "signal.data.collection": "public.debezium_signal",
     "signal.kafka.bootstrap.servers": "${KAFKA_BOOTSTRAP_SERVERS}",

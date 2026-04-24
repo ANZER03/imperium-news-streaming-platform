@@ -368,12 +368,15 @@ These tables provide both content and context necessary for processing and servi
 * User activity tracking pipeline
 * Event-based analytics
 * Trending computation
+* Phase 2 decision note: [`docs/product/phase-2-cdc-decision.md`](docs/product/phase-2-cdc-decision.md)
+* Source readiness runbook: [`docs/operations/source-cdc-readiness-runbook.md`](docs/operations/source-cdc-readiness-runbook.md)
 
 ### Phase 3
 
-* Personalized feed generation
-* Recommendation models
-* Ranking systems
+* Canonical article processing and serving projections
+* Topic taxonomy and model-only classification
+* Redis feed projection and Qdrant vector projection
+* Phase 3 PRD: [`docs/product/phase-3-processing-canonical-article-prd.md`](docs/product/phase-3-processing-canonical-article-prd.md)
 
 ### Phase 4
 

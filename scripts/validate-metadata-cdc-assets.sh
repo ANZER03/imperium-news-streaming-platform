@@ -26,6 +26,7 @@ grep -q '"snapshot.mode": "never"' "$CONNECTOR_FILE" || fail "metadata connector
 grep -q '"signal.enabled.channels": "source,kafka"' "$CONNECTOR_FILE" || fail "metadata connector must use Kafka signals"
 grep -q '"signal.kafka.topic": "${METADATA_CDC_SIGNAL_TOPIC}"' "$CONNECTOR_FILE" || fail "metadata connector must define a signal topic"
 grep -q '"table.include.list": "${METADATA_CDC_TABLES}"' "$CONNECTOR_FILE" || fail "metadata connector must include the metadata tables"
+grep -q '"incremental.snapshot.chunk.size": "${METADATA_CDC_INCREMENTAL_SNAPSHOT_CHUNK_SIZE}"' "$CONNECTOR_FILE" || fail "metadata connector must define an incremental snapshot chunk size"
 grep -q 'require_empty_signal_topic' "$REGISTER_SCRIPT" || fail "metadata connector registration must guard against retained signal replay"
 grep -q '"id": "${CDC_SIGNAL_ID}"' "$SIGNAL_FILE" || fail "metadata signal payload must accept a generated signal id"
 grep -q 'CDC_SIGNAL_ID' "$SIGNAL_SCRIPT" || fail "metadata signal emitter must generate unique signal ids"
@@ -33,8 +34,10 @@ grep -q 'CDC_SIGNAL_ID' "$SIGNAL_SCRIPT" || fail "metadata signal emitter must g
 for topic in \
   'imperium.metadata.public.table_authority' \
   'imperium.metadata.public.table_links' \
+  'imperium.metadata.public.debezium_signal' \
   'imperium.metadata.schema-history' \
-  'imperium.metadata.signals'; do
+  'imperium.metadata.signals' \
+  '__debezium-heartbeat.imperium.metadata'; do
   grep -q "$topic" "$TOPIC_SCRIPT" || fail "metadata topic bootstrap missing $topic"
 done
 
@@ -45,5 +48,6 @@ grep -q '"insert.mode": "upsert"' "$LINKS_SINK" || fail "links sink template mus
 
 grep -q '^METADATA_CDC_CONNECTOR_NAME=imperium-metadata-cdc$' "$ROOT_DIR/.env.example" || fail "missing metadata CDC env vars"
 grep -q '^METADATA_CDC_TABLES=public.table_authority,public.table_links$' "$ROOT_DIR/.env.example" || fail "missing metadata CDC table list"
+grep -q '^METADATA_CDC_INCREMENTAL_SNAPSHOT_CHUNK_SIZE=8192$' "$ROOT_DIR/.env.example" || fail "missing metadata CDC incremental snapshot chunk size"
 grep -q '^METADATA_SINK_AUTHORITY_NAME=imperium-metadata-authority-sink$' "$ROOT_DIR/.env.example" || fail "missing authority sink env var"
 grep -q '^METADATA_SINK_LINKS_NAME=imperium-metadata-links-sink$' "$ROOT_DIR/.env.example" || fail "missing links sink env var"
