@@ -23,6 +23,20 @@ global and country sorted-set feeds before classification completes. Redis cards
 exclude full body text, and projector failures are captured so Redis outages do
 not block independent projectors.
 
+The central embedding gateway slice implements GitHub issue `#18`: Spark jobs
+and topic embedding refresh code call an internal gateway abstraction instead of
+holding provider credentials in executor code. The gateway owns NVIDIA
+`baai/bge-m3` configuration, 8192-item batch limits, global 40 RPM throttling,
+retry/backoff behavior for 429 and 5xx provider failures, split-before-final
+item failure, and request metrics.
+
+The embedding similarity classification slice implements GitHub issue `#19`:
+classify pending canonical articles by embedding the title plus the first 30
+cleaned body words through the central gateway, comparing against active leaf
+topic embeddings from PostgreSQL, deriving root topic metadata from the
+taxonomy, and emitting an updated canonical article with
+`classification_status=classified` or `classification_status=failed`.
+
 ## Local Tests
 
 ```bash
@@ -59,6 +73,24 @@ producer.
 `imperium_news_pipeline.phase3.redis_projection` owns Redis feed-card and
 non-topic feed projection behind a small Redis client abstraction. Topic feed
 membership remains a later classification-dependent slice.
+
+`imperium_news_pipeline.phase3.embedding_gateway` owns the central embedding
+gateway contracts. `EmbeddingGateway` depends on an `EmbeddingProvider`
+abstraction; `NvidiaEmbeddingProvider` is the provider adapter that holds the
+API key and translates retryable NVIDIA HTTP responses into gateway retry
+signals. Downstream Spark code should depend on the gateway interface and pass
+article/topic text only.
+
+`imperium_news_pipeline.phase3.classification` owns embedding-similarity
+classification. The classifier depends on the central gateway abstraction,
+`TopicEmbeddingRepository`, `TopicTaxonomyService`, and existing cleaned article
+repository / producer abstractions so reclassification updates the same
+`article_id` state and emits the latest canonical article result.
+
+`jobs/nvidia_embedding_smoke.py` is a manual smoke entrypoint for the real
+NVIDIA API. It reads the `NVIDIA_*` environment variables, sends two short
+texts through the gateway, and prints a compact success summary. It does not
+log the API key or persist results.
 
 ## Spark Submit Model
 

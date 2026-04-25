@@ -48,8 +48,8 @@ Usage:
     - Concrete Kafka producer wiring is still deployment-boundary work. The `#14` core contracts and PostgreSQL repository adapter are ready for the next Spark integration slice.
     - Runtime submission should use one dedicated Spark driver container per long-running Phase 3 job, with separate env, logs, restart policy, and checkpoint location per job.
 
-- [ ] `#17` Phase 3: Topic taxonomy and topic embeddings
-  - Status: Partially implemented on 2026-04-25; awaiting human review of seed taxonomy content before completion.
+- [x] `#17` Phase 3: Topic taxonomy and topic embeddings
+  - Status: Completed on 2026-04-25 after human review approval.
   - Related issues: pairs naturally with `#18` for later `#19`.
   - Notes: Independent root slice for taxonomy schema, seed content, embedding storage, and human review.
   - Progress notes:
@@ -60,13 +60,29 @@ Usage:
   - Verification:
     - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 9 tests.
     - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
-  - Remaining incomplete acceptance criteria:
-    - Human review must confirm taxonomy seed content before broad use.
+  - Completion note:
+    - Human review confirmed the seed taxonomy content is acceptable for Phase 3 broad use.
 
-- [ ] `#18` Phase 3: Central embedding gateway
-  - Status: Not started.
+- [x] `#18` Phase 3: Central embedding gateway
+  - Status: Completed on 2026-04-25.
   - Related issues: pairs naturally with `#17`; unlocks `#19` and `#21`.
-  - Notes: Independent root slice for provider abstraction, batching, 40 RPM rate limit, retries, and metrics.
+  - Notes: Independent root slice for provider abstraction, batching, 40 RPM rate limit, retries, split-before-final-failure, and metrics.
+  - Files changed:
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/embedding_gateway.py`
+    - `tests/processing/test_embedding_gateway.py`
+  - Acceptance evidence:
+    - `EmbeddingGateway` depends on an `EmbeddingProvider` protocol; `NvidiaEmbeddingProvider` is the NVIDIA HTTP adapter.
+    - `EmbeddingGatewayConfig` supports base URL, model, batch size, rate limit RPM, truncate mode, API key, retry count, and backoff.
+    - Default and maximum batch size are both 8192.
+    - Default global NVIDIA request rate is 40 RPM through `InMemoryRateLimiter`.
+    - Retryable provider errors cover NVIDIA 429 and 5xx HTTP responses and use exponential backoff.
+    - Repeatedly failing multi-item batches split recursively before the single item becomes a final failure.
+    - API key is held by the gateway/provider adapter boundary, not by Spark executor-facing request items.
+    - Metrics track request count, latest RPM usage, batch sizes, latency, retry count, and failures.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 21 tests.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
 
 - [x] `#15` Phase 3: Spark dimension materialization with partial eligibility
   - Status: Completed on 2026-04-25.
@@ -119,18 +135,35 @@ Usage:
   - Follow-ups:
     - Root-topic feed membership remains in `#20` after classification.
 
-- [ ] `#19` Phase 3: Embedding similarity classification
-  - Status: Blocked by `#17` and `#18`.
+- [x] `#19` Phase 3: Embedding similarity classification
+  - Status: Completed on 2026-04-25.
   - Related issues: supports `#20`, `#21`, and `#23`.
   - Notes: Classifies by title plus first 30 cleaned body words against active PostgreSQL topic embeddings.
+  - Files changed:
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/canonical.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/classification.py`
+    - `tests/processing/test_embedding_similarity_classification.py`
+  - Acceptance evidence:
+    - `classification_input_text` uses article title plus the first 30 words from `body_text_clean`.
+    - `EmbeddingSimilarityClassifier` depends on the central gateway abstraction and does not call a provider directly.
+    - Classifier compares the article embedding against active leaf topic embeddings loaded through `TopicEmbeddingRepository`.
+    - Successful classification sets `primary_topic_id`, `primary_topic_label`, top 3 `topic_candidates`, and `topic_confidence` from cosine similarity.
+    - `root_topic_id` and `root_topic_label` are derived through `TopicTaxonomyService`.
+    - Updated canonical articles use `classification_status=classified` and `classification_method=embedding_similarity`.
+    - Gateway failure or missing topic matches keep the article visible for non-topic feeds and set `classification_status=failed`.
+    - Reclassification upserts the same `article_id` cleaned row so the latest result wins without duplicate cleaned article rows.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 25 tests.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
 
 - [ ] `#20` Phase 3: Redis root topic feed updates
-  - Status: Blocked by `#16` and `#19`.
+  - Status: Not started.
   - Related issues: supports `#22` and `#23`.
   - Notes: Root-topic and country-root-topic Redis feed membership after classification.
 
 - [ ] `#21` Phase 3: Qdrant vector projection
-  - Status: Blocked by `#18` and `#19`.
+  - Status: Not started.
   - Related issues: supports `#22` and `#23`.
   - Notes: Independent Qdrant projection with vector payload filters and visibility updates.
 
