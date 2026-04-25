@@ -43,11 +43,20 @@ classification completes, Redis adds `article_id` membership to
 removes old memberships on reclassification, and cleans them up on hide/delete
 without ever using leaf-topic feed keys.
 
+Use `#20` for browse surfaces. Topic pages and country+topic pages can read
+Redis directly after classification. Reclassification must rerun the same
+article ID so old root-topic membership is removed before new membership is
+written.
+
 The Qdrant projection slice implements GitHub issue `#21`: classified canonical
 articles are projected independently into Qdrant with article embeddings and
 filter payload fields for `article_id`, country/root/primary topic IDs,
 secondary topic IDs, topic tags, authority/language/rubric IDs, `published_at`,
 `is_visible`, and `source_domain`.
+
+Use `#21` for semantic search and vector filtering. Qdrant stores embedding plus
+payload filters so later search jobs can ask for topic, country, language, or
+visibility constraints without depending on Redis state.
 
 ## Local Tests
 
