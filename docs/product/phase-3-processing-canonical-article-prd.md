@@ -121,6 +121,114 @@ Primary deep modules:
 Each module should expose a small stable interface and hide provider-specific
 details behind adapters.
 
+## 6.1 Runtime Topology
+
+Phase 3 should run as separate long-running runtime units. Each Spark job should
+be submitted from its own driver container instead of using `spark-master` as
+the shared driver for every job.
+
+Default Spark cluster roles:
+- `spark-master` coordinates the cluster only
+- `spark-worker` containers execute tasks
+- one dedicated driver container owns one long-running Spark job
+- each streaming job uses its own stable checkpoint location
+- each job has separate environment, logs, restart policy, and failure boundary
+
+Recommended runtime units:
+1. `phase3-dimension-materializer`
+   - Spark job.
+   - Reads reference and metadata CDC topics.
+   - Writes curated PostgreSQL dimension tables.
+2. `phase3-canonical-article-processor`
+   - Spark job.
+   - Reads news CDC.
+   - Enriches from curated PostgreSQL dimensions.
+   - Writes cleaned article PostgreSQL records.
+   - Emits canonical article events with `classification_status = pending`.
+3. `phase3-topic-embedding-refresh`
+   - Batch Python or Spark job.
+   - Reads PostgreSQL topic taxonomy.
+   - Calls the embedding gateway.
+   - Writes PostgreSQL topic embeddings.
+4. `phase3-embedding-gateway`
+   - Internal service, not a Spark job.
+   - Owns NVIDIA API keys, batching, global rate limiting, retries, and metrics.
+5. `phase3-article-classifier`
+   - Spark job.
+   - Reads pending canonical article events.
+   - Calls the embedding gateway for article embeddings.
+   - Compares article embeddings against active PostgreSQL topic embeddings.
+   - Emits updated canonical article events with classification fields.
+6. `phase3-redis-projector`
+   - Python worker or Spark job.
+   - Reads canonical article events.
+   - Writes Redis cards, global feeds, country feeds, and root topic feeds.
+   - Handles delete and visibility cleanup.
+7. `phase3-qdrant-projector`
+   - Python worker or Spark job.
+   - Reads canonical article events that are eligible for vector indexing.
+   - Writes Qdrant vectors and filter payloads.
+   - Marks hidden or deleted articles as `is_visible = false`.
+
+Target runtime count:
+- 7 runtime units total
+- 4 Spark driver containers when `phase3-topic-embedding-refresh` runs on Spark
+- 3 non-Spark service or worker containers
+
+Spark driver containers must all submit to the same cluster with
+`--master spark://spark-master:7077`, but they must not share checkpoint
+directories. A streaming checkpoint path is part of a job identity and belongs
+to exactly one job.
+
+## 6.2 Stores, Tables, Collections, and Topics
+
+Physical stores:
+- PostgreSQL for durable cleaned storage, curated dimensions, topic taxonomy,
+  topic embeddings, classification status, and projection state
+- Redis for recent feed cards and feed sorted sets
+- Qdrant for article vectors and semantic-search filter payloads
+
+Recommended PostgreSQL Phase 3 tables:
+- `phase3_cleaned_articles`
+- `phase3_dim_links`
+- `phase3_dim_authorities`
+- `phase3_dim_countries`
+- `phase3_dim_rubrics`
+- `phase3_dim_languages`
+- `phase3_dim_seditions`
+- `phase3_topic_taxonomy`
+- `phase3_topic_embeddings`
+- `phase3_projection_state`
+
+Qdrant collections:
+- `phase3_articles`
+
+Redis key families:
+- `article:{article_id}`
+- `feed:global`
+- `feed:country:{country_id}`
+- `feed:topic:{root_topic_id}`
+- `feed:country:{country_id}:topic:{root_topic_id}`
+
+Phase 3 consumes existing Phase 2 CDC topics for:
+- `table_news`
+- `table_links`
+- `table_authority`
+- `table_pays`
+- `table_rubrique`
+- `table_langue`
+- `table_sedition`
+
+Minimum new Phase 3 Kafka topics:
+- `phase3.canonical-articles`
+- `phase3.canonical-articles.dlq`
+
+Recommended new Phase 3 Kafka topics:
+- `phase3.canonical-articles`
+- `phase3.canonical-articles.dlq`
+- `phase3.dimension-events`
+- `phase3.classification-failures`
+
 ## 7. Data Model
 
 ### 7.1 Canonical Article
@@ -556,4 +664,3 @@ Canonical domain terms are maintained in `UBIQUITOUS_LANGUAGE.md`. The PRD
 should use those terms consistently, especially for canonical article, cleaned
 article, feed card, root topic, primary topic, topic embedding, article
 embedding, projection, projector, and visibility.
-
