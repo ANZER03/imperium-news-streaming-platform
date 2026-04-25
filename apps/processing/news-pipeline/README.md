@@ -37,6 +37,18 @@ topic embeddings from PostgreSQL, deriving root topic metadata from the
 taxonomy, and emitting an updated canonical article with
 `classification_status=classified` or `classification_status=failed`.
 
+The Redis root-topic feed slice implements GitHub issue `#20`: once
+classification completes, Redis adds `article_id` membership to
+`feed:topic:{root_topic_id}` and `feed:country:{country_id}:topic:{root_topic_id}`,
+removes old memberships on reclassification, and cleans them up on hide/delete
+without ever using leaf-topic feed keys.
+
+The Qdrant projection slice implements GitHub issue `#21`: classified canonical
+articles are projected independently into Qdrant with article embeddings and
+filter payload fields for `article_id`, country/root/primary topic IDs,
+secondary topic IDs, topic tags, authority/language/rubric IDs, `published_at`,
+`is_visible`, and `source_domain`.
+
 ## Local Tests
 
 ```bash
@@ -86,6 +98,15 @@ classification. The classifier depends on the central gateway abstraction,
 `TopicEmbeddingRepository`, `TopicTaxonomyService`, and existing cleaned article
 repository / producer abstractions so reclassification updates the same
 `article_id` state and emits the latest canonical article result.
+
+`imperium_news_pipeline.phase3.redis_projection` also owns root-topic feed
+membership updates for classified articles. Reclassification removes prior root
+memberships before writing the new root and optional country+root feed keys.
+
+`imperium_news_pipeline.phase3.qdrant_projection` owns vector projection behind
+small vector-gateway and Qdrant-client abstractions so Qdrant health remains
+independent from Redis projection health. `projection_fanout.py` is a minimal
+coordinator that invokes both projectors and preserves failure isolation.
 
 `jobs/nvidia_embedding_smoke.py` is a manual smoke entrypoint for the real
 NVIDIA API. It reads the `NVIDIA_*` environment variables, sends two short

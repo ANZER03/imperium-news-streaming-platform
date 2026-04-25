@@ -69,6 +69,14 @@ class DimensionSnapshot:
     def rubric_title(self) -> str | None:
         return _optional_text(self.rubric, "rubric_title")
 
+    @property
+    def language_id(self) -> int | None:
+        return _optional_int(self.language, "language_id")
+
+    @property
+    def language_code(self) -> str | None:
+        return _optional_text(self.language, "language_code")
+
 
 @dataclass
 class InMemoryDimensionRepository:

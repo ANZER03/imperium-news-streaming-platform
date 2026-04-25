@@ -82,6 +82,8 @@ class CanonicalArticle:
     source_domain: str | None
     rubric_id: int | None
     rubric_title: str | None
+    language_id: int | None
+    language_code: str | None
     root_topic_id: int | None
     root_topic_label: str | None
     primary_topic_id: int | None
@@ -127,6 +129,8 @@ class CanonicalArticle:
             "source_domain": self.source_domain,
             "rubric_id": self.rubric_id,
             "rubric_title": self.rubric_title,
+            "language_id": self.language_id,
+            "language_code": self.language_code,
             "root_topic_id": self.root_topic_id,
             "root_topic_label": self.root_topic_label,
             "primary_topic_id": self.primary_topic_id,
@@ -251,6 +255,8 @@ class CanonicalArticleBuilder:
             source_domain=getattr(dimensions, "source_domain", None),
             rubric_id=raw.rubrique_id,
             rubric_title=getattr(dimensions, "rubric_title", None),
+            language_id=getattr(dimensions, "language_id", raw.langue_id),
+            language_code=getattr(dimensions, "language_code", None),
             root_topic_id=None,
             root_topic_label=None,
             primary_topic_id=None,

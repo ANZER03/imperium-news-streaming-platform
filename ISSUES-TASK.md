@@ -157,15 +157,55 @@ Usage:
     - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 25 tests.
     - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
 
-- [ ] `#20` Phase 3: Redis root topic feed updates
-  - Status: Not started.
+- [x] `#20` Phase 3: Redis root topic feed updates
+  - Status: Completed on 2026-04-25.
   - Related issues: supports `#22` and `#23`.
-  - Notes: Root-topic and country-root-topic Redis feed membership after classification.
+  - Notes: Extended Redis projection to manage root-topic and country+root-topic sorted-set membership after classification.
+  - Files changed:
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/canonical.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/dimensions.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/redis_projection.py`
+    - `tests/processing/test_phase3_dimensions_and_redis.py`
+  - Acceptance evidence:
+    - Classified articles with `root_topic_id` are added to `feed:topic:{root_topic_id}`.
+    - Classified articles with `country_id` and `root_topic_id` are added to `feed:country:{country_id}:topic:{root_topic_id}`.
+    - Root-topic projection uses `root_topic_id` only; leaf topics remain canonical/Qdrant metadata and are not used as Redis feed keys.
+    - `update_topic_membership()` removes prior root-topic memberships before writing the latest classified root, covering reclassification.
+    - Hidden or deleted articles remove topic memberships through the same cleanup path.
+    - Sorted-set membership is idempotent by `article_id` because `zadd` overwrites the same member score.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 30 tests.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
+  - Issues faced:
+    - Existing canonical article records did not yet expose language metadata needed by the adjacent Qdrant slice.
+  - Solutions:
+    - Expanded canonical/dimension metadata once so Redis and Qdrant projections share the same article contract.
 
-- [ ] `#21` Phase 3: Qdrant vector projection
-  - Status: Not started.
+- [x] `#21` Phase 3: Qdrant vector projection
+  - Status: Completed on 2026-04-25.
   - Related issues: supports `#22` and `#23`.
-  - Notes: Independent Qdrant projection with vector payload filters and visibility updates.
+  - Notes: Added an independent Qdrant projector and minimal projection fanout that keeps Redis and Qdrant failures isolated.
+  - Files changed:
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/canonical.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/dimensions.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/projection_fanout.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/qdrant_projection.py`
+    - `tests/processing/test_qdrant_projection.py`
+  - Acceptance evidence:
+    - Qdrant projection writes article vector embeddings keyed by `article_id`.
+    - Payload includes `article_id`, `country_id`, `root_topic_id`, `primary_topic_id`, `secondary_topic_ids`, `topic_tags`, `authority_id`, `language_id`, `rubric_id`, `published_at`, `is_visible`, and `source_domain`.
+    - Hidden or deleted articles are upserted with `is_visible=false`.
+    - `ProjectionFanout` executes Redis and Qdrant projectors independently; one failure returns errors without blocking the other result.
+    - Qdrant projection is idempotent by `article_id` because repeated upserts replace the same point.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 30 tests.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
+  - Issues faced:
+    - No existing Qdrant boundary existed in the Phase 3 pipeline.
+  - Solutions:
+    - Introduced small `QdrantClient` and article-vector gateway protocols plus in-memory adapters so the slice stays testable and deployment wiring can be added later.
 
 - [ ] `#22` Phase 3: Replay-safe projection state
   - Status: Blocked by `#16`, `#20`, and `#21`.

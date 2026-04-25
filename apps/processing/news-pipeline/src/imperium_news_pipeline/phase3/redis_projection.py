@@ -25,6 +25,7 @@ class RedisClient(Protocol):
 class RedisProjectionResult:
     projected: bool
     removed: bool
+    updated_topic_feeds: bool = False
     errors: tuple[str, ...] = ()
 
 
@@ -45,7 +46,11 @@ class RedisFeedProjector:
             self.redis.zadd("feed:global", {article.article_id: score})
             if article.country_id is not None:
                 self.redis.zadd(f"feed:country:{article.country_id}", {article.article_id: score})
-            return RedisProjectionResult(projected=True, removed=False)
+            updated_topic_feeds = False
+            if article.classification_status == "classified" and article.root_topic_id is not None:
+                self._write_topic_membership(article, score)
+                updated_topic_feeds = True
+            return RedisProjectionResult(projected=True, removed=False, updated_topic_feeds=updated_topic_feeds)
         except Exception as exc:  # pragma: no cover - branch asserted via behavior, exact client error varies.
             return RedisProjectionResult(projected=False, removed=False, errors=(str(exc),))
 
@@ -59,8 +64,54 @@ class RedisFeedProjector:
             if article.country_id is not None:
                 self.redis.zrem(f"feed:country:{article.country_id}:topic:{article.root_topic_id}", article.article_id)
 
+    def update_topic_membership(
+        self,
+        article: CanonicalArticle,
+        previous_root_topic_id: int | None = None,
+        previous_country_id: int | None = None,
+    ) -> RedisProjectionResult:
+        try:
+            if (
+                article.is_deleted
+                or not article.is_visible
+                or article.classification_status != "classified"
+                or article.root_topic_id is None
+            ):
+                self._remove_topic_membership(
+                    article.article_id,
+                    previous_root_topic_id or article.root_topic_id,
+                    previous_country_id if previous_country_id is not None else article.country_id,
+                )
+                return RedisProjectionResult(projected=False, removed=True, updated_topic_feeds=True)
+
+            score = _score(article.published_at or article.crawled_at)
+            self._remove_topic_membership(article.article_id, previous_root_topic_id, previous_country_id)
+            self._write_topic_membership(article, score)
+            return RedisProjectionResult(projected=True, removed=False, updated_topic_feeds=True)
+        except Exception as exc:  # pragma: no cover
+            return RedisProjectionResult(projected=False, removed=False, errors=(str(exc),))
+
     def _eligible_for_global_feed(self, article: CanonicalArticle) -> bool:
         return bool(article.title and article.url and (article.published_at or article.crawled_at))
+
+    def _write_topic_membership(self, article: CanonicalArticle, score: float) -> None:
+        if article.root_topic_id is None:
+            return
+        self.redis.zadd(f"feed:topic:{article.root_topic_id}", {article.article_id: score})
+        if article.country_id is not None:
+            self.redis.zadd(f"feed:country:{article.country_id}:topic:{article.root_topic_id}", {article.article_id: score})
+
+    def _remove_topic_membership(
+        self,
+        article_id: str,
+        root_topic_id: int | None,
+        country_id: int | None,
+    ) -> None:
+        if root_topic_id is None:
+            return
+        self.redis.zrem(f"feed:topic:{root_topic_id}", article_id)
+        if country_id is not None:
+            self.redis.zrem(f"feed:country:{country_id}:topic:{root_topic_id}", article_id)
 
 
 @dataclass

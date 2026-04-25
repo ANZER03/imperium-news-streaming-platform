@@ -191,6 +191,81 @@ class DimensionAndRedisProjectionTests(unittest.TestCase):
         self.assertNotIn("news:45", redis.sorted_sets["feed:global"])
         self.assertEqual(failed.errors, ("redis unavailable",))
 
+    def test_redis_root_topic_membership_updates_on_classification_and_reclassification(self) -> None:
+        article = _classified_article(root_topic_id=100, country_id=504)
+        redis = InMemoryRedisClient()
+        projector = RedisFeedProjector(redis)
+
+        first = projector.update_topic_membership(article)
+        reclassified = type(article)(**{**article.__dict__, "root_topic_id": 300, "root_topic_label": "Technology"})
+        second = projector.update_topic_membership(
+            reclassified,
+            previous_root_topic_id=100,
+            previous_country_id=504,
+        )
+
+        self.assertTrue(first.updated_topic_feeds)
+        self.assertIn("news:77", redis.sorted_sets["feed:topic:300"])
+        self.assertIn("news:77", redis.sorted_sets["feed:country:504:topic:300"])
+        self.assertNotIn("news:77", redis.sorted_sets["feed:topic:100"])
+        self.assertNotIn("news:77", redis.sorted_sets["feed:country:504:topic:100"])
+
+        first_score = redis.sorted_sets["feed:topic:300"]["news:77"]
+        second_score = redis.sorted_sets["feed:country:504:topic:300"]["news:77"]
+        self.assertEqual(first_score, second_score)
+
+    def test_redis_root_topic_membership_cleanup_handles_hidden_and_idempotent_updates(self) -> None:
+        article = _classified_article(root_topic_id=100, country_id=250)
+        redis = InMemoryRedisClient()
+        projector = RedisFeedProjector(redis)
+
+        projector.update_topic_membership(article)
+        projector.update_topic_membership(article, previous_root_topic_id=100, previous_country_id=250)
+        hidden = type(article)(**{**article.__dict__, "is_visible": False})
+        removed = projector.update_topic_membership(
+            hidden,
+            previous_root_topic_id=100,
+            previous_country_id=250,
+        )
+
+        self.assertTrue(removed.removed)
+        self.assertNotIn("news:77", redis.sorted_sets["feed:topic:100"])
+        self.assertNotIn("news:77", redis.sorted_sets["feed:country:250:topic:100"])
+
+
+def _classified_article(root_topic_id: int, country_id: int):
+    processor = CanonicalArticleFirstEmitProcessor(
+        builder=CanonicalArticleBuilder(
+            id_provider=NewsArticleIdProvider(),
+            clock=FixedClock(datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)),
+        ),
+        repository=InMemoryCleanedArticleRepository(),
+        producer=InMemoryCanonicalArticleProducer(),
+    )
+    article = processor.process(
+        RawNewsRecord(
+            id=77,
+            link_id=1,
+            authority_id=2,
+            rubrique_id=3,
+            more_title="Classified feed story",
+            more_url="https://example.test/classified",
+            pubdate=datetime(2026, 4, 24, 8, 30, tzinfo=timezone.utc),
+            valide=True,
+        )
+    ).article
+    return type(article)(
+        **{
+            **article.__dict__,
+            "country_id": country_id,
+            "root_topic_id": root_topic_id,
+            "root_topic_label": "Politics",
+            "primary_topic_id": 101,
+            "primary_topic_label": "Elections",
+            "classification_status": "classified",
+        }
+    )
+
 
 if __name__ == "__main__":
     unittest.main()
