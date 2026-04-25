@@ -68,15 +68,56 @@ Usage:
   - Related issues: pairs naturally with `#17`; unlocks `#19` and `#21`.
   - Notes: Independent root slice for provider abstraction, batching, 40 RPM rate limit, retries, and metrics.
 
-- [ ] `#15` Phase 3: Spark dimension materialization with partial eligibility
-  - Status: Not started; unblocked by completed `#14`.
+- [x] `#15` Phase 3: Spark dimension materialization with partial eligibility
+  - Status: Completed on 2026-04-25.
   - Related issues: supports `#16` and `#23`.
-  - Notes: Spark Structured Streaming dimension projection into curated PostgreSQL tables.
+  - Notes: Implemented Spark Structured Streaming dimension materialization boundary, curated dimension domain projection, inactive deletes, compacted-event publishing abstraction, enrichment lookup, and partial eligibility integration with canonical article processing.
+  - Files changed:
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/jobs/dimension_materialization.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/canonical.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/dimensions.py`
+    - `infrastructure/postgres/phase3/03_curated_dimensions.sql`
+    - `tests/processing/test_phase3_dimensions_and_redis.py`
+  - Acceptance evidence:
+    - Spark job boundary consumes links, authority, sedition, country, rubric, and language CDC topics from env-configured Kafka topics.
+    - Curated records store filtered fields only; irrelevant raw fields are discarded in tests.
+    - Optional compacted dimension publication is modeled by `DimensionEventProducer` and key format `{dimension_type}:{dimension_id}`.
+    - Curated projection is owned by `DimensionMaterializer`; sink connectors remain outside this ownership boundary.
+    - Country resolution prefers `authority.sedition_id -> sedition.country_id -> countries` and falls back to `links.country_id`.
+    - Deletes become inactive curated records; inactive dimensions are not returned for enrichment.
+    - Writes are idempotent by dimension type and dimension ID.
+    - Canonical processing uses `DimensionEnrichmentService`, keeps minimum-field failures as `pending_required`, and emits visible partial articles when optional dimensions are missing.
+    - Projection eligibility fields now derive from available curated country/source/rubric fields.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 15 tests.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
+  - Issues faced:
+    - Runtime PostgreSQL/Kafka adapters are deployment-boundary work, matching the existing #14 pattern.
+  - Solutions:
+    - Kept core projection and enrichment behavior testable through repository, producer, and Spark micro-batch abstractions.
 
-- [ ] `#16` Phase 3: Redis feed card projection
-  - Status: Blocked by `#14` and `#15`.
+- [x] `#16` Phase 3: Redis feed card projection
+  - Status: Completed on 2026-04-25.
   - Related issues: supports `#20`, `#22`, and `#23`.
-  - Notes: Global and country feeds before classification completes.
+  - Notes: Implemented independent Redis feed-card projector for classification-pending canonical articles.
+  - Files changed:
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/redis_projection.py`
+    - `tests/processing/test_phase3_dimensions_and_redis.py`
+  - Acceptance evidence:
+    - `article:{article_id}` stores compact feed card fields only.
+    - `feed:global` stores `article_id` members scored by `published_at` or `crawled_at`.
+    - `feed:country:{country_id}` is written only when `country_id` exists.
+    - Full body text is excluded from Redis cards.
+    - Hidden or deleted articles remove the card plus global, country, and known topic feed memberships.
+    - Redis client failures are captured in `RedisProjectionResult.errors` instead of propagating through the caller.
+    - Projector depends on a Redis client abstraction and is covered by observable in-memory Redis state tests.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 15 tests.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
+  - Follow-ups:
+    - Root-topic feed membership remains in `#20` after classification.
 
 - [ ] `#19` Phase 3: Embedding similarity classification
   - Status: Blocked by `#17` and `#18`.

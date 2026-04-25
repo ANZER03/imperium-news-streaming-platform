@@ -209,7 +209,7 @@ class CanonicalArticleBuilder:
     schema_version: int = SCHEMA_VERSION
     excerpt_word_limit: int = 30
 
-    def build(self, raw: RawNewsRecord) -> CanonicalArticle:
+    def build(self, raw: RawNewsRecord, dimensions: Any | None = None) -> CanonicalArticle:
         title = normalize_text(raw.more_title)
         url = normalize_text(raw.more_url)
         published_at = raw.pubdate or raw.crawl_date
@@ -225,7 +225,7 @@ class CanonicalArticleBuilder:
 
         body_text = normalize_text(raw.more_inner_text)
         body_text_clean = clean_body_text(body_text)
-        missing_dimensions = _missing_dimension_names(raw)
+        missing_dimensions = (*_missing_dimension_names(raw), *_snapshot_missing_dimensions(dimensions))
 
         if missing_required:
             dimension_status = DIMENSION_STATUS_PENDING_REQUIRED
@@ -242,12 +242,12 @@ class CanonicalArticleBuilder:
             source_news_id=raw.id,
             link_id=raw.link_id,
             authority_id=raw.authority_id,
-            country_id=None,
-            country_name=None,
-            source_name=None,
-            source_domain=None,
+            country_id=getattr(dimensions, "country_id", None),
+            country_name=getattr(dimensions, "country_name", None),
+            source_name=getattr(dimensions, "source_name", None),
+            source_domain=getattr(dimensions, "source_domain", None),
             rubric_id=raw.rubrique_id,
-            rubric_title=None,
+            rubric_title=getattr(dimensions, "rubric_title", None),
             root_topic_id=None,
             root_topic_label=None,
             primary_topic_id=None,
@@ -288,9 +288,18 @@ class CanonicalArticleFirstEmitProcessor:
     builder: CanonicalArticleBuilder
     repository: CleanedArticleRepository
     producer: CanonicalArticleProducer
+    dimension_enrichment: Any | None = None
 
     def process(self, raw: RawNewsRecord) -> ProcessResult:
-        article = self.builder.build(raw)
+        dimensions = None
+        if self.dimension_enrichment is not None:
+            dimensions = self.dimension_enrichment.snapshot_for(
+                link_id=raw.link_id,
+                authority_id=raw.authority_id,
+                rubric_id=raw.rubrique_id,
+                language_id=raw.langue_id,
+            )
+        article = self.builder.build(raw, dimensions=dimensions)
         should_emit = self.repository.upsert(
             CleanedArticleRecord(
                 article_id=article.article_id,
@@ -353,6 +362,12 @@ def _missing_dimension_names(raw: RawNewsRecord) -> tuple[str, ...]:
     if not raw.rubrique_id:
         missing.append("rubric_id")
     return tuple(missing)
+
+
+def _snapshot_missing_dimensions(dimensions: Any | None) -> tuple[str, ...]:
+    if dimensions is None:
+        return ()
+    return tuple(getattr(dimensions, "missing_optional", ()))
 
 
 def _required_int(row: Mapping[str, Any], key: str) -> int:
