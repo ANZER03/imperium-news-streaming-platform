@@ -49,9 +49,19 @@ Usage:
     - Runtime submission should use one dedicated Spark driver container per long-running Phase 3 job, with separate env, logs, restart policy, and checkpoint location per job.
 
 - [ ] `#17` Phase 3: Topic taxonomy and topic embeddings
-  - Status: Not started.
+  - Status: Partially implemented on 2026-04-25; awaiting human review of seed taxonomy content before completion.
   - Related issues: pairs naturally with `#18` for later `#19`.
   - Notes: Independent root slice for taxonomy schema, seed content, embedding storage, and human review.
+  - Progress notes:
+    - Implemented `imperium_news_pipeline.phase3.topics` with topic taxonomy entities, root/leaf derivation, deterministic embedding input text, input hashing, regeneration checks, active embedding repository contracts, and a small draft `phase3-v1` seed taxonomy.
+    - Added PostgreSQL DDL for `phase3_topic_taxonomy` and `phase3_topic_embeddings`, including hierarchy, multilingual metadata JSON, `model_hint`, `taxonomy_version`, active state, and `review_status`.
+    - Added tests for root and primary topic behavior, multilingual embedding input construction, metadata/model/version regeneration decisions, active embedding loading for classifiers, and glossary-aligned record fields.
+    - Updated `apps/processing/news-pipeline/README.md` with taxonomy and embedding storage notes.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 9 tests.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
+  - Remaining incomplete acceptance criteria:
+    - Human review must confirm taxonomy seed content before broad use.
 
 - [ ] `#18` Phase 3: Central embedding gateway
   - Status: Not started.

@@ -6,6 +6,11 @@ The first tracer bullet implements GitHub issue `#14`: convert CDC-like
 `table_news` records into a canonical article, upsert the cleaned article into
 PostgreSQL, and emit the canonical event with `classification_status=pending`.
 
+The topic taxonomy slice implements the core of GitHub issue `#17`: hierarchical
+root and primary topics, multilingual topic metadata, deterministic topic
+embedding input text, embedding input hashing, and active embedding repository
+contracts for the classifier.
+
 ## Local Tests
 
 ```bash
@@ -26,6 +31,12 @@ can be tested without external services and replaced at the job boundary.
 implements the PostgreSQL cleaned-article upsert behind the repository
 abstraction. It accepts a DB-API style connection factory so deployment can
 choose the concrete driver without changing core processing.
+
+`imperium_news_pipeline.phase3.topics` owns taxonomy and topic embedding domain
+contracts. The seed taxonomy is intentionally small and should be reviewed by a
+human before broad use. PostgreSQL stores the durable source of truth in
+`phase3_topic_taxonomy` and active topic vectors in `phase3_topic_embeddings`;
+classification loads active embeddings from PostgreSQL instead of Qdrant.
 
 ## Spark Submit Model
 
