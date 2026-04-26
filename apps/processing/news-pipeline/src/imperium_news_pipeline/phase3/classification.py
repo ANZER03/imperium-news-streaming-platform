@@ -61,32 +61,49 @@ class EmbeddingSimilarityClassifier:
     taxonomy_version: str | None = None
 
     def classify(self, article: CanonicalArticle) -> CanonicalArticle:
-        input_text = classification_input_text(article)
-        result = self.gateway.embed((EmbeddingRequestItem(article.article_id, input_text),))
-        article_embedding = result.embeddings.get(article.article_id)
-        if article_embedding is None:
-            return self._failed_article(article, input_text)
+        return self.classify_many((article,))[0]
 
-        matches = self._rank_topic_matches(article_embedding)
-        if not matches:
-            return self._failed_article(article, input_text)
-
-        primary = matches[0]
-        candidates = tuple(match.to_candidate() for match in matches[:3])
-        return replace(
-            article,
-            root_topic_id=primary.root_topic.topic_id,
-            root_topic_label=primary.root_topic.display_name,
-            primary_topic_id=primary.topic.topic_id,
-            primary_topic_label=primary.topic.display_name,
-            topic_confidence=primary.similarity,
-            topic_candidates=candidates,
-            classification_status=CLASSIFICATION_STATUS_CLASSIFIED,
-            classification_method=CLASSIFICATION_METHOD_EMBEDDING_SIMILARITY,
-            classification_model=self.embedding_model,
-            classified_at=article.processed_at,
-            classification_input_hash=_input_hash(input_text),
+    def classify_many(self, articles: Sequence[CanonicalArticle]) -> tuple[CanonicalArticle, ...]:
+        if not articles:
+            return ()
+        inputs = {
+            article.article_id: classification_input_text(article)
+            for article in articles
+        }
+        result = self.gateway.embed(
+            tuple(EmbeddingRequestItem(article.article_id, inputs[article.article_id]) for article in articles)
         )
+        classified = []
+        for article in articles:
+            article_embedding = result.embeddings.get(article.article_id)
+            if article_embedding is None:
+                classified.append(self._failed_article(article, inputs[article.article_id]))
+                continue
+
+            matches = self._rank_topic_matches(article_embedding)
+            if not matches:
+                classified.append(self._failed_article(article, inputs[article.article_id]))
+                continue
+
+            primary = matches[0]
+            candidates = tuple(match.to_candidate() for match in matches[:3])
+            classified.append(
+                replace(
+                    article,
+                    root_topic_id=primary.root_topic.topic_id,
+                    root_topic_label=primary.root_topic.display_name,
+                    primary_topic_id=primary.topic.topic_id,
+                    primary_topic_label=primary.topic.display_name,
+                    topic_confidence=primary.similarity,
+                    topic_candidates=candidates,
+                    classification_status=CLASSIFICATION_STATUS_CLASSIFIED,
+                    classification_method=CLASSIFICATION_METHOD_EMBEDDING_SIMILARITY,
+                    classification_model=self.embedding_model,
+                    classified_at=article.processed_at,
+                    classification_input_hash=_input_hash(inputs[article.article_id]),
+                )
+            )
+        return tuple(classified)
 
     def _rank_topic_matches(self, article_embedding: Sequence[float]) -> tuple[TopicMatch, ...]:
         leaf_topics = {
@@ -137,22 +154,34 @@ class ArticleClassificationProcessor:
     clock: Clock
 
     def process(self, article: CanonicalArticle) -> bool:
+        return self.process_many((article,))[0]
+
+    def process_many(self, articles: Sequence[CanonicalArticle]) -> tuple[bool, ...]:
+        if not articles:
+            return ()
         processed_at = self.clock.now()
-        classified = replace(
-            self.classifier.classify(article),
-            processed_at=processed_at,
-            classified_at=processed_at,
+        classified_articles = tuple(
+            replace(
+                classified,
+                processed_at=processed_at,
+                classified_at=processed_at,
+            )
+            for classified in self.classifier.classify_many(articles)
         )
-        should_emit = self.repository.upsert(
-            CleanedArticleRecord(
-                article_id=classified.article_id,
-                source_news_id=classified.source_news_id,
-                payload=classified.to_event(),
+        decisions = self.repository.upsert_many(
+            tuple(
+                CleanedArticleRecord(
+                    article_id=classified.article_id,
+                    source_news_id=classified.source_news_id,
+                    payload=classified.to_event(),
+                )
+                for classified in classified_articles
             )
         )
-        if should_emit:
-            self.producer.emit(classified)
-        return should_emit
+        emitted_articles = [article for article, should_emit in zip(classified_articles, decisions) if should_emit]
+        if emitted_articles:
+            self.producer.emit_many(emitted_articles)
+        return tuple(decisions)
 
 
 def classification_input_text(article: CanonicalArticle) -> str:
@@ -164,7 +193,7 @@ def classification_input_text(article: CanonicalArticle) -> str:
 def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
     if len(left) != len(right):
         raise ValueError("embedding vectors must have the same dimension")
-    dot = sum(a * b for a, b in zip(left, right, strict=True))
+    dot = sum(a * b for a, b in zip(left, right))
     left_norm = math.sqrt(sum(value * value for value in left))
     right_norm = math.sqrt(sum(value * value for value in right))
     if left_norm == 0 or right_norm == 0:

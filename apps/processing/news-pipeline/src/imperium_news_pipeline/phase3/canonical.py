@@ -166,6 +166,55 @@ class CanonicalArticle:
         }
 
 
+def canonical_article_from_event(event: Mapping[str, Any]) -> CanonicalArticle:
+    return CanonicalArticle(
+        article_id=str(event["article_id"]),
+        source_news_id=_required_int(event, "source_news_id"),
+        link_id=_optional_int(event.get("link_id")),
+        authority_id=_optional_int(event.get("authority_id")),
+        country_id=_optional_int(event.get("country_id")),
+        country_name=normalize_optional_text(event.get("country_name")),
+        source_name=normalize_optional_text(event.get("source_name")),
+        source_domain=normalize_optional_text(event.get("source_domain")),
+        rubric_id=_optional_int(event.get("rubric_id")),
+        rubric_title=normalize_optional_text(event.get("rubric_title")),
+        language_id=_optional_int(event.get("language_id")),
+        language_code=normalize_optional_text(event.get("language_code")),
+        root_topic_id=_optional_int(event.get("root_topic_id")),
+        root_topic_label=normalize_optional_text(event.get("root_topic_label")),
+        primary_topic_id=_optional_int(event.get("primary_topic_id")),
+        primary_topic_label=normalize_optional_text(event.get("primary_topic_label")),
+        topic_confidence=_optional_float(event.get("topic_confidence")),
+        topic_candidates=tuple(event.get("topic_candidates") or ()),
+        classification_status=str(event["classification_status"]),
+        classification_method=normalize_optional_text(event.get("classification_method")),
+        title=str(event.get("title") or ""),
+        url=str(event.get("url") or ""),
+        body_text=str(event.get("body_text") or ""),
+        body_text_clean=str(event.get("body_text_clean") or ""),
+        excerpt=str(event.get("excerpt") or ""),
+        image_url=normalize_optional_text(event.get("image_url")),
+        video_url=normalize_optional_text(event.get("video_url")),
+        reporter=normalize_optional_text(event.get("reporter")),
+        source_date_text=normalize_optional_text(event.get("source_date_text")),
+        published_at=_optional_datetime(event.get("published_at")),
+        crawled_at=_optional_datetime(event.get("crawled_at")),
+        meta_keywords=normalize_optional_text(event.get("meta_keywords")),
+        meta_description=normalize_optional_text(event.get("meta_description")),
+        is_video=bool(event.get("is_video", False)),
+        is_valid=bool(event.get("is_valid", False)),
+        is_visible=bool(event.get("is_visible", False)),
+        is_deleted=bool(event.get("is_deleted", False)),
+        dimension_status=str(event.get("dimension_status") or ""),
+        missing_dimensions=tuple(event.get("missing_dimensions") or ()),
+        classification_model=normalize_optional_text(event.get("classification_model")),
+        classified_at=_optional_datetime(event.get("classified_at")),
+        classification_input_hash=normalize_optional_text(event.get("classification_input_hash")),
+        schema_version=int(event.get("schema_version", SCHEMA_VERSION)),
+        processed_at=_optional_datetime(event.get("processed_at")) or datetime.now(timezone.utc),
+    )
+
+
 @dataclass(frozen=True)
 class CleanedArticleRecord:
     article_id: str
@@ -193,9 +242,15 @@ class CleanedArticleRepository(Protocol):
     def upsert(self, record: CleanedArticleRecord) -> bool:
         """Return True when this event should be emitted for the upserted state."""
 
+    def upsert_many(self, records: Sequence[CleanedArticleRecord]) -> tuple[bool, ...]:
+        """Return one emit decision per submitted record in the same order."""
+
 
 class CanonicalArticleProducer(Protocol):
     def emit(self, article: CanonicalArticle) -> None:
+        ...
+
+    def emit_many(self, articles: Sequence[CanonicalArticle]) -> None:
         ...
 
 
@@ -300,25 +355,41 @@ class CanonicalArticleFirstEmitProcessor:
     dimension_enrichment: Any | None = None
 
     def process(self, raw: RawNewsRecord) -> ProcessResult:
+        return self.process_many((raw,))[0]
+
+    def process_many(self, raws: Sequence[RawNewsRecord]) -> tuple[ProcessResult, ...]:
+        if not raws:
+            return ()
         dimensions = None
-        if self.dimension_enrichment is not None:
-            dimensions = self.dimension_enrichment.snapshot_for(
-                link_id=raw.link_id,
-                authority_id=raw.authority_id,
-                rubric_id=raw.rubrique_id,
-                language_id=raw.langue_id,
+        records: list[CleanedArticleRecord] = []
+        articles: list[CanonicalArticle] = []
+        for raw in raws:
+            if self.dimension_enrichment is not None:
+                dimensions = self.dimension_enrichment.snapshot_for(
+                    link_id=raw.link_id,
+                    authority_id=raw.authority_id,
+                    rubric_id=raw.rubrique_id,
+                    language_id=raw.langue_id,
+                )
+            else:
+                dimensions = None
+            article = self.builder.build(raw, dimensions=dimensions)
+            articles.append(article)
+            records.append(
+                CleanedArticleRecord(
+                    article_id=article.article_id,
+                    source_news_id=article.source_news_id,
+                    payload=article.to_event(),
+                )
             )
-        article = self.builder.build(raw, dimensions=dimensions)
-        should_emit = self.repository.upsert(
-            CleanedArticleRecord(
-                article_id=article.article_id,
-                source_news_id=article.source_news_id,
-                payload=article.to_event(),
-            )
+        decisions = self.repository.upsert_many(records)
+        emitted_articles = [article for article, should_emit in zip(articles, decisions) if should_emit]
+        if emitted_articles:
+            self.producer.emit_many(emitted_articles)
+        return tuple(
+            ProcessResult(article=article, emitted=should_emit)
+            for article, should_emit in zip(articles, decisions)
         )
-        if should_emit:
-            self.producer.emit(article)
-        return ProcessResult(article=article, emitted=should_emit)
 
 
 @dataclass
@@ -326,11 +397,18 @@ class InMemoryCleanedArticleRepository:
     rows: dict[str, Mapping[str, Any]] = field(default_factory=dict)
 
     def upsert(self, record: CleanedArticleRecord) -> bool:
-        existing = self.rows.get(record.article_id)
-        if existing == record.payload:
-            return False
-        self.rows[record.article_id] = dict(record.payload)
-        return True
+        return self.upsert_many((record,))[0]
+
+    def upsert_many(self, records: Sequence[CleanedArticleRecord]) -> tuple[bool, ...]:
+        decisions = []
+        for record in records:
+            existing = self.rows.get(record.article_id)
+            if existing == record.payload:
+                decisions.append(False)
+                continue
+            self.rows[record.article_id] = dict(record.payload)
+            decisions.append(True)
+        return tuple(decisions)
 
 
 @dataclass
@@ -338,7 +416,10 @@ class InMemoryCanonicalArticleProducer:
     emitted: list[dict[str, Any]] = field(default_factory=list)
 
     def emit(self, article: CanonicalArticle) -> None:
-        self.emitted.append(article.to_event())
+        self.emit_many((article,))
+
+    def emit_many(self, articles: Sequence[CanonicalArticle]) -> None:
+        self.emitted.extend(article.to_event() for article in articles)
 
 
 def normalize_text(value: str | None) -> str:
@@ -392,6 +473,12 @@ def _optional_int(value: Any) -> int | None:
     return int(value)
 
 
+def _optional_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    return float(value)
+
+
 def _optional_text(value: Any) -> str | None:
     if value is None:
         return None
@@ -403,7 +490,21 @@ def _optional_datetime(value: Any) -> datetime | None:
         return None
     if isinstance(value, datetime):
         return value
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if isinstance(value, (int, float)):
+        return _epoch_datetime(value)
+    text = str(value).strip()
+    if text.isdigit():
+        return _epoch_datetime(int(text))
+    return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def _epoch_datetime(value: int | float) -> datetime:
+    numeric = float(value)
+    if numeric >= 1_000_000_000_000_000:
+        return datetime.fromtimestamp(numeric / 1_000_000, tz=timezone.utc)
+    if numeric >= 1_000_000_000_000:
+        return datetime.fromtimestamp(numeric / 1_000, tz=timezone.utc)
+    return datetime.fromtimestamp(numeric, tz=timezone.utc)
 
 
 def _iso_or_none(value: datetime | None) -> str | None:

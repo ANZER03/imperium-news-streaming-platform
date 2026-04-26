@@ -7,7 +7,7 @@ from imperium_news_pipeline.phase3.canonical import CanonicalArticle
 
 
 class QdrantClient(Protocol):
-    def upsert(self, point_id: str, vector: Sequence[float], payload: dict[str, Any]) -> None:
+    def upsert(self, point_id: int, vector: Sequence[float], payload: dict[str, Any]) -> None:
         ...
 
 
@@ -30,7 +30,7 @@ class QdrantArticleProjector:
     def project(self, article: CanonicalArticle) -> QdrantProjectionResult:
         try:
             vector = tuple(float(value) for value in self.vectors.vector_for(article))
-            self.qdrant.upsert(article.article_id, vector, qdrant_payload(article))
+            self.qdrant.upsert(qdrant_point_id(article), vector, qdrant_payload(article))
             return QdrantProjectionResult(projected=True)
         except Exception as exc:  # pragma: no cover - exact client errors are adapter-specific.
             return QdrantProjectionResult(projected=False, errors=(str(exc),))
@@ -54,10 +54,12 @@ class InMemoryArticleVectorGateway:
 class InMemoryQdrantClient:
     points: dict[str, dict[str, Any]] = field(default_factory=dict)
     fail_writes: bool = False
+    upsert_count: int = 0
 
-    def upsert(self, point_id: str, vector: Sequence[float], payload: dict[str, Any]) -> None:
+    def upsert(self, point_id: int, vector: Sequence[float], payload: dict[str, Any]) -> None:
         if self.fail_writes:
             raise RuntimeError("qdrant unavailable")
+        self.upsert_count += 1
         self.points[point_id] = {"vector": tuple(vector), "payload": dict(payload)}
 
 
@@ -67,7 +69,10 @@ def qdrant_payload(article: CanonicalArticle) -> dict[str, Any]:
         for candidate in article.topic_candidates
         if candidate.get("topic_id") != article.primary_topic_id
     ]
-    topic_tags = [label for label in (article.root_topic_label, article.primary_topic_label) if label]
+    topic_tags = []
+    for label in (article.root_topic_label, article.primary_topic_label):
+        if label and label not in topic_tags:
+            topic_tags.append(label)
     payload: dict[str, Any] = {
         "article_id": article.article_id,
         "country_id": article.country_id,
@@ -83,3 +88,7 @@ def qdrant_payload(article: CanonicalArticle) -> dict[str, Any]:
         "source_domain": article.source_domain,
     }
     return payload
+
+
+def qdrant_point_id(article: CanonicalArticle) -> int:
+    return int(article.source_news_id)

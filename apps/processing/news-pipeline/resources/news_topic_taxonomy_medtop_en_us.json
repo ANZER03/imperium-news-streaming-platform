@@ -1,0 +1,392 @@
+[
+  {
+    "id": "medtop:01000000",
+    "name": "Arts, culture, entertainment and media",
+    "description": "Matters related to the cultural and social life of a community, including its creative and artistic expression, entertainment and news media.",
+    "tags": [
+      "cinema",
+      "music",
+      "theatre",
+      "painting",
+      "sculpture",
+      "literature",
+      "heritage",
+      "broadcasting",
+      "journalism"
+    ],
+    "sub_topics": [
+      "Arts and entertainment",
+      "Media",
+      "Heritage and history",
+      "Festivals and celebrations"
+    ]
+  },
+  {
+    "id": "medtop:16000000",
+    "name": "Conflict, war and peace",
+    "description": "Matters related to armed conflict, internal and international, and its consequences.",
+    "tags": [
+      "war",
+      "army",
+      "navy",
+      "air force",
+      "peace treaty",
+      "civil war",
+      "terrorism",
+      "defense",
+      "military"
+    ],
+    "sub_topics": [
+      "Armed forces",
+      "International relations",
+      "Internal conflict",
+      "Terrorism",
+      "Arms control"
+    ]
+  },
+  {
+    "id": "medtop:02000000",
+    "name": "Crime, law and justice",
+    "description": "Establishment and administration of law and order, and the judicial system.",
+    "tags": [
+      "police",
+      "court",
+      "prison",
+      "murder",
+      "theft",
+      "fraud",
+      "lawsuit",
+      "judge",
+      "attorney",
+      "investigation"
+    ],
+    "sub_topics": [
+      "Crime",
+      "Judiciary",
+      "Law enforcement",
+      "Punishment",
+      "Legal system"
+    ]
+  },
+  {
+    "id": "medtop:03000000",
+    "name": "Disaster, accident and emergency incident",
+    "description": "Natural or man-made events causing extensive damage, destruction, or loss of life.",
+    "tags": [
+      "earthquake",
+      "flood",
+      "fire",
+      "accident",
+      "crash",
+      "emergency services",
+      "rescue",
+      "casualty",
+      "natural disaster"
+    ],
+    "sub_topics": [
+      "Natural disasters",
+      "Accidents",
+      "Emergency response",
+      "Man-made disasters"
+    ]
+  },
+  {
+    "id": "medtop:04000000",
+    "name": "Economy, business and finance",
+    "description": "The system of production, distribution, and consumption of goods and services, and the management of money.",
+    "tags": [
+      "market",
+      "stocks",
+      "company",
+      "bank",
+      "investment",
+      "trade",
+      "industry",
+      "revenue",
+      "fiscal policy",
+      "entrepreneurship"
+    ],
+    "sub_topics": [
+      "Business",
+      "Finance",
+      "Macroeconomics",
+      "Markets",
+      "Real estate"
+    ]
+  },
+  {
+    "id": "medtop:05000000",
+    "name": "Education",
+    "description": "The process of teaching or learning, especially in a school or college.",
+    "tags": [
+      "school",
+      "university",
+      "student",
+      "teacher",
+      "curriculum",
+      "graduation",
+      "scholarship",
+      "vocational training",
+      "literacy"
+    ],
+    "sub_topics": [
+      "Schools",
+      "Higher education",
+      "Vocational training",
+      "Adult education"
+    ]
+  },
+  {
+    "id": "medtop:06000000",
+    "name": "Environment",
+    "description": "The natural world and the impact of human activity on its condition.",
+    "tags": [
+      "climate change",
+      "pollution",
+      "wildlife",
+      "sustainability",
+      "ecology",
+      "nature",
+      "conservation",
+      "energy saving",
+      "greenhouse effect"
+    ],
+    "sub_topics": [
+      "Climate change",
+      "Pollution",
+      "Conservation",
+      "Ecology",
+      "Natural resources"
+    ]
+  },
+  {
+    "id": "medtop:07000000",
+    "name": "Health",
+    "description": "The state of being free from illness or injury and the provision of medical care.",
+    "tags": [
+      "medicine",
+      "doctor",
+      "hospital",
+      "disease",
+      "wellness",
+      "mental health",
+      "surgery",
+      "epidemic",
+      "pharmaceuticals",
+      "nutrition"
+    ],
+    "sub_topics": [
+      "Diseases",
+      "Medical treatment",
+      "Healthcare policy",
+      "Mental health",
+      "Public health"
+    ]
+  },
+  {
+    "id": "medtop:08000000",
+    "name": "Human interest",
+    "description": "Stories about individuals or events that provoke an emotional response.",
+    "tags": [
+      "people",
+      "unusual",
+      "heartwarming",
+      "bizarre",
+      "animals",
+      "humanity",
+      "personalities",
+      "local heroes"
+    ],
+    "sub_topics": [
+      "Animal stories",
+      "Bizarre events",
+      "People",
+      "Curiosities"
+    ]
+  },
+  {
+    "id": "medtop:09000000",
+    "name": "Labour",
+    "description": "Work and the people who perform it, including employment and industrial relations.",
+    "tags": [
+      "jobs",
+      "unemployment",
+      "strikes",
+      "unions",
+      "salary",
+      "workforce",
+      "retirement",
+      "recruitment",
+      "working conditions"
+    ],
+    "sub_topics": [
+      "Employment",
+      "Industrial relations",
+      "Unions",
+      "Vocational training"
+    ]
+  },
+  {
+    "id": "medtop:10000000",
+    "name": "Lifestyle and leisure",
+    "description": "Activities people choose for relaxation, pleasure, or self-improvement.",
+    "tags": [
+      "fashion",
+      "food",
+      "travel",
+      "gaming",
+      "hobbies",
+      "home",
+      "gardening",
+      "shopping",
+      "luxury"
+    ],
+    "sub_topics": [
+      "Fashion",
+      "Food and drink",
+      "Travel",
+      "Games and toys",
+      "Hobbies"
+    ]
+  },
+  {
+    "id": "medtop:11000000",
+    "name": "Politics and government",
+    "description": "The governance of a country or area and the activities and policies of governments.",
+    "tags": [
+      "elections",
+      "parliament",
+      "president",
+      "policy",
+      "diplomacy",
+      "democracy",
+      "voting",
+      "corruption",
+      "local government",
+      "international relations"
+    ],
+    "sub_topics": [
+      "Elections",
+      "Government policy",
+      "International relations",
+      "Local government",
+      "Human rights"
+    ]
+  },
+  {
+    "id": "medtop:12000000",
+    "name": "Religion",
+    "description": "The belief in and worship of a superhuman controlling power.",
+    "tags": [
+      "church",
+      "mosque",
+      "temple",
+      "faith",
+      "theology",
+      "ritual",
+      "spiritual",
+      "clergy",
+      "pilgrimage"
+    ],
+    "sub_topics": [
+      "Christianity",
+      "Islam",
+      "Judaism",
+      "Buddhism",
+      "Hinduism",
+      "Secularism"
+    ]
+  },
+  {
+    "id": "medtop:13000000",
+    "name": "Science and technology",
+    "description": "Systematic study of the structure and behavior of the physical and natural world.",
+    "tags": [
+      "research",
+      "innovation",
+      "AI",
+      "space",
+      "computers",
+      "internet",
+      "biotechnology",
+      "physics",
+      "engineering",
+      "robotics"
+    ],
+    "sub_topics": [
+      "Applied science",
+      "Natural science",
+      "Technology",
+      "Space",
+      "Computing"
+    ]
+  },
+  {
+    "id": "medtop:14000000",
+    "name": "Society",
+    "description": "Aspects of the collective life of people in a community.",
+    "tags": [
+      "demographics",
+      "migration",
+      "welfare",
+      "families",
+      "civil rights",
+      "ethics",
+      "social issues",
+      "minorities",
+      "discrimination"
+    ],
+    "sub_topics": [
+      "Demographics",
+      "Migration",
+      "Social issues",
+      "Family",
+      "Human rights"
+    ]
+  },
+  {
+    "id": "medtop:15000000",
+    "name": "Sport",
+    "description": "An activity involving physical exertion and skill in which an individual or team competes.",
+    "tags": [
+      "football",
+      "basketball",
+      "tennis",
+      "olympics",
+      "athlete",
+      "tournament",
+      "stadium",
+      "coaching",
+      "score",
+      "championship"
+    ],
+    "sub_topics": [
+      "Soccer",
+      "Motorsport",
+      "Winter sports",
+      "Olympic Games",
+      "Team sports"
+    ]
+  },
+  {
+    "id": "medtop:17000000",
+    "name": "Weather",
+    "description": "The state of the atmosphere at a particular place and time.",
+    "tags": [
+      "forecast",
+      "temperature",
+      "storm",
+      "sunshine",
+      "rain",
+      "snow",
+      "meteorology",
+      "climate",
+      "warning"
+    ],
+    "sub_topics": [
+      "Weather forecasts",
+      "Severe weather",
+      "Climatology"
+    ]
+  }
+]

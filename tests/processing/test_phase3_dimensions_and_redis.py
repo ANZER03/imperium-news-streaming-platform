@@ -192,45 +192,47 @@ class DimensionAndRedisProjectionTests(unittest.TestCase):
         self.assertEqual(failed.errors, ("redis unavailable",))
 
     def test_redis_root_topic_membership_updates_on_classification_and_reclassification(self) -> None:
-        article = _classified_article(root_topic_id=100, country_id=504)
+        article = _classified_article(root_topic_id=11000000, country_id=504)
         redis = InMemoryRedisClient()
         projector = RedisFeedProjector(redis)
 
         first = projector.update_topic_membership(article)
-        reclassified = type(article)(**{**article.__dict__, "root_topic_id": 300, "root_topic_label": "Technology"})
+        reclassified = type(article)(
+            **{**article.__dict__, "root_topic_id": 13000000, "root_topic_label": "Science and technology"}
+        )
         second = projector.update_topic_membership(
             reclassified,
-            previous_root_topic_id=100,
+            previous_root_topic_id=11000000,
             previous_country_id=504,
         )
 
         self.assertTrue(first.updated_topic_feeds)
-        self.assertIn("news:77", redis.sorted_sets["feed:topic:300"])
-        self.assertIn("news:77", redis.sorted_sets["feed:country:504:topic:300"])
-        self.assertNotIn("news:77", redis.sorted_sets["feed:topic:100"])
-        self.assertNotIn("news:77", redis.sorted_sets["feed:country:504:topic:100"])
+        self.assertIn("news:77", redis.sorted_sets["feed:topic:13000000"])
+        self.assertIn("news:77", redis.sorted_sets["feed:country:504:topic:13000000"])
+        self.assertNotIn("news:77", redis.sorted_sets["feed:topic:11000000"])
+        self.assertNotIn("news:77", redis.sorted_sets["feed:country:504:topic:11000000"])
 
-        first_score = redis.sorted_sets["feed:topic:300"]["news:77"]
-        second_score = redis.sorted_sets["feed:country:504:topic:300"]["news:77"]
+        first_score = redis.sorted_sets["feed:topic:13000000"]["news:77"]
+        second_score = redis.sorted_sets["feed:country:504:topic:13000000"]["news:77"]
         self.assertEqual(first_score, second_score)
 
     def test_redis_root_topic_membership_cleanup_handles_hidden_and_idempotent_updates(self) -> None:
-        article = _classified_article(root_topic_id=100, country_id=250)
+        article = _classified_article(root_topic_id=11000000, country_id=250)
         redis = InMemoryRedisClient()
         projector = RedisFeedProjector(redis)
 
         projector.update_topic_membership(article)
-        projector.update_topic_membership(article, previous_root_topic_id=100, previous_country_id=250)
+        projector.update_topic_membership(article, previous_root_topic_id=11000000, previous_country_id=250)
         hidden = type(article)(**{**article.__dict__, "is_visible": False})
         removed = projector.update_topic_membership(
             hidden,
-            previous_root_topic_id=100,
+            previous_root_topic_id=11000000,
             previous_country_id=250,
         )
 
         self.assertTrue(removed.removed)
-        self.assertNotIn("news:77", redis.sorted_sets["feed:topic:100"])
-        self.assertNotIn("news:77", redis.sorted_sets["feed:country:250:topic:100"])
+        self.assertNotIn("news:77", redis.sorted_sets["feed:topic:11000000"])
+        self.assertNotIn("news:77", redis.sorted_sets["feed:country:250:topic:11000000"])
 
 
 def _classified_article(root_topic_id: int, country_id: int):
@@ -255,16 +257,16 @@ def _classified_article(root_topic_id: int, country_id: int):
         )
     ).article
     return type(article)(
-        **{
-            **article.__dict__,
-            "country_id": country_id,
-            "root_topic_id": root_topic_id,
-            "root_topic_label": "Politics",
-            "primary_topic_id": 101,
-            "primary_topic_label": "Elections",
-            "classification_status": "classified",
-        }
-    )
+            **{
+                **article.__dict__,
+                "country_id": country_id,
+                "root_topic_id": root_topic_id,
+                "root_topic_label": "Politics and government",
+                "primary_topic_id": root_topic_id,
+                "primary_topic_label": "Politics and government",
+                "classification_status": "classified",
+            }
+        )
 
 
 if __name__ == "__main__":

@@ -16,28 +16,29 @@ from imperium_news_pipeline.phase3.topics import (
 
 
 class TopicTaxonomyTests(unittest.TestCase):
-    def test_seed_taxonomy_has_roots_and_leaf_primary_topics(self) -> None:
+    def test_seed_taxonomy_has_root_medtop_topics(self) -> None:
         topics = seed_phase3_topics()
         service = TopicTaxonomyService(InMemoryTopicTaxonomyRepository(topics))
 
         leaves = service.active_leaf_topics()
-        root = service.root_for_leaf(301)
+        root = service.root_for_leaf(13000000)
 
-        self.assertIn(301, [topic.topic_id for topic in leaves])
-        self.assertEqual(root.topic_key, "technology")
-        self.assertTrue(all(topic.parent_topic_id is not None for topic in leaves))
+        self.assertEqual(len(topics), 17)
+        self.assertIn(13000000, [topic.topic_id for topic in leaves])
+        self.assertEqual(root.topic_key, "science.and.technology")
+        self.assertTrue(all(topic.parent_topic_id is None for topic in leaves))
 
     def test_topic_metadata_contains_multilingual_embedding_input_fields(self) -> None:
-        topic = next(topic for topic in seed_phase3_topics() if topic.topic_id == 301)
-        root = next(topic for topic in seed_phase3_topics() if topic.topic_id == 300)
+        topic = next(topic for topic in seed_phase3_topics() if topic.topic_id == 13000000)
+        root = next(topic for topic in seed_phase3_topics() if topic.topic_id == 13000000)
 
         embedding_input = TopicEmbeddingInputBuilder().build(topic, root)
 
         self.assertEqual(embedding_input.embedding_model, DEFAULT_EMBEDDING_MODEL)
-        self.assertIn("Topic: Artificial Intelligence", embedding_input.input_text)
-        self.assertIn("Root topic: Technology", embedding_input.input_text)
-        self.assertIn("fr: Intelligence artificielle", embedding_input.input_text)
-        self.assertIn("ar:", embedding_input.input_text)
+        self.assertIn("Topic: Science and technology", embedding_input.input_text)
+        self.assertIn("Description:", embedding_input.input_text)
+        self.assertIn("Sub-topics:", embedding_input.input_text)
+        self.assertIn("Technology", embedding_input.input_text)
         self.assertEqual(len(embedding_input.input_hash), 64)
 
     def test_embedding_regeneration_detects_metadata_model_and_version_changes(self) -> None:
@@ -83,7 +84,7 @@ class TopicTaxonomyTests(unittest.TestCase):
         repository = InMemoryTopicEmbeddingRepository(
             (
                 TopicEmbedding(
-                    topic_id=301,
+                    topic_id=13000000,
                     taxonomy_version="phase3-v1",
                     embedding_model=DEFAULT_EMBEDDING_MODEL,
                     embedding_dimension=3,
@@ -93,7 +94,7 @@ class TopicTaxonomyTests(unittest.TestCase):
                     is_active=True,
                 ),
                 TopicEmbedding(
-                    topic_id=201,
+                    topic_id=4000000,
                     taxonomy_version="phase3-v1",
                     embedding_model=DEFAULT_EMBEDDING_MODEL,
                     embedding_dimension=3,
@@ -110,7 +111,7 @@ class TopicTaxonomyTests(unittest.TestCase):
             embedding_model=DEFAULT_EMBEDDING_MODEL,
         )
 
-        self.assertEqual([embedding.topic_id for embedding in embeddings], [301])
+        self.assertEqual([embedding.topic_id for embedding in embeddings], [13000000])
 
     def test_topic_record_preserves_glossary_terms(self) -> None:
         record = topic_record_json(seed_phase3_topics()[0])
@@ -118,6 +119,7 @@ class TopicTaxonomyTests(unittest.TestCase):
         self.assertIn("taxonomy_version", record)
         self.assertIn("parent_topic_id", record)
         self.assertIn("model_hint", record)
+        self.assertIn("sub_topics", record)
 
 
 if __name__ == "__main__":

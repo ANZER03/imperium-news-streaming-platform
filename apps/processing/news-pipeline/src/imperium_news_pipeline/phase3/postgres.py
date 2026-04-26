@@ -80,32 +80,66 @@ class PostgresCleanedArticleRepository:
     connection_factory: ConnectionFactory
 
     def upsert(self, record: CleanedArticleRecord) -> bool:
-        payload_json = json.dumps(record.payload, sort_keys=True)
+        return self.upsert_many((record,))[0]
+
+    def upsert_many(self, records: list[CleanedArticleRecord] | tuple[CleanedArticleRecord, ...]) -> tuple[bool, ...]:
+        if not records:
+            return ()
+
+        payloads_by_article_id = {
+            record.article_id: json.dumps(record.payload, sort_keys=True)
+            for record in records
+        }
+        existing_payloads = self._load_existing_payloads(tuple(payloads_by_article_id))
+
+        to_write = []
+        decisions = []
+        for record in records:
+            payload_json = payloads_by_article_id[record.article_id]
+            existing_payload = existing_payloads.get(record.article_id)
+            if existing_payload is not None and _payload_json(existing_payload) == payload_json:
+                decisions.append(False)
+                continue
+            decisions.append(True)
+            to_write.append(
+                {
+                    "article_id": record.article_id,
+                    "source_news_id": record.source_news_id,
+                    "payload": payload_json,
+                    "schema_version": record.payload["schema_version"],
+                    "classification_status": record.payload["classification_status"],
+                    "dimension_status": record.payload["dimension_status"],
+                    "is_visible": record.payload["is_visible"],
+                    "is_deleted": record.payload["is_deleted"],
+                    "published_at": record.payload["published_at"],
+                    "crawled_at": record.payload["crawled_at"],
+                    "processed_at": record.payload["processed_at"],
+                }
+            )
+
+        if not to_write:
+            return tuple(decisions)
+
         connection = self.connection_factory()
-
         with connection.cursor() as cursor:
-            cursor.execute(SELECT_CLEANED_ARTICLE_PAYLOAD_SQL, {"article_id": record.article_id})
-            existing = cursor.fetchone()
-            if existing is not None and _payload_json(existing[0]) == payload_json:
-                return False
-
-            params = {
-                "article_id": record.article_id,
-                "source_news_id": record.source_news_id,
-                "payload": payload_json,
-                "schema_version": record.payload["schema_version"],
-                "classification_status": record.payload["classification_status"],
-                "dimension_status": record.payload["dimension_status"],
-                "is_visible": record.payload["is_visible"],
-                "is_deleted": record.payload["is_deleted"],
-                "published_at": record.payload["published_at"],
-                "crawled_at": record.payload["crawled_at"],
-                "processed_at": record.payload["processed_at"],
-            }
-            cursor.execute(UPSERT_CLEANED_ARTICLE_SQL, params)
-
+            if hasattr(cursor, "executemany"):
+                cursor.executemany(UPSERT_CLEANED_ARTICLE_SQL, tuple(to_write))
+            else:
+                for params in to_write:
+                    cursor.execute(UPSERT_CLEANED_ARTICLE_SQL, params)
         connection.commit()
-        return True
+        return tuple(decisions)
+
+    def _load_existing_payloads(self, article_ids: tuple[str, ...]) -> dict[str, Any]:
+        connection = self.connection_factory()
+        existing_payloads: dict[str, Any] = {}
+        with connection.cursor() as cursor:
+            for article_id in article_ids:
+                cursor.execute(SELECT_CLEANED_ARTICLE_PAYLOAD_SQL, {"article_id": article_id})
+                existing = cursor.fetchone()
+                if existing is not None:
+                    existing_payloads[article_id] = existing[0]
+        return existing_payloads
 
 
 def _payload_json(value: Any) -> str:

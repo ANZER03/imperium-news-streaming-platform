@@ -4,6 +4,11 @@ USER root
 
 RUN apt-get update && apt-get install -y curl python3-pip && rm -rf /var/lib/apt/lists/*
 
+RUN pip3 install --no-cache-dir \
+    kafka-python==2.0.2 \
+    psycopg[binary]==3.2.3 \
+    redis==5.1.1
+
 ENV SCALA_VERSION=2.12
 ENV SPARK_VERSION=3.5.3
 ENV CONFLUENT_VERSION=7.7.0
@@ -16,6 +21,8 @@ RUN curl -s https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10
     -o /opt/spark/jars/spark-avro_${SCALA_VERSION}-${SPARK_VERSION}.jar && \
     curl -s https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.5.1/kafka-clients-3.5.1.jar \
     -o /opt/spark/jars/kafka-clients-3.5.1.jar && \
+    curl -s https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar \
+    -o /opt/spark/jars/commons-pool2-2.11.1.jar && \
     curl -s https://packages.confluent.io/maven/io/confluent/kafka-schema-registry-client/${CONFLUENT_VERSION}/kafka-schema-registry-client-${CONFLUENT_VERSION}.jar \
     -o /opt/spark/jars/kafka-schema-registry-client-${CONFLUENT_VERSION}.jar && \
     curl -s https://packages.confluent.io/maven/io/confluent/kafka-avro-serializer/${CONFLUENT_VERSION}/kafka-avro-serializer-${CONFLUENT_VERSION}.jar \

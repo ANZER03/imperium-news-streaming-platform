@@ -30,6 +30,9 @@ class DimensionRepository(Protocol):
     def upsert(self, record: DimensionRecord) -> bool:
         """Return True when the curated dimension state changed."""
 
+    def upsert_many(self, records: tuple[DimensionRecord, ...]) -> int:
+        """Return the number of records submitted in one batch."""
+
     def get(self, dimension_type: str, dimension_id: int | None) -> DimensionRecord | None:
         ...
 
@@ -99,6 +102,11 @@ class InMemoryDimensionRepository:
             return None
         return record
 
+    def upsert_many(self, records: tuple[DimensionRecord, ...]) -> int:
+        for record in records:
+            self.upsert(record)
+        return len(records)
+
 
 @dataclass
 class InMemoryDimensionEventProducer:
@@ -118,6 +126,15 @@ class DimensionMaterializer:
         if changed and self.event_producer is not None:
             self.event_producer.publish(record)
         return changed
+
+    def materialize_many(self, records: tuple[DimensionRecord, ...]) -> int:
+        if not records:
+            return 0
+        count = self.repository.upsert_many(records)
+        if self.event_producer is not None:
+            for record in records:
+                self.event_producer.publish(record)
+        return count
 
 
 @dataclass
@@ -165,12 +182,13 @@ def link_dimension(row: Mapping[str, Any]) -> DimensionRecord:
         dimension_id=_required_int(row, "id"),
         payload={
             "link_id": _required_int(row, "id"),
-            "url": _optional_text(row, "url"),
+            "url": _optional_text(row, "url") or _optional_text(row, "link"),
             "source_domain": _optional_text(row, "domain"),
-            "source_name": _optional_text(row, "source_name"),
+            "source_name": _optional_text(row, "source_name") or _optional_text(row, "title"),
             "country_id": _optional_int(row, "pays_id"),
         },
         is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
     )
 
 
@@ -180,11 +198,12 @@ def authority_dimension(row: Mapping[str, Any]) -> DimensionRecord:
         dimension_id=_required_int(row, "id"),
         payload={
             "authority_id": _required_int(row, "id"),
-            "source_name": _optional_text(row, "name") or _optional_text(row, "title"),
+            "source_name": _optional_text(row, "name") or _optional_text(row, "authority") or _optional_text(row, "title"),
             "source_domain": _optional_text(row, "domain"),
             "sedition_id": _optional_int(row, "sedition_id"),
         },
         is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
     )
 
 
@@ -192,8 +211,9 @@ def country_dimension(row: Mapping[str, Any]) -> DimensionRecord:
     return DimensionRecord(
         dimension_type=DIMENSION_TOPIC_COUNTRIES,
         dimension_id=_required_int(row, "id"),
-        payload={"country_id": _required_int(row, "id"), "country_name": _optional_text(row, "name")},
+        payload={"country_id": _required_int(row, "id"), "country_name": _optional_text(row, "name") or _optional_text(row, "pays")},
         is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
     )
 
 
@@ -203,6 +223,7 @@ def sedition_dimension(row: Mapping[str, Any]) -> DimensionRecord:
         dimension_id=_required_int(row, "id"),
         payload={"sedition_id": _required_int(row, "id"), "country_id": _optional_int(row, "pays_id")},
         is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
     )
 
 
@@ -210,8 +231,9 @@ def rubric_dimension(row: Mapping[str, Any]) -> DimensionRecord:
     return DimensionRecord(
         dimension_type=DIMENSION_TOPIC_RUBRICS,
         dimension_id=_required_int(row, "id"),
-        payload={"rubric_id": _required_int(row, "id"), "rubric_title": _optional_text(row, "title")},
+        payload={"rubric_id": _required_int(row, "id"), "rubric_title": _optional_text(row, "title") or _optional_text(row, "rubrique")},
         is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
     )
 
 
@@ -219,8 +241,9 @@ def language_dimension(row: Mapping[str, Any]) -> DimensionRecord:
     return DimensionRecord(
         dimension_type=DIMENSION_TOPIC_LANGUAGES,
         dimension_id=_required_int(row, "id"),
-        payload={"language_id": _required_int(row, "id"), "language_code": _optional_text(row, "code")},
+        payload={"language_id": _required_int(row, "id"), "language_code": _optional_text(row, "code") or _optional_text(row, "abr")},
         is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
     )
 
 
@@ -248,3 +271,12 @@ def _optional_text(row: Mapping[str, Any] | None, key: str) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _optional_datetime(row: Mapping[str, Any] | None, key: str) -> datetime | None:
+    if row is None:
+        return None
+    value = row.get(key)
+    if value is None or isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(str(value))

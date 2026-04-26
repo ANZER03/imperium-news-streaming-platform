@@ -2,7 +2,9 @@
 
 Source of truth:
 - PRD: `docs/product/phase-3-processing-canonical-article-prd.md`
+- Runtime MVP PRD: `docs/product/phase-3-runtime-mvp-prd.md`
 - GitHub parent issue: `#13` PRD: Phase 3 canonical article processing and serving projections
+- Runtime MVP parent issue: `#24` PRD: Phase 3 runtime MVP from CDC topics to serving stores
 - Working branch: `phase-3-processing`
 
 Usage:
@@ -10,6 +12,8 @@ Usage:
 - Keep partial work unchecked.
 - Add notes for completed steps, issues faced, and how they were solved.
 - Refresh live GitHub issue bodies before starting a new implementation session.
+- Runtime MVP issues `#26`, `#27`, and `#28` require real local processing from Kafka CDC topics to configured serving stores before completion. Fixture-only tests, in-memory repositories, DB-API doubles, and adapter-shape smokes are guardrails only; they are not completion evidence.
+- Live runtime proof on 2026-04-26: dedicated drivers now run on Spark cluster mode with 3 workers, Spark history logging is enabled, and a fresh CDC article flowed through PostgreSQL, Redis, and Qdrant after the Qdrant point-id fix.
 
 ## Issue Dependency Order
 
@@ -57,6 +61,7 @@ Usage:
     - Added PostgreSQL DDL for `phase3_topic_taxonomy` and `phase3_topic_embeddings`, including hierarchy, multilingual metadata JSON, `model_hint`, `taxonomy_version`, active state, and `review_status`.
     - Added tests for root and primary topic behavior, multilingual embedding input construction, metadata/model/version regeneration decisions, active embedding loading for classifiers, and glossary-aligned record fields.
     - Updated `apps/processing/news-pipeline/README.md` with taxonomy and embedding storage notes.
+    - Replaced the small draft seed with the full `news_topic_taxonomy_medtop_en_us.json` Medtop taxonomy, added `sub_topics` storage, and widened topic embedding input to include topic name, description, tags, and sub-topics.
   - Verification:
     - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 9 tests.
     - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
@@ -134,6 +139,7 @@ Usage:
     - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
   - Follow-ups:
     - Root-topic feed membership remains in `#20` after classification.
+    - Runtime cadence now keeps dimensions ahead of news using trigger timing in the dedicated driver topology.
 
 - [x] `#19` Phase 3: Embedding similarity classification
   - Status: Completed on 2026-04-25.
@@ -207,15 +213,149 @@ Usage:
   - Solutions:
     - Introduced small `QdrantClient` and article-vector gateway protocols plus in-memory adapters so the slice stays testable and deployment wiring can be added later.
 
-- [ ] `#22` Phase 3: Replay-safe projection state
-  - Status: Blocked by `#16`, `#20`, and `#21`.
+- [x] `#22` Phase 3: Replay-safe projection state
+  - Status: Completed on 2026-04-25.
   - Related issues: supports `#23`.
-  - Notes: Persist previous projection fields for idempotent replay and safe Redis/Qdrant cleanup.
+  - Notes: Added replay-safe projection state contracts, fanout state handling, and cleanup logic for country/topic/visibility changes.
+  - Files changed:
+    - `ISSUES-TASK.md`
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/projection_fanout.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/projection_state.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/qdrant_projection.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/redis_projection.py`
+    - `infrastructure/postgres/phase3/04_projection_state.sql`
+    - `tests/processing/test_qdrant_projection.py`
+  - Acceptance evidence:
+    - `ProjectionState` stores `article_id`, `country_id`, `root_topic_id`, `published_at`, `is_visible`, and `is_deleted`.
+    - `ProjectionFanout` uses projection state to skip identical replay and keep replay behavior idempotent.
+    - Country updates remove old `feed:country:{country_id}` membership and write the new country membership.
+    - Topic updates remove old `feed:topic:{root_topic_id}` and `feed:country:{country_id}:topic:{root_topic_id}` membership and write new membership.
+    - Hide/delete cleanup removes card, global feed, country feeds, and topic feeds using current and previous projection state.
+    - Qdrant visibility transitions are idempotent: first hidden update writes `is_visible=false`, repeated hidden replay is skipped by state match.
+    - Projection state is behind a repository abstraction (`ProjectionStateRepository`) with in-memory implementation and behavior tests.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 32 tests.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
 
-- [ ] `#23` Phase 3: End-to-end validation
-  - Status: Blocked by `#14`, `#15`, `#16`, `#17`, `#18`, `#19`, `#20`, `#21`, and `#22`.
+- [x] `#23` Phase 3: End-to-end validation
+  - Status: Completed on 2026-04-25.
   - Related issues: final validation issue.
-  - Notes: Full flow from CDC-like inputs through cleaned PostgreSQL, Redis, classification, Qdrant, replay, delete, and pass/fail reporting.
+  - Notes: Added deterministic end-to-end validation coverage and a runnable smoke report for local/CI acceptance checks.
+  - Files changed:
+    - `ISSUES-TASK.md`
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/jobs/phase3_e2e_smoke.py`
+    - `tests/processing/test_phase3_end_to_end.py`
+  - Acceptance evidence:
+    - Spark-boundary dimension materialization behavior is validated via CDC-like dimension records projected through `DimensionMaterializer` into curated in-memory dimension state.
+    - Raw CDC-like news input is converted into canonical article using `DimensionEnrichmentService` and first-emit processor contracts.
+    - Cleaned article row is validated after first emit (`classification_status=pending`) and after classification (`classification_status=classified`).
+    - Redis global and country feeds are validated before classification is complete.
+    - Classification update adds root topic metadata and top candidates.
+    - Redis root-topic and country+root-topic feeds are validated after classification projection.
+    - Qdrant payload assertions validate required filter fields and visibility state.
+    - Replay idempotency is validated by `ProjectionFanout` replay skip and stable Qdrant upsert count.
+    - Delete/visibility update validates Redis cleanup and Qdrant `is_visible=false`.
+    - Local smoke script prints explicit PASS/FAIL checkpoint lines for each acceptance area.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 33 tests.
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 apps/processing/news-pipeline/jobs/phase3_e2e_smoke.py` -> passed, all 9 acceptance checkpoints PASS.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
+
+## Runtime MVP Issue Dependency Order
+
+- [x] `#25` Phase 3 Runtime MVP: Runtime foundation and CDC adapter smoke
+  - Status: Completed on 2026-04-26.
+  - Parent: `#24` PRD: Phase 3 runtime MVP from CDC topics to serving stores.
+  - Related issues: unlocks `#26`, `#27`, and `#28`.
+  - Notes: Added the reusable runtime foundation for the first real CDC jobs without attempting the full CDC-to-serving flow.
+  - Files changed:
+    - `ISSUES-TASK.md`
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/jobs/phase3_runtime_foundation_smoke.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/cdc.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/runtime_adapters.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/runtime_config.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/topic_bootstrap.py`
+    - `tests/processing/test_phase3_runtime_foundation.py`
+  - Acceptance evidence:
+    - `Phase3RuntimeConfig` loads Kafka, Schema Registry, PostgreSQL, Redis, Qdrant, NVIDIA, topic names, 5-day window, source topic prefix, and checkpoint root settings from environment with local defaults.
+    - NVIDIA runtime config records only whether `NVIDIA_API_KEY` is present; the secret is not stored or logged by the config object.
+    - `DebeziumAvroCdcDecoder` decodes insert/read, update, and delete envelopes into `TableChangeRecord` with operation, key, before/after payload, source table, and event timestamp.
+    - Decoder tests cover insert/update/delete envelopes, missing value payloads, invalid operations, missing update `after`, and missing delete `before`.
+    - PostgreSQL adapter classes exist for curated dimensions, topic taxonomy, topic embeddings, and projection state using existing repository contracts.
+    - Kafka adapter boundaries exist for keyed canonical article publication and status-filtered in-memory canonical topic consumption.
+    - Redis and Qdrant runtime wrappers exist behind the existing projector client protocols.
+    - Qdrant runtime wrapper can ensure the `phase3_articles` collection through an injected local client boundary and upsert points by `article_id`.
+    - Topic bootstrap specs create or verify `phase3.canonical-articles` as compacted and `phase3.canonical-articles.dlq` as delete-retained.
+    - Runtime foundation smoke reports PASS/FAIL for config loading, CDC decode fixture, topic bootstrap specs, and live local PostgreSQL, Kafka, Schema Registry, Redis, and Qdrant connectivity.
+    - NVIDIA config presence is reported as WARN when `NVIDIA_API_KEY` is absent; the existing `nvidia_embedding_smoke.py` remains the live provider validation path once secrets are loaded.
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 38 tests.
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 apps/processing/news-pipeline/jobs/phase3_runtime_foundation_smoke.py` -> passed with live local PostgreSQL, Kafka, Schema Registry, Redis, and Qdrant connectivity; `NVIDIA_API_KEY` reported WARN because the secret was not loaded.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
+  - Issues faced:
+    - Initial sandboxed socket checks failed with `Operation not permitted`; the smoke needed escalated local service access to validate runtime ports.
+    - Redis and Qdrant were not running on the repo's configured Phase 3 ports during the first live smoke.
+  - Solutions:
+    - Started the local Compose `redis` and `qdrant` services.
+    - Kept live clients injectable behind adapter boundaries and made the foundation smoke explicit about PASS, FAIL, and NVIDIA WARN behavior.
+
+- [ ] `#26` Phase 3 Runtime MVP: CDC to pending canonical and Redis global feed
+  - Status: In progress as of 2026-04-26.
+  - Blocked by: `#25` completed.
+  - Completion rule: Must run real Spark processing from actual Phase 2 Debezium Kafka CDC topics into real local PostgreSQL, canonical Kafka output, and Redis feed/card state. Do not mark complete from fixture-only or in-memory smoke results.
+  - Progress notes:
+    - Added `pending_feed_runtime.py` as the first runtime behavior module for decoded CDC-to-pending-feed processing.
+    - Mapped decoded Phase 2 source tables to curated dimensions:
+      - `public.table_links` -> `links`
+      - `public.table_authority` -> `authorities`
+      - `public.table_sedition` -> `seditions`
+      - `public.table_pays` -> `countries`
+      - `public.table_rubrique` -> `rubrics`
+      - `public.table_langue` -> `languages`
+    - Dimension CDC deletes now become inactive curated records through the existing dimension materializer contract.
+    - News CDC records from `public.table_news` are filtered by the configured 5-day MVP window before canonical processing.
+    - Pending canonical processing enriches from curated dimensions and preserves the authority/sedition country before link-country fallback already covered by dimension enrichment tests.
+    - Pending canonical events are emitted through the canonical producer only when the cleaned article upsert changes state, so exact replay does not duplicate canonical output.
+    - Redis projection writes compact pre-classification cards and global/country feed memberships; cards exclude full body text.
+    - PostgreSQL dimension runtime adapter now writes filtered curated columns as first-class table columns as well as the JSON payload.
+    - Added `phase3_pending_feed_smoke.py` to prove the first decoded CDC fixture path through curated dimensions, cleaned pending article state, canonical pending event output, Redis feed/card state, and replay idempotency.
+  - Files changed:
+    - `ISSUES-TASK.md`
+    - `apps/processing/news-pipeline/README.md`
+    - `apps/processing/news-pipeline/jobs/phase3_pending_feed_smoke.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/dimensions.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/pending_feed_runtime.py`
+    - `apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/runtime_adapters.py`
+    - `tests/processing/test_phase3_pending_feed_runtime.py`
+    - `tests/processing/test_phase3_runtime_foundation.py`
+  - Verification:
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'` -> passed, 43 tests.
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 apps/processing/news-pipeline/jobs/phase3_pending_feed_smoke.py` -> passed, all 6 pending-feed checkpoints PASS.
+    - `PYTHONPATH=apps/processing/news-pipeline/src python3 apps/processing/news-pipeline/jobs/phase3_runtime_foundation_smoke.py` -> passed with local PostgreSQL, Kafka, Schema Registry, Redis, and Qdrant connectivity; `NVIDIA_API_KEY` reported WARN because the secret was not loaded.
+    - `python3 -m compileall apps/processing/news-pipeline/src apps/processing/news-pipeline/jobs tests/processing` -> passed.
+  - Remaining acceptance criteria before completion:
+    - Wire the Spark entrypoints to consume raw Debezium Avro CDC topics through the decoder rather than CDC fixtures.
+    - Run a local CDC insert/replay against Kafka/PostgreSQL/Redis and verify the same checkpoints against real stores.
+    - Confirm stable manual `spark-submit` commands and checkpoint paths for each source dimension type and the canonical processor.
+  - Runtime progress on 2026-04-26:
+    - Added dedicated Compose driver services for dimension materialization, canonical processing, classification, Redis projection, and Qdrant projection.
+    - Added Spark History Server with persisted event logs so job runs are debuggable from UI.
+    - Added a real topic embedding refresh driver that used NVIDIA embeddings and wrote `phase3_topic_taxonomy` / `phase3_topic_embeddings` in PostgreSQL.
+    - Switched the runtime drivers to container-local Spark mode so the jobs can run concurrently without depending on the shared worker's limited memory.
+    - Reset the live topic taxonomy tables to the Medtop seed and regenerated 17 active topic embeddings with richer input text.
+
+- [ ] `#27` Phase 3 Runtime MVP: NVIDIA classification and Qdrant projection
+  - Status: Not started.
+  - Blocked by: `#25` and the pending canonical runtime path in `#26`.
+  - Completion rule: Must consume real pending canonical Kafka events, call real NVIDIA embeddings, update real PostgreSQL cleaned rows, write real Redis topic feeds, and write real Qdrant article vectors. Fixture-only classifier/projector tests are not completion evidence.
+
+- [ ] `#28` Phase 3 Runtime MVP: Local runtime validation and MVP handoff
+  - Status: Not started.
+  - Blocked by: `#26` and `#27`.
+  - Completion rule: Must validate the complete real local runtime after clean restart and replay, with pass/fail evidence from Kafka, PostgreSQL, Redis, and Qdrant. Documentation alone cannot complete the issue.
 
 ## Session Notes
 

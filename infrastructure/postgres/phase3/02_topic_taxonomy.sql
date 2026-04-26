@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS phase3_topic_taxonomy
     display_name text NOT NULL,
     description text NOT NULL,
     tags jsonb NOT NULL DEFAULT '[]'::jsonb,
+    sub_topics jsonb NOT NULL DEFAULT '[]'::jsonb,
     translations jsonb NOT NULL DEFAULT '[]'::jsonb,
     model_hint text NOT NULL DEFAULT '',
     taxonomy_version text NOT NULL,

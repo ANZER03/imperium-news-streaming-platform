@@ -76,12 +76,12 @@ class EmbeddingSimilarityClassificationTests(unittest.TestCase):
         self.assertEqual(gateway.calls[0][0].item_id, article.article_id)
         self.assertEqual(classified.classification_status, "classified")
         self.assertEqual(classified.classification_method, "embedding_similarity")
-        self.assertEqual(classified.primary_topic_id, 101)
-        self.assertEqual(classified.primary_topic_label, "Elections")
-        self.assertEqual(classified.root_topic_id, 100)
-        self.assertEqual(classified.root_topic_label, "Politics")
+        self.assertEqual(classified.primary_topic_id, 11000000)
+        self.assertEqual(classified.primary_topic_label, "Politics and government")
+        self.assertEqual(classified.root_topic_id, 11000000)
+        self.assertEqual(classified.root_topic_label, "Politics and government")
         self.assertEqual(classified.topic_confidence, 1.0)
-        self.assertEqual([candidate["topic_id"] for candidate in classified.topic_candidates], [101, 201, 301])
+        self.assertEqual([candidate["topic_id"] for candidate in classified.topic_candidates], [11000000, 4000000, 13000000])
         self.assertEqual(classified.classification_model, DEFAULT_EMBEDDING_MODEL)
         self.assertEqual(len(classified.classification_input_hash or ""), 64)
 
@@ -115,10 +115,10 @@ class EmbeddingSimilarityClassificationTests(unittest.TestCase):
         self.assertTrue(processor.process(article))
 
         self.assertEqual(set(repository.rows), {article.article_id})
-        self.assertEqual(repository.rows[article.article_id]["primary_topic_id"], 301)
-        self.assertEqual(repository.rows[article.article_id]["root_topic_id"], 300)
+        self.assertEqual(repository.rows[article.article_id]["primary_topic_id"], 13000000)
+        self.assertEqual(repository.rows[article.article_id]["root_topic_id"], 13000000)
         self.assertEqual(len(producer.emitted), 2)
-        self.assertEqual(producer.emitted[-1]["primary_topic_id"], 301)
+        self.assertEqual(producer.emitted[-1]["primary_topic_id"], 13000000)
 
 
 def _classifier(gateway: RecordingGateway) -> EmbeddingSimilarityClassifier:
@@ -129,29 +129,29 @@ def _classifier(gateway: RecordingGateway) -> EmbeddingSimilarityClassifier:
         topic_embedding_repository=InMemoryTopicEmbeddingRepository(
             (
                 TopicEmbedding(
-                    topic_id=101,
+                    topic_id=11000000,
                     taxonomy_version="phase3-v1",
                     embedding_model=DEFAULT_EMBEDDING_MODEL,
                     embedding_dimension=2,
-                    embedding_input_text="elections",
+                    embedding_input_text="politics",
                     embedding_input_hash="a",
                     embedding_vector=(1.0, 0.0),
                 ),
                 TopicEmbedding(
-                    topic_id=201,
+                    topic_id=4000000,
                     taxonomy_version="phase3-v1",
                     embedding_model=DEFAULT_EMBEDDING_MODEL,
                     embedding_dimension=2,
-                    embedding_input_text="markets",
+                    embedding_input_text="business",
                     embedding_input_hash="b",
                     embedding_vector=(0.8, 0.2),
                 ),
                 TopicEmbedding(
-                    topic_id=301,
+                    topic_id=13000000,
                     taxonomy_version="phase3-v1",
                     embedding_model=DEFAULT_EMBEDDING_MODEL,
                     embedding_dimension=2,
-                    embedding_input_text="ai",
+                    embedding_input_text="technology",
                     embedding_input_hash="c",
                     embedding_vector=(0.0, 1.0),
                 ),

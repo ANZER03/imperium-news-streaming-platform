@@ -155,7 +155,7 @@ class EmbeddingGateway:
             failures.append(EmbeddingFailure(item_id=batch[0].item_id, reason=str(exc)))
             return
 
-        for item, vector in zip(batch, vectors, strict=True):
+        for item, vector in zip(batch, vectors):
             embeddings[item.item_id] = vector
 
     def _call_with_retries(self, batch: tuple[EmbeddingRequestItem, ...]) -> tuple[tuple[float, ...], ...]:

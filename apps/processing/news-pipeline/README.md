@@ -6,10 +6,11 @@ The first tracer bullet implements GitHub issue `#14`: convert CDC-like
 `table_news` records into a canonical article, upsert the cleaned article into
 PostgreSQL, and emit the canonical event with `classification_status=pending`.
 
-The topic taxonomy slice implements the core of GitHub issue `#17`: hierarchical
-root and primary topics, multilingual topic metadata, deterministic topic
-embedding input text, embedding input hashing, and active embedding repository
-contracts for the classifier.
+The topic taxonomy slice implements the core of GitHub issue `#17`: the
+`news_topic_taxonomy_medtop_en_us.json` Medtop seed, deterministic topic
+embedding input text from topic name, description, tags, and sub-topics,
+embedding input hashing, and active embedding repository contracts for the
+classifier.
 
 The dimension materialization slice implements GitHub issue `#15`: Spark reads
 dimension CDC topics, projects filtered curated records, handles deletes as
@@ -58,11 +59,60 @@ Use `#21` for semantic search and vector filtering. Qdrant stores embedding plus
 payload filters so later search jobs can ask for topic, country, language, or
 visibility constraints without depending on Redis state.
 
+The replay-safe projection state slice implements GitHub issue `#22`: projection
+state stores `article_id`, `country_id`, `root_topic_id`, `published_at`,
+`is_visible`, and `is_deleted` so fanout can detect duplicate replays, clean old
+country/root-topic memberships on updates, and keep hide/delete cleanup safe for
+both Redis and Qdrant.
+
+The runtime foundation slice implements GitHub issue `#25`: Phase 3 runtime
+configuration loads local Compose defaults, Debezium Avro CDC envelopes decode
+into stable table-change records, Kafka topic bootstrap specs define canonical
+and DLQ topic behavior, and concrete adapter boundaries exist for PostgreSQL,
+Kafka, Redis, Qdrant, and NVIDIA runtime wiring.
+
+The pending feed runtime slice starts GitHub issue `#26`: decoded Debezium CDC
+dimension changes are materialized into curated dimension records, decoded news
+changes in the 5-day MVP window become pending canonical articles enriched from
+curated dimensions, pending canonical events are emitted by `article_id`, and
+Redis writes compact `article:{article_id}`, `feed:global`, and
+`feed:country:{country_id}` state before classification.
+
 ## Local Tests
 
 ```bash
 PYTHONPATH=apps/processing/news-pipeline/src python3 -m unittest discover -s tests/processing -p 'test_*.py'
 ```
+
+Phase 3 end-to-end smoke report (`#23`) with explicit acceptance checkpoints:
+
+```bash
+PYTHONPATH=apps/processing/news-pipeline/src python3 apps/processing/news-pipeline/jobs/phase3_e2e_smoke.py
+```
+
+Phase 3 runtime foundation smoke report (`#25`) with offline foundation checks:
+
+```bash
+PYTHONPATH=apps/processing/news-pipeline/src python3 apps/processing/news-pipeline/jobs/phase3_runtime_foundation_smoke.py
+```
+
+The foundation smoke reports PASS for config loading, CDC fixture decoding,
+topic bootstrap specs, and live local PostgreSQL, Kafka, Schema Registry, Redis,
+and Qdrant connectivity. It reports WARN for NVIDIA when `NVIDIA_API_KEY` is
+not supplied, because the live provider smoke remains
+`jobs/nvidia_embedding_smoke.py`.
+
+Phase 3 pending feed smoke report (`#26` first runtime behavior slice):
+
+```bash
+PYTHONPATH=apps/processing/news-pipeline/src python3 apps/processing/news-pipeline/jobs/phase3_pending_feed_smoke.py
+```
+
+The pending feed smoke decodes CDC fixtures for curated dimensions and one news
+event, writes a pending cleaned article, emits the canonical pending event,
+projects Redis global/country feed state, checks Redis cards exclude full body
+text, and replays the same news event to prove idempotent cleaned/Kafka/Redis
+behavior.
 
 ## Spark Entrypoint
 
@@ -117,10 +167,47 @@ small vector-gateway and Qdrant-client abstractions so Qdrant health remains
 independent from Redis projection health. `projection_fanout.py` is a minimal
 coordinator that invokes both projectors and preserves failure isolation.
 
+`imperium_news_pipeline.phase3.projection_state` owns replay-safe projection
+state contracts behind a repository abstraction. `ProjectionFanout` reads prior
+state to remove stale Redis memberships on country/topic updates, skips exact
+replays, and only persists new state when both Redis and Qdrant projectors
+succeed.
+
 `jobs/nvidia_embedding_smoke.py` is a manual smoke entrypoint for the real
 NVIDIA API. It reads the `NVIDIA_*` environment variables, sends two short
 texts through the gateway, and prints a compact success summary. It does not
 log the API key or persist results.
+
+`imperium_news_pipeline.phase3.runtime_config` centralizes runtime environment
+parsing for Kafka, Schema Registry, PostgreSQL, Redis, Qdrant, NVIDIA,
+checkpoint roots, source topic prefix, canonical topic names, and the 5-day MVP
+window.
+
+`imperium_news_pipeline.phase3.cdc` owns the reusable Debezium Avro CDC decoder
+boundary. Spark jobs should deserialize Avro at the job edge, then pass key and
+value mappings into `DebeziumAvroCdcDecoder` to get table-change records with
+operation, key, before/after payloads, source table, and event timestamp.
+
+`imperium_news_pipeline.phase3.runtime_adapters` owns the first concrete local
+adapter wrappers for PostgreSQL repositories, canonical Kafka event IO, Redis
+commands, and Qdrant collection/point writes. These adapters keep live clients
+at the runtime edge while preserving the existing testable repository and
+projector abstractions.
+
+`imperium_news_pipeline.phase3.topic_bootstrap` defines the local runtime Kafka
+topic specs. `phase3.canonical-articles` is compacted with bounded retention;
+`phase3.canonical-articles.dlq` is delete-retained for runtime failures. The
+foundation smoke validates the spec shape; later runtime jobs should use the
+admin adapter against the live Kafka cluster before consuming or producing.
+
+`imperium_news_pipeline.phase3.pending_feed_runtime` owns the first `#26`
+runtime behavior. It maps Phase 2 source tables (`table_links`,
+`table_authority`, `table_sedition`, `table_pays`, `table_rubrique`,
+`table_langue`, and `table_news`) from decoded CDC envelopes into the existing
+dimension, canonical article, producer, and Redis projector contracts. It keeps
+the 5-day MVP window and replay/idempotency behavior testable before the Spark
+job entrypoints are fully wired to live Avro deserialization and concrete
+clients.
 
 ## Spark Submit Model
 
@@ -163,3 +250,54 @@ Dimension materializer submit shape:
 Do not reuse the same checkpoint directory across jobs. A checkpoint path is
 part of the streaming job identity and must remain stable for that specific job
 only.
+
+## Compose Driver Runtime
+
+The local runtime now has one dedicated driver container per Phase 3 job:
+
+- `phase3-topic-embedding-driver`
+- `phase3-dimension-driver`
+- `phase3-canonical-driver`
+- `phase3-classification-driver`
+- `phase3-redis-driver`
+- `phase3-qdrant-driver`
+- `spark-history-server`
+- `spark-worker-1`
+- `spark-worker-2`
+- `spark-worker-3`
+
+Runtime cadence:
+- dimension materializer runs as fast as it can on its own trigger loop
+- canonical news processing uses a 5 second processing-time trigger
+- classification, Redis, and Qdrant projection use 15 second processing-time triggers
+- this keeps dimensions ahead of news without depending on source-order luck
+
+Bring up the full real runtime with:
+
+```bash
+SPARK_HISTORY_UI_EXTERNAL_PORT=48182 \
+docker-compose --env-file .env \
+  --profile backbone \
+  --profile source \
+  --profile serving \
+  --profile processing \
+  up -d \
+  spark-history-server \
+  phase3-topic-embedding-driver \
+  phase3-dimension-driver \
+  phase3-canonical-driver \
+  phase3-classification-driver \
+  phase3-redis-driver \
+  phase3-qdrant-driver
+```
+
+Notes:
+
+- Each driver keeps its own checkpoint under `/tmp/imperium/phase3/checkpoints`.
+- Spark event logs are written to the shared `spark-events` volume.
+- Spark History Server reads those logs and exposes the UI on the configured
+  host port.
+- The driver containers run `spark-submit` directly rather than requiring
+  interactive execution inside `spark-master`.
+- The Spark cluster now runs with 3 workers so the long-lived jobs do not fight
+  over a single worker.

@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from hashlib import sha256
 import json
+from pathlib import Path
+import re
+import unicodedata
 from typing import Protocol, Sequence
 
 
@@ -33,6 +36,7 @@ class Topic:
     display_name: str
     description: str
     tags: tuple[str, ...] = ()
+    sub_topics: tuple[str, ...] = ()
     translations: tuple[TopicTranslation, ...] = ()
     model_hint: str = ""
     taxonomy_version: str = DEFAULT_TAXONOMY_VERSION
@@ -131,6 +135,7 @@ class TopicEmbeddingInputBuilder:
             f"Topic: {topic.display_name}",
             f"Description: {topic.description}",
             _join_items("Tags", topic.tags),
+            _join_items("Sub-topics", topic.sub_topics),
             _join_items("Model hint", (topic.model_hint,)),
             *context,
             _translations_text(topic.translations),
@@ -187,89 +192,27 @@ class InMemoryTopicEmbeddingRepository:
 
 
 def seed_phase3_topics(taxonomy_version: str = DEFAULT_TAXONOMY_VERSION) -> tuple[Topic, ...]:
-    return (
-        Topic(
-            topic_id=100,
-            topic_key="politics",
-            display_name="Politics",
-            description="Government, elections, public policy, diplomacy, and public institutions.",
-            tags=("government", "elections", "policy", "diplomacy"),
-            translations=(
-                TopicTranslation("fr", "Politique", "Gouvernement, elections, politiques publiques.", ("gouvernement", "elections")),
-                TopicTranslation("ar", "السياسة", "الحكومة والانتخابات والسياسات العامة.", ("حكومة", "انتخابات")),
-            ),
-            model_hint="Classify institutional power, parties, ministers, elected officials, and policy decisions here.",
+    return load_medtop_topics(taxonomy_version)
+
+
+def load_medtop_topics(taxonomy_version: str = DEFAULT_TAXONOMY_VERSION) -> tuple[Topic, ...]:
+    path = Path(__file__).resolve().parents[3] / "resources" / "news_topic_taxonomy_medtop_en_us.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    topics = []
+    for item in data:
+        topic = Topic(
+            topic_id=_medtop_topic_id(item["id"]),
+            topic_key=_slugify_topic_key(item["name"]),
+            display_name=item["name"],
+            description=item.get("description", ""),
+            tags=tuple(item.get("tags", ())),
+            sub_topics=tuple(item.get("sub_topics", ())),
+            translations=(),
+            model_hint="",
             taxonomy_version=taxonomy_version,
-        ),
-        Topic(
-            topic_id=101,
-            topic_key="politics.elections",
-            display_name="Elections",
-            description="Campaigns, voting, electoral commissions, polling, and election results.",
-            tags=("campaigns", "voting", "polling", "results"),
-            translations=(
-                TopicTranslation("fr", "Elections", "Campagnes, vote, sondages et resultats electoraux.", ("vote", "sondages")),
-                TopicTranslation("ar", "الانتخابات", "الحملات والتصويت والنتائج الانتخابية.", ("تصويت", "نتائج")),
-            ),
-            model_hint="Prefer this leaf for campaign events, turnout, vote counting, polls, and electoral disputes.",
-            taxonomy_version=taxonomy_version,
-            parent_topic_id=100,
-        ),
-        Topic(
-            topic_id=200,
-            topic_key="business",
-            display_name="Business",
-            description="Companies, markets, industry, banking, trade, labor, and the economy.",
-            tags=("companies", "markets", "economy", "banking", "trade"),
-            translations=(
-                TopicTranslation("fr", "Economie", "Entreprises, marches, industrie, banques et commerce.", ("entreprises", "marches")),
-                TopicTranslation("ar", "الاقتصاد", "الشركات والاسواق والصناعة والبنوك والتجارة.", ("شركات", "اسواق")),
-            ),
-            model_hint="Classify macroeconomic news, corporate actions, finance, and trade here.",
-            taxonomy_version=taxonomy_version,
-        ),
-        Topic(
-            topic_id=201,
-            topic_key="business.markets",
-            display_name="Markets",
-            description="Financial markets, stocks, commodities, currencies, and investor activity.",
-            tags=("stocks", "commodities", "currencies", "investors"),
-            translations=(
-                TopicTranslation("fr", "Marches", "Bourses, matieres premieres, devises et investisseurs.", ("bourse", "devises")),
-                TopicTranslation("ar", "الاسواق", "الاسهم والسلع والعملات ونشاط المستثمرين.", ("اسهم", "عملات")),
-            ),
-            model_hint="Prefer this leaf for market movement, exchange data, commodities, and investor sentiment.",
-            taxonomy_version=taxonomy_version,
-            parent_topic_id=200,
-        ),
-        Topic(
-            topic_id=300,
-            topic_key="technology",
-            display_name="Technology",
-            description="Software, hardware, telecom, cybersecurity, AI, startups, and digital policy.",
-            tags=("software", "ai", "cybersecurity", "telecom", "startups"),
-            translations=(
-                TopicTranslation("fr", "Technologie", "Logiciels, IA, cybersecurite, telecoms et startups.", ("logiciel", "ia")),
-                TopicTranslation("ar", "التكنولوجيا", "البرمجيات والذكاء الاصطناعي والامن السيبراني والاتصالات.", ("برمجيات", "ذكاء اصطناعي")),
-            ),
-            model_hint="Classify digital products, AI, security incidents, telecom infrastructure, and tech firms here.",
-            taxonomy_version=taxonomy_version,
-        ),
-        Topic(
-            topic_id=301,
-            topic_key="technology.ai",
-            display_name="Artificial Intelligence",
-            description="AI models, deployment, regulation, chips, automation, and applied machine learning.",
-            tags=("ai models", "machine learning", "automation", "chips", "regulation"),
-            translations=(
-                TopicTranslation("fr", "Intelligence artificielle", "Modeles IA, automatisation, puces et regulation.", ("ia", "automatisation")),
-                TopicTranslation("ar", "الذكاء الاصطناعي", "نماذج الذكاء الاصطناعي والتشغيل الالي والرقائق والتنظيم.", ("ذكاء اصطناعي", "رقائق")),
-            ),
-            model_hint="Prefer this leaf for model releases, AI regulation, automation, model infrastructure, and ML applications.",
-            taxonomy_version=taxonomy_version,
-            parent_topic_id=300,
-        ),
-    )
+        )
+        topics.append(topic)
+    return tuple(topics)
 
 
 def topic_to_record(topic: Topic) -> dict[str, object]:
@@ -280,6 +223,7 @@ def topic_to_record(topic: Topic) -> dict[str, object]:
         "display_name": topic.display_name,
         "description": topic.description,
         "tags": list(topic.tags),
+        "sub_topics": list(topic.sub_topics),
         "translations": [translation.to_mapping() for translation in topic.translations],
         "model_hint": topic.model_hint,
         "taxonomy_version": topic.taxonomy_version,
@@ -312,3 +256,14 @@ def _translations_text(translations: tuple[TopicTranslation, ...]) -> str:
     if not lines:
         return ""
     return "Translations:\n" + "\n".join(lines)
+
+
+def _medtop_topic_id(topic_code: str) -> int:
+    numeric = topic_code.split(":", 1)[-1]
+    return int(numeric)
+
+
+def _slugify_topic_key(name: str) -> str:
+    normalized = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", ".", normalized.lower()).strip(".")
+    return slug or "topic"
