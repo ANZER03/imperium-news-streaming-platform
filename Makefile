@@ -2,7 +2,7 @@ COMPOSE ?= docker-compose
 FOUNDATION_PROFILE ?= foundation
 PROCESSING_PROFILE ?= processing
 ENV_FILE ?= .env
-PROCESSING_SERVICES := imperium-dimension-driver imperium-canonical-enrichment-driver imperium-classification-driver imperium-redis-driver imperium-redis-topics-driver imperium-qdrant-driver
+PROCESSING_SERVICES := imperium-dimension-driver imperium-canonical-enrichment-driver imperium-classification-driver imperium-redis-projector imperium-postgres-projector imperium-qdrant-projector
 
 .PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test validate-reference-cdc validate-metadata-cdc validate-news-cdc source-db-refresh cdc-clean cdc-up cdc-verify cdc-reset-and-verify processing-config processing-down processing-clean processing-clean-full processing-up processing-reset-and-run processing-logs processing-validate clean-all-from-source
 

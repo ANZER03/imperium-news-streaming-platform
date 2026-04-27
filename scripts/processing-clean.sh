@@ -25,9 +25,9 @@ processing_containers=(
   imperium-dimension-driver \
   imperium-canonical-driver \
   imperium-classification-driver \
-  imperium-redis-driver \
-  imperium-redis-topics-driver \
-  imperium-qdrant-driver
+  imperium-redis-projector \
+  imperium-postgres-projector \
+  imperium-qdrant-projector
 )
 
 docker rm -f "${processing_containers[@]}" >/dev/null 2>&1 || true
@@ -96,9 +96,9 @@ elif [[ "${MODE}" == "--full-reset" ]]; then
     imperium-dimension-driver \
     imperium-canonical-driver \
     imperium-classification-driver \
-    imperium-redis-driver \
-    imperium-redis-topics-driver \
-    imperium-qdrant-driver >/dev/null 2>&1 || true
+    imperium-redis-projector \
+    imperium-postgres-projector \
+    imperium-qdrant-projector >/dev/null 2>&1 || true
 
   pg_exec <<'SQL'
 DROP TABLE IF EXISTS public.phase3_projection_state;
@@ -172,7 +172,7 @@ if [[ "${MODE}" != "--refactor-reset" ]]; then
   qdrant_request -X DELETE "${QDRANT_URL}/collections/imperium_articles" >/dev/null 2>&1 || true
   qdrant_request -X PUT "${QDRANT_URL}/collections/imperium_articles" \
     -H 'Content-Type: application/json' \
-    -d '{"vectors":{"size":1024,"distance":"Cosine"}}' >/dev/null
+    -d '{"vectors":{"size":768,"distance":"Cosine"}}' >/dev/null
 fi
 
 docker exec -i imperium-spark-master bash -lc "rm -rf '${PROCESSING_CHECKPOINT_ROOT}' '/tmp/imperium/phase3/checkpoints-live' '/tmp/imperium/phase3/checkpoints-qdrant-replay' '/tmp/imperium/phase3/checkpoints-redis-topics'" >/dev/null 2>&1 || true

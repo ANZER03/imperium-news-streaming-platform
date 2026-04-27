@@ -15,6 +15,7 @@ class KafkaRuntimeConfig:
     canonical_topic: str
     canonical_dlq_topic: str
     canonical_retry_topic: str
+    classified_topic: str
     source_topic_prefix: str
 
     def source_topic(self, table_name: str) -> str:
@@ -89,6 +90,7 @@ class Phase3RuntimeConfig:
                 canonical_topic=_get(values, "PHASE3_CANONICAL_TOPIC", "imperium.canonical-articles"),
                 canonical_dlq_topic=_get(values, "PHASE3_CANONICAL_DLQ_TOPIC", "imperium.canonical-articles.dlq"),
                 canonical_retry_topic=_get(values, "PHASE3_CANONICAL_RETRY_TOPIC", "imperium.canonical-articles.retry"),
+                classified_topic=_get(values, "PHASE3_CLASSIFIED_TOPIC", "imperium.news.classified"),
                 source_topic_prefix=_get(values, "PHASE3_SOURCE_TOPIC_PREFIX", DEFAULT_SOURCE_TOPIC_PREFIX),
             ),
             postgres=PostgresRuntimeConfig(

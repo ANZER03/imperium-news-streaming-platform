@@ -399,8 +399,8 @@ services:
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
       --conf spark.cores.max=2
-      --conf spark.executor.memory=2g
-      --conf spark.driver.memory=2g
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.eventLog.enabled=true
@@ -432,9 +432,9 @@ services:
       /opt/spark/bin/spark-submit
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
-      --conf spark.cores.max=3
-      --conf spark.executor.memory=2g
-      --conf spark.driver.memory=2g
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.eventLog.enabled=true
@@ -466,9 +466,9 @@ services:
       /opt/spark/bin/spark-submit
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
-      --conf spark.cores.max=3
-      --conf spark.executor.memory=2g
-      --conf spark.driver.memory=2g
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.eventLog.enabled=true
@@ -502,9 +502,9 @@ services:
       /opt/spark/bin/spark-submit
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
-      --conf spark.cores.max=4
-      --conf spark.executor.memory=2g
-      --conf spark.driver.memory=2g
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
       --conf spark.driver.bindAddress=0.0.0.0
       --conf spark.driver.port=31000
       --conf spark.blockManager.port=32000
@@ -518,6 +518,7 @@ services:
 
   imperium-classification-driver:
     <<: *phase3-driver-defaults
+    restart: "no"
     container_name: imperium-classification-driver
     hostname: imperium-classification-driver
     environment:
@@ -531,9 +532,9 @@ services:
       PHASE3_REDIS_URL: redis://redis:6379/0
       PHASE3_QDRANT_URL: http://qdrant:6333
       PHASE3_CLASSIFICATION_STARTING_OFFSETS: earliest
-      PHASE3_CLASSIFICATION_MAX_OFFSETS_PER_TRIGGER: 2500
-      PHASE3_CLASSIFICATION_TRIGGER_PROCESSING_TIME: 5 seconds
-      PHASE3_CLASSIFICATION_EMBEDDING_BATCH_SIZE: 8191
+      PHASE3_CLASSIFICATION_MAX_OFFSETS_PER_TRIGGER: 700
+      PHASE3_CLASSIFICATION_TRIGGER_PROCESSING_TIME: 10 seconds
+      PHASE3_CLASSIFICATION_EMBEDDING_BATCH_SIZE: 100
       PHASE3_CLASSIFICATION_NVIDIA_RPM_BUDGET: 24
       PHASE3_CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
       SPARK_EVENTLOG_DIR: file:/tmp/spark-events
@@ -547,8 +548,8 @@ services:
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
       --conf spark.cores.max=2
-      --conf spark.executor.memory=2g
-      --conf spark.driver.memory=2g
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
       --conf spark.driver.bindAddress=0.0.0.0
       --conf spark.driver.port=31001
       --conf spark.blockManager.port=32001
@@ -560,130 +561,48 @@ services:
       /opt/imperium/news-pipeline/jobs/phase3_classification_runtime.py
       '
 
-  imperium-redis-driver:
-    <<: *phase3-driver-defaults
-    container_name: imperium-redis-driver
-    hostname: imperium-redis-driver
+  imperium-redis-projector:
+    <<: *service-defaults
+    build:
+      context: ./apps/processing/news-pipeline/jobs/projections
+    container_name: imperium-redis-projector
+    hostname: imperium-redis-projector
+    profiles:
+      - processing
     environment:
-      PYTHONPATH: /opt/imperium/news-pipeline/src
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      PHASE3_POSTGRES_DSN: postgresql://postgres:postgres@postgres-source:5432/imperium-news-source
       PHASE3_REDIS_URL: redis://redis:6379/0
-      PHASE3_QDRANT_URL: http://qdrant:6333
-      PHASE3_REDIS_STARTING_OFFSETS: earliest
-      PHASE3_REDIS_MAX_OFFSETS_PER_TRIGGER: 5000
-      PHASE3_REDIS_TRIGGER_PROCESSING_TIME: 4 seconds
-      PHASE3_CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
-      SPARK_EVENTLOG_DIR: file:/tmp/spark-events
-    ports:
-      - "${PHASE3_REDIS_UI_EXTERNAL_PORT:-48102}:4040"
-      - "${PHASE3_REDIS_DRIVER_EXTERNAL_PORT:-47102}:31002"
-      - "${PHASE3_REDIS_BLOCKMANAGER_EXTERNAL_PORT:-47202}:32002"
-    command: >
-      bash -lc '
-      /opt/spark/bin/spark-submit
-      --master spark://spark-master:7077
-      --conf spark.executor.cores=1
-      --conf spark.cores.max=1
-      --conf spark.executor.memory=1g
-      --conf spark.driver.memory=1g
-      --conf spark.driver.bindAddress=0.0.0.0
-      --conf spark.driver.port=31002
-      --conf spark.blockManager.port=32002
-      --conf spark.ui.port=4040
-      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      --conf spark.eventLog.enabled=true
-      --conf spark.eventLog.dir=file:/tmp/spark-events
-      /opt/imperium/news-pipeline/jobs/phase3_redis_pending_projector.py
-      '
+    command: ["python", "redis_projector.py"]
 
-  imperium-redis-topics-driver:
-    <<: *phase3-driver-defaults
-    container_name: imperium-redis-topics-driver
-    hostname: imperium-redis-topics-driver
+  imperium-postgres-projector:
+    <<: *service-defaults
+    build:
+      context: ./apps/processing/news-pipeline/jobs/projections
+    container_name: imperium-postgres-projector
+    hostname: imperium-postgres-projector
+    profiles:
+      - processing
     environment:
-      PYTHONPATH: /opt/imperium/news-pipeline/src
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       PHASE3_POSTGRES_DSN: postgresql://postgres:postgres@postgres-source:5432/imperium-news-source
-      PHASE3_PROJECTION_STATE_TABLE: imperium_projection_state
-      PHASE3_REDIS_URL: redis://redis:6379/0
-      PHASE3_QDRANT_URL: http://qdrant:6333
-      PHASE3_REDIS_TOPICS_STARTING_OFFSETS: earliest
-      PHASE3_REDIS_TOPICS_MAX_OFFSETS_PER_TRIGGER: 5000
-      PHASE3_REDIS_TOPICS_TRIGGER_PROCESSING_TIME: 4 seconds
-      PHASE3_CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
-      SPARK_EVENTLOG_DIR: file:/tmp/spark-events
-    ports:
-      - "${PHASE3_REDIS_TOPICS_UI_EXTERNAL_PORT:-48103}:4040"
-      - "${PHASE3_REDIS_TOPICS_DRIVER_EXTERNAL_PORT:-47103}:31003"
-      - "${PHASE3_REDIS_TOPICS_BLOCKMANAGER_EXTERNAL_PORT:-47203}:32003"
-    command: >
-      bash -lc '
-      /opt/spark/bin/spark-submit
-      --master spark://spark-master:7077
-      --conf spark.executor.cores=1
-      --conf spark.cores.max=1
-      --conf spark.executor.memory=1g
-      --conf spark.driver.memory=1g
-      --conf spark.driver.bindAddress=0.0.0.0
-      --conf spark.driver.port=31003
-      --conf spark.blockManager.port=32003
-      --conf spark.ui.port=4040
-      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      --conf spark.eventLog.enabled=true
-      --conf spark.eventLog.dir=file:/tmp/spark-events
-      /opt/imperium/news-pipeline/jobs/phase3_redis_topics_projector.py
-      '
+    command: ["python", "postgres_projector.py"]
 
-  imperium-qdrant-driver:
-    <<: *phase3-driver-defaults
-    container_name: imperium-qdrant-driver
-    hostname: imperium-qdrant-driver
+  imperium-qdrant-projector:
+    <<: *service-defaults
+    build:
+      context: ./apps/processing/news-pipeline/jobs/projections
+    container_name: imperium-qdrant-projector
+    hostname: imperium-qdrant-projector
+    profiles:
+      - processing
     environment:
-      PYTHONPATH: /opt/imperium/news-pipeline/src
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      PHASE3_POSTGRES_DSN: postgresql://postgres:postgres@postgres-source:5432/imperium-news-source
-      PHASE3_REDIS_URL: redis://redis:6379/0
       PHASE3_QDRANT_URL: http://qdrant:6333
       PHASE3_QDRANT_COLLECTION: imperium_articles
-      PHASE3_QDRANT_STARTING_OFFSETS: earliest
-      PHASE3_QDRANT_MAX_OFFSETS_PER_TRIGGER: 1500
-      PHASE3_QDRANT_TRIGGER_PROCESSING_TIME: 5 seconds
-      PHASE3_QDRANT_EMBEDDING_BATCH_SIZE: 8191
-      PHASE3_QDRANT_EMBEDDING_CHUNK_SIZE: 8
-      PHASE3_QDRANT_EMBEDDING_MAX_RETRIES: 1
-      PHASE3_QDRANT_EMBEDDING_TIMEOUT_SECONDS: 10
-      PHASE3_QDRANT_EMBEDDING_SPLIT_ON_FAILURE: false
-      PHASE3_QDRANT_NVIDIA_RPM_BUDGET: 16
-      PHASE3_CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
-      SPARK_EVENTLOG_DIR: file:/tmp/spark-events
-    ports:
-      - "${PHASE3_QDRANT_UI_EXTERNAL_PORT:-48104}:4040"
-      - "${PHASE3_QDRANT_DRIVER_EXTERNAL_PORT:-47104}:31004"
-      - "${PHASE3_QDRANT_BLOCKMANAGER_EXTERNAL_PORT:-47204}:32004"
-    command: >
-      bash -lc '
-      /opt/spark/bin/spark-submit
-      --master spark://spark-master:7077
-      --conf spark.executor.cores=1
-      --conf spark.cores.max=2
-      --conf spark.executor.memory=2g
-      --conf spark.driver.memory=2g
-      --conf spark.driver.bindAddress=0.0.0.0
-      --conf spark.driver.port=31004
-      --conf spark.blockManager.port=32004
-      --conf spark.ui.port=4040
-      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      --conf spark.eventLog.enabled=true
-      --conf spark.eventLog.dir=file:/tmp/spark-events
-      /opt/imperium/news-pipeline/jobs/phase3_qdrant_projector_runtime.py
-      '
+    command: ["python", "qdrant_projector.py"]
 
   redis:
     <<: *service-defaults

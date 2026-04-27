@@ -10,6 +10,6 @@ compose --profile source --profile backbone --profile serving --profile processi
 compose --profile source --profile backbone --profile serving --profile processing up -d imperium-dimension-driver
 compose --profile source --profile backbone --profile serving --profile processing up -d imperium-canonical-driver
 compose --profile source --profile backbone --profile serving --profile processing up -d imperium-classification-driver
-compose --profile source --profile backbone --profile serving --profile processing up -d imperium-redis-driver
-compose --profile source --profile backbone --profile serving --profile processing up -d imperium-redis-topics-driver
-compose --profile source --profile backbone --profile serving --profile processing up -d imperium-qdrant-driver
+compose --profile source --profile backbone --profile serving --profile processing up -d imperium-redis-projector
+compose --profile source --profile backbone --profile serving --profile processing up -d imperium-postgres-projector
+compose --profile source --profile backbone --profile serving --profile processing up -d imperium-qdrant-projector

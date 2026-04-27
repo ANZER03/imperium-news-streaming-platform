@@ -8,9 +8,9 @@ compose --profile processing stop \
   imperium-dimension-driver \
   imperium-canonical-driver \
   imperium-classification-driver \
-  imperium-redis-driver \
-  imperium-redis-topics-driver \
-  imperium-qdrant-driver || true
+  imperium-redis-projector \
+  imperium-postgres-projector \
+  imperium-qdrant-projector || true
 
 docker rm -f \
   imperium-phase3-dimension-driver \
@@ -22,6 +22,6 @@ docker rm -f \
   imperium-dimension-driver \
   imperium-canonical-driver \
   imperium-classification-driver \
-  imperium-redis-driver \
-  imperium-redis-topics-driver \
-  imperium-qdrant-driver >/dev/null 2>&1 || true
+  imperium-redis-projector \
+  imperium-postgres-projector \
+  imperium-qdrant-projector >/dev/null 2>&1 || true
