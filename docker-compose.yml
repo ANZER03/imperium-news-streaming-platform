@@ -378,6 +378,8 @@ services:
     <<: *phase3-driver-defaults
     container_name: imperium-dimension-reference-driver
     hostname: imperium-dimension-reference-driver
+    ports:
+      - "44041:4040"
     environment:
       PYTHONPATH: /opt/imperium/news-pipeline/src
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
@@ -389,7 +391,7 @@ services:
       PHASE3_STARTING_OFFSETS: earliest
       PHASE3_REFERENCE_TRIGGER_PROCESSING_TIME: 5 seconds
       PHASE3_REFERENCE_MAX_OFFSETS_PER_TRIGGER: 10000
-      PHASE3_DIMENSION_DB_BATCH_SIZE: 5000
+      PHASE3_DIMENSION_DB_BATCH_SIZE: 50000
       SPARK_EVENTLOG_DIR: file:/tmp/spark-events
     command: >
       bash -lc '
@@ -410,6 +412,8 @@ services:
     <<: *phase3-driver-defaults
     container_name: imperium-dimension-authority-driver
     hostname: imperium-dimension-authority-driver
+    ports:
+      - "44042:4040"
     environment:
       PYTHONPATH: /opt/imperium/news-pipeline/src
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
@@ -421,7 +425,7 @@ services:
       PHASE3_STARTING_OFFSETS: earliest
       PHASE3_AUTHORITY_TRIGGER_PROCESSING_TIME: 5 seconds
       PHASE3_AUTHORITY_MAX_OFFSETS_PER_TRIGGER: 200000
-      PHASE3_DIMENSION_DB_BATCH_SIZE: 5000
+      PHASE3_DIMENSION_DB_BATCH_SIZE: 50000
       SPARK_EVENTLOG_DIR: file:/tmp/spark-events
     command: >
       bash -lc '
@@ -442,6 +446,8 @@ services:
     <<: *phase3-driver-defaults
     container_name: imperium-dimension-links-driver
     hostname: imperium-dimension-links-driver
+    ports:
+      - "44043:4040"
     environment:
       PYTHONPATH: /opt/imperium/news-pipeline/src
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
@@ -453,7 +459,7 @@ services:
       PHASE3_STARTING_OFFSETS: earliest
       PHASE3_LINKS_TRIGGER_PROCESSING_TIME: 5 seconds
       PHASE3_LINKS_MAX_OFFSETS_PER_TRIGGER: 200000
-      PHASE3_DIMENSION_DB_BATCH_SIZE: 5000
+      PHASE3_DIMENSION_DB_BATCH_SIZE: 50000
       SPARK_EVENTLOG_DIR: file:/tmp/spark-events
     command: >
       bash -lc '

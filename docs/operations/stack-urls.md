@@ -57,6 +57,9 @@ Use these first during replay:
 - Qdrant Spark UI: `http://localhost:48104`
 - Qdrant driver RPC: `localhost:47104`
 - Qdrant block manager: `localhost:47204`
+- Dimension reference Spark UI: `http://localhost:44041`
+- Dimension authority Spark UI: `http://localhost:44042`
+- Dimension links Spark UI: `http://localhost:44043`
 
 Replay progress is easiest to read from:
 
