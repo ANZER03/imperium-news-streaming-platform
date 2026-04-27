@@ -44,6 +44,7 @@
 | **Embedding Gateway** | The centralized internal service that calls NVIDIA embeddings with batching and global rate limiting. | Embedding client, API wrapper |
 | **Embedding Provider** | The external provider that returns embeddings for text inputs. | Model API, AI service |
 | **Embedding Similarity Classifier** | The classifier that assigns topics by comparing article embeddings with topic embeddings. | Model classifier, AI classifier |
+| **Dimension Materialization Job** | A Spark Structured Streaming job that turns raw dimension CDC into curated dimension records. | Dimension projector service, sink connector |
 | **Classification Status** | The lifecycle state of article topic classification: pending, classified, or failed. | Topic status, model status |
 | **Dimension Status** | The lifecycle state of dimension enrichment: complete, partial, or pending required. | Enrichment status, lookup status |
 
@@ -66,6 +67,7 @@
 - A **Root Topic** is derived from a **Primary Topic** through the **Topic Taxonomy**.
 - A **Topic Embedding** belongs to one **Topic Taxonomy** version.
 - An **Embedding Similarity Classifier** compares one **Article Embedding** with many **Topic Embeddings**.
+- A **Dimension Materialization Job** produces curated dimensions consumed by article processing.
 - A **Projector** must depend on abstractions for storage and external clients.
 
 ## Example Dialogue
@@ -93,3 +95,4 @@
 - "classification model" could mean LLM classification or embedding similarity. Phase 3 uses **Embedding Similarity Classifier** only.
 - "cache" was used for Redis article data. Use **Feed Card** for Redis article payload and **Feed Index** for Redis sorted sets.
 - "embedding service" could mean external NVIDIA API or internal service. Use **Embedding Provider** for NVIDIA and **Embedding Gateway** for the internal service.
+- "dimension projector" could mean a service or connector. Use **Dimension Materialization Job** for the Spark Structured Streaming job, and use sink connectors only for raw mirror/bootstrap use cases.

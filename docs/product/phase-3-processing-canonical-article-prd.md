@@ -65,6 +65,9 @@ Convert raw CDC into:
 12. As an engineer, I want every service to depend on abstractions, so that
     storage clients, embedding providers, and projectors can be replaced without
     changing core processing logic.
+13. As a data engineer, I want dimension materialization to run as a Spark
+    Structured Streaming job, so that dimension projection uses the same
+    scalable stream-processing runtime as article processing.
 
 ## 4. In Scope
 
@@ -107,7 +110,8 @@ implementations.
 
 Primary deep modules:
 - canonical article builder
-- dimension enrichment service
+- Spark dimension materialization job
+- dimension projection builder
 - excerpt generator
 - topic taxonomy service
 - topic embedding service
@@ -355,12 +359,31 @@ Large dimensions are materialized, not queried as raw source tables on every
 record.
 
 Strategy:
-- keep large dimensions in curated PostgreSQL tables with filtered columns
-- use keyed lookups from processor by `link_id`, `authority_id`, `country_id`
+- materialize dimensions with a Spark Structured Streaming job
+- consume raw dimension CDC topics from Kafka
+- write curated PostgreSQL dimension tables with filtered columns
+- optionally publish curated compacted dimension topics for processor state
+- use keyed lookups from article processor by `link_id`, `authority_id`,
+  `country_id`
 - avoid per-row source DB lookups
 - allow late-arriving dimension data through retry/pending handling
 - emit canonical articles when minimum article fields are valid, even if
   optional dimensions are incomplete
+
+Dimension materialization job:
+- runtime: Spark Structured Streaming
+- inputs: raw CDC topics for links, authority, sedition, pays/country, rubric,
+  language, and source metadata
+- outputs: curated PostgreSQL dimension tables
+- optional outputs: Kafka compacted dimension topics keyed by dimension ID
+- behavior: normalize fields, filter unused columns, handle deletes as inactive
+  records, resolve country relationships where possible, and keep writes
+  idempotent by dimension ID
+
+Sink connectors can be used only for raw mirroring or bootstrap tables. They are
+not the owner of curated dimension projection because Phase 3 needs business
+rules, relationship resolution, fallback logic, late dimension handling, and
+domain-shaped records.
 
 Country resolution:
 - primary: `authority.sedition_id -> sedition.pays_id -> pays`
@@ -385,20 +408,22 @@ display fields. Country feed requires `country_id`. Topic feeds require
 
 ## 11. Processing Flow
 
-1. Read raw news CDC.
-2. Enrich from curated dimension tables.
-3. If required minimum fields are missing, mark pending and retry.
-4. Clean body, title, URLs, media fields, metadata fields.
-5. Build deterministic `excerpt` from cleaned body text.
-6. Build initial canonical article with `classification_status = pending`.
-7. Upsert cleaned article into PostgreSQL.
-8. Emit canonical article event.
-9. Redis projector writes eligible feed card and feed indexes.
-10. Embedding service batch-embeds article classification input.
-11. Classifier compares article embedding to active PostgreSQL topic embeddings.
-12. Processor emits updated canonical article with classification fields.
-13. Redis projector adds eligible root topic feed membership.
-14. Qdrant projector writes article vector and payload.
+1. Spark dimension materialization job consumes raw dimension CDC and writes
+   curated dimensions.
+2. Read raw news CDC.
+3. Enrich from curated dimension tables.
+4. If required minimum fields are missing, mark pending and retry.
+5. Clean body, title, URLs, media fields, metadata fields.
+6. Build deterministic `excerpt` from cleaned body text.
+7. Build initial canonical article with `classification_status = pending`.
+8. Upsert cleaned article into PostgreSQL.
+9. Emit canonical article event.
+10. Redis projector writes eligible feed card and feed indexes.
+11. Embedding service batch-embeds article classification input.
+12. Classifier compares article embedding to active PostgreSQL topic embeddings.
+13. Processor emits updated canonical article with classification fields.
+14. Redis projector adds eligible root topic feed membership.
+15. Qdrant projector writes article vector and payload.
 
 ## 12. Redis Rules
 
@@ -505,6 +530,8 @@ details.
 
 Required test coverage:
 - canonical article builder emits stable schema from raw CDC and dimensions
+- Spark dimension materialization consumes CDC-like dimension changes and writes
+  curated dimension rows idempotently
 - excerpt generator produces deterministic first-30-word classification input
   and feed excerpt behavior
 - dimension enrichment handles complete, partial, and pending-required states
@@ -542,6 +569,7 @@ assert external state, connector status, projection outputs, and replay behavior
 - topic taxonomy table
 - topic embedding table
 - canonical processor
+- Spark dimension materialization job
 - centralized embedding service
 - Redis projector
 - Qdrant projector
