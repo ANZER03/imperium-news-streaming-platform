@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from hashlib import sha256
 import math
 from typing import Protocol, Sequence
@@ -59,6 +59,9 @@ class EmbeddingSimilarityClassifier:
     topic_embedding_repository: TopicEmbeddingRepository
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
     taxonomy_version: str | None = None
+    _leaf_topics_cache: dict[tuple[str | None], dict[int, Topic]] = field(default_factory=dict)
+    _root_topics_cache: dict[tuple[str | None], dict[int, Topic]] = field(default_factory=dict)
+    _topic_embeddings_cache: dict[tuple[str | None, str], tuple[TopicEmbedding, ...]] = field(default_factory=dict)
 
     def classify(self, article: CanonicalArticle) -> CanonicalArticle:
         return self.classify_many((article,))[0]
@@ -66,6 +69,9 @@ class EmbeddingSimilarityClassifier:
     def classify_many(self, articles: Sequence[CanonicalArticle]) -> tuple[CanonicalArticle, ...]:
         if not articles:
             return ()
+        leaf_topics = self._leaf_topics()
+        topic_embeddings = self._topic_embeddings(leaf_topics)
+        root_topics = self._root_topics(leaf_topics)
         inputs = {
             article.article_id: classification_input_text(article)
             for article in articles
@@ -80,7 +86,7 @@ class EmbeddingSimilarityClassifier:
                 classified.append(self._failed_article(article, inputs[article.article_id]))
                 continue
 
-            matches = self._rank_topic_matches(article_embedding)
+            matches = self._rank_topic_matches(article_embedding, leaf_topics, topic_embeddings, root_topics)
             if not matches:
                 classified.append(self._failed_article(article, inputs[article.article_id]))
                 continue
@@ -105,21 +111,56 @@ class EmbeddingSimilarityClassifier:
             )
         return tuple(classified)
 
-    def _rank_topic_matches(self, article_embedding: Sequence[float]) -> tuple[TopicMatch, ...]:
-        leaf_topics = {
-            topic.topic_id: topic
-            for topic in self.taxonomy_service.active_leaf_topics(self.taxonomy_version)
-        }
-        embeddings = self.topic_embedding_repository.list_active_embeddings(
-            taxonomy_version=self.taxonomy_version,
-            embedding_model=self.embedding_model,
-        )
+    def _leaf_topics(self) -> dict[int, Topic]:
+        cache_key = (self.taxonomy_version,)
+        cached = self._leaf_topics_cache.get(cache_key)
+        if cached is None:
+            cached = {
+                topic.topic_id: topic
+                for topic in self.taxonomy_service.active_leaf_topics(self.taxonomy_version)
+            }
+            self._leaf_topics_cache[cache_key] = cached
+        return cached
+
+    def _root_topics(self, leaf_topics: dict[int, Topic]) -> dict[int, Topic]:
+        cache_key = (self.taxonomy_version,)
+        cached = self._root_topics_cache.get(cache_key)
+        if cached is None:
+            cached = {
+                topic_id: self.taxonomy_service.root_for_leaf(topic_id, self.taxonomy_version)
+                for topic_id in leaf_topics
+            }
+            self._root_topics_cache[cache_key] = cached
+        return cached
+
+    def _topic_embeddings(self, leaf_topics: dict[int, Topic]) -> tuple[TopicEmbedding, ...]:
+        cache_key = (self.taxonomy_version, self.embedding_model)
+        cached = self._topic_embeddings_cache.get(cache_key)
+        if cached is None:
+            cached = tuple(
+                embedding
+                for embedding in self.topic_embedding_repository.list_active_embeddings(
+                    taxonomy_version=self.taxonomy_version,
+                    embedding_model=self.embedding_model,
+                )
+                if embedding.topic_id in leaf_topics
+            )
+            self._topic_embeddings_cache[cache_key] = cached
+        return cached
+
+    def _rank_topic_matches(
+        self,
+        article_embedding: Sequence[float],
+        leaf_topics: dict[int, Topic],
+        embeddings: Sequence[TopicEmbedding],
+        root_topics: dict[int, Topic],
+    ) -> tuple[TopicMatch, ...]:
         matches = []
         for embedding in embeddings:
             topic = leaf_topics.get(embedding.topic_id)
             if topic is None:
                 continue
-            root_topic = self.taxonomy_service.root_for_leaf(topic.topic_id, self.taxonomy_version)
+            root_topic = root_topics[topic.topic_id]
             matches.append(
                 TopicMatch(
                     topic=topic,

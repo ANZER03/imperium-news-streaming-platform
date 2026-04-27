@@ -9,7 +9,7 @@ from imperium_news_pipeline.phase3.topics import TopicEmbeddingInputBuilder, Top
 
 
 UPSERT_TOPIC_SQL = """
-INSERT INTO phase3_topic_taxonomy (
+INSERT INTO {topic_taxonomy_table} (
     topic_id, parent_topic_id, topic_key, display_name, description, tags, sub_topics, translations,
     model_hint, taxonomy_version, is_active, review_status, updated_at
 )
@@ -34,7 +34,7 @@ ON CONFLICT (topic_id) DO UPDATE SET
 
 
 UPSERT_EMBEDDING_SQL = """
-INSERT INTO phase3_topic_embeddings (
+INSERT INTO {topic_embeddings_table} (
     topic_id, taxonomy_version, embedding_model, embedding_dimension,
     embedding_input_text, embedding_input_hash, embedding_vector, is_active, updated_at
 )
@@ -71,7 +71,7 @@ def main() -> None:
     connection = _postgres_connection_factory(config.postgres.dsn)()
     with connection.cursor() as cursor:
         cursor.executemany(
-            UPSERT_TOPIC_SQL,
+            UPSERT_TOPIC_SQL.format(topic_taxonomy_table=config.postgres.topic_taxonomy_table),
             tuple(
                 {
                     "topic_id": topic.topic_id,
@@ -90,7 +90,7 @@ def main() -> None:
             ),
         )
         cursor.executemany(
-            UPSERT_EMBEDDING_SQL,
+            UPSERT_EMBEDDING_SQL.format(topic_embeddings_table=config.postgres.topic_embeddings_table),
             tuple(
                 {
                     "topic_id": item.topic_id,
@@ -105,7 +105,7 @@ def main() -> None:
             ),
         )
     connection.commit()
-    print(f"phase3-topic-embedding-refresh topics={len(topics)} embeddings={len(topic_inputs)}")
+    print(f"imperium-topic-embedding-refresh topics={len(topics)} embeddings={len(topic_inputs)}")
 
 
 class _SeedTaxonomyRepository:

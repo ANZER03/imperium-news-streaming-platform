@@ -36,6 +36,9 @@ class DimensionRepository(Protocol):
     def get(self, dimension_type: str, dimension_id: int | None) -> DimensionRecord | None:
         ...
 
+    def get_many(self, dimension_type: str, dimension_ids: tuple[int, ...]) -> Mapping[int, DimensionRecord]:
+        ...
+
 
 class DimensionEventProducer(Protocol):
     def publish(self, record: DimensionRecord) -> None:
@@ -107,6 +110,13 @@ class InMemoryDimensionRepository:
             self.upsert(record)
         return len(records)
 
+    def get_many(self, dimension_type: str, dimension_ids: tuple[int, ...]) -> Mapping[int, DimensionRecord]:
+        return {
+            dimension_id: record
+            for dimension_id in dimension_ids
+            if (record := self.get(dimension_type, dimension_id)) is not None
+        }
+
 
 @dataclass
 class InMemoryDimensionEventProducer:
@@ -142,38 +152,92 @@ class DimensionEnrichmentService:
     repository: DimensionRepository
 
     def snapshot_for(self, link_id: int | None, authority_id: int | None, rubric_id: int | None, language_id: int | None) -> DimensionSnapshot:
-        link = self.repository.get(DIMENSION_TOPIC_LINKS, link_id)
-        authority = self.repository.get(DIMENSION_TOPIC_AUTHORITIES, authority_id)
-        sedition_id = _optional_int(authority.payload if authority else None, "sedition_id")
-        sedition = self.repository.get(DIMENSION_TOPIC_SEDITIONS, sedition_id)
-        country_id = _optional_int(sedition.payload if sedition else None, "country_id")
-        if country_id is None:
-            country_id = _optional_int(link.payload if link else None, "country_id")
-        country = self.repository.get(DIMENSION_TOPIC_COUNTRIES, country_id)
-        rubric = self.repository.get(DIMENSION_TOPIC_RUBRICS, rubric_id)
-        language = self.repository.get(DIMENSION_TOPIC_LANGUAGES, language_id)
+        return self.snapshot_for_many(((link_id, authority_id, rubric_id, language_id),))[0]
 
-        missing = []
-        if link_id is not None and link is None:
-            missing.append("link")
-        if authority_id is not None and authority is None:
-            missing.append("authority")
-        if country_id is not None and country is None:
-            missing.append("country")
-        if rubric_id is not None and rubric is None:
-            missing.append("rubric")
-        if language_id is not None and language is None:
-            missing.append("language")
+    def snapshot_for_many(
+        self,
+        refs: tuple[tuple[int | None, int | None, int | None, int | None], ...],
+    ) -> tuple[DimensionSnapshot, ...]:
+        if not refs:
+            return ()
+        link_ids = _distinct_ids(refs, 0)
+        authority_ids = _distinct_ids(refs, 1)
+        rubric_ids = _distinct_ids(refs, 2)
+        language_ids = _distinct_ids(refs, 3)
 
-        return DimensionSnapshot(
-            link=link.payload if link else None,
-            authority=authority.payload if authority else None,
-            sedition=sedition.payload if sedition else None,
-            country=country.payload if country else None,
-            rubric=rubric.payload if rubric else None,
-            language=language.payload if language else None,
-            missing_optional=tuple(missing),
+        links = self.repository.get_many(DIMENSION_TOPIC_LINKS, link_ids)
+        authorities = self.repository.get_many(DIMENSION_TOPIC_AUTHORITIES, authority_ids)
+        rubrics = self.repository.get_many(DIMENSION_TOPIC_RUBRICS, rubric_ids)
+        languages = self.repository.get_many(DIMENSION_TOPIC_LANGUAGES, language_ids)
+
+        sedition_ids = tuple(
+            sorted(
+                {
+                    sedition_id
+                    for authority in authorities.values()
+                    if (sedition_id := _optional_int(authority.payload, "sedition_id")) is not None
+                }
+            )
         )
+        seditions = self.repository.get_many(DIMENSION_TOPIC_SEDITIONS, sedition_ids)
+
+        country_ids = set()
+        for link_id, authority_id, _rubric_id, _language_id in refs:
+            link = links.get(link_id) if link_id is not None else None
+            authority = authorities.get(authority_id) if authority_id is not None else None
+            sedition_id = _optional_int(authority.payload if authority else None, "sedition_id")
+            sedition = seditions.get(sedition_id) if sedition_id is not None else None
+            country_id = _optional_int(sedition.payload if sedition else None, "country_id")
+            if country_id is None:
+                country_id = _optional_int(link.payload if link else None, "country_id")
+            if country_id is not None:
+                country_ids.add(country_id)
+        countries = self.repository.get_many(DIMENSION_TOPIC_COUNTRIES, tuple(sorted(country_ids)))
+
+        snapshots = []
+        for link_id, authority_id, rubric_id, language_id in refs:
+            link = links.get(link_id) if link_id is not None else None
+            authority = authorities.get(authority_id) if authority_id is not None else None
+            sedition_id = _optional_int(authority.payload if authority else None, "sedition_id")
+            sedition = seditions.get(sedition_id) if sedition_id is not None else None
+            country_id = _optional_int(sedition.payload if sedition else None, "country_id")
+            if country_id is None:
+                country_id = _optional_int(link.payload if link else None, "country_id")
+            country = countries.get(country_id) if country_id is not None else None
+            rubric = rubrics.get(rubric_id) if rubric_id is not None else None
+            language = languages.get(language_id) if language_id is not None else None
+
+            missing = []
+            if link_id is not None and link is None:
+                missing.append("link")
+            if authority_id is not None and authority is None:
+                missing.append("authority")
+            if country_id is not None and country is None:
+                missing.append("country")
+            if rubric_id is not None and rubric is None:
+                missing.append("rubric")
+            if language_id is not None and language is None:
+                missing.append("language")
+
+            snapshots.append(
+                DimensionSnapshot(
+                    link=link.payload if link else None,
+                    authority=authority.payload if authority else None,
+                    sedition=sedition.payload if sedition else None,
+                    country=country.payload if country else None,
+                    rubric=rubric.payload if rubric else None,
+                    language=language.payload if language else None,
+                    missing_optional=tuple(missing),
+                )
+            )
+        return tuple(snapshots)
+
+
+def _distinct_ids(
+    refs: tuple[tuple[int | None, int | None, int | None, int | None], ...],
+    index: int,
+) -> tuple[int, ...]:
+    return tuple(sorted({value for ref in refs if (value := ref[index]) is not None}))
 
 
 def link_dimension(row: Mapping[str, Any]) -> DimensionRecord:

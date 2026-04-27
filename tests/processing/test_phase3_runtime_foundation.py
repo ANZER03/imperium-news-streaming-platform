@@ -76,7 +76,7 @@ class Phase3RuntimeConfigTests(unittest.TestCase):
 
         self.assertEqual(config.kafka.bootstrap_servers, "localhost:49092")
         self.assertEqual(config.kafka.source_topic("table_news"), "imperium.news.public.table_news")
-        self.assertEqual(config.kafka.canonical_topic, "phase3.canonical-articles")
+        self.assertEqual(config.kafka.canonical_topic, "imperium.canonical-articles")
         self.assertEqual(config.window_days, 5)
         self.assertEqual(config.checkpoints.for_job("canonical-article"), "/checkpoints/phase3/canonical-article")
         self.assertTrue(config.nvidia.api_key_present)
@@ -95,9 +95,9 @@ class RuntimeTopicBootstrapTests(unittest.TestCase):
 
         ensure_runtime_topics(admin, specs)
 
-        self.assertEqual({spec.name for spec in specs}, {"phase3.canonical-articles", "phase3.canonical-articles.dlq"})
-        self.assertEqual(admin.topics["phase3.canonical-articles"].configs["cleanup.policy"], "compact")
-        self.assertEqual(admin.topics["phase3.canonical-articles.dlq"].configs["cleanup.policy"], "delete")
+        self.assertEqual({spec.name for spec in specs}, {"imperium.canonical-articles", "imperium.canonical-articles.dlq"})
+        self.assertEqual(admin.topics["imperium.canonical-articles"].configs["cleanup.policy"], "compact")
+        self.assertEqual(admin.topics["imperium.canonical-articles.dlq"].configs["cleanup.policy"], "delete")
 
 
 class PostgresRuntimeAdapterTests(unittest.TestCase):

@@ -33,20 +33,12 @@ class RedisProjectionResult:
 class RedisFeedProjector:
     redis: RedisClient
 
-    def project(
+    def project_cards_and_feeds(
         self,
         article: CanonicalArticle,
         previous_country_id: int | None = None,
-        previous_root_topic_id: int | None = None,
     ) -> RedisProjectionResult:
         try:
-            if article.is_deleted or not article.is_visible:
-                self._remove(
-                    article,
-                    previous_country_id=previous_country_id,
-                    previous_root_topic_id=previous_root_topic_id,
-                )
-                return RedisProjectionResult(projected=False, removed=True)
             if not self._eligible_for_global_feed(article):
                 return RedisProjectionResult(projected=False, removed=False)
 
@@ -57,27 +49,9 @@ class RedisFeedProjector:
                 self.redis.zadd(f"feed:country:{article.country_id}", {article.article_id: score})
             if previous_country_id is not None and previous_country_id != article.country_id:
                 self.redis.zrem(f"feed:country:{previous_country_id}", article.article_id)
-            updated_topic_feeds = False
-            if article.classification_status == "classified" and article.root_topic_id is not None:
-                self._write_topic_membership(article, score)
-                updated_topic_feeds = True
-            return RedisProjectionResult(projected=True, removed=False, updated_topic_feeds=updated_topic_feeds)
+            return RedisProjectionResult(projected=True, removed=False)
         except Exception as exc:  # pragma: no cover - branch asserted via behavior, exact client error varies.
             return RedisProjectionResult(projected=False, removed=False, errors=(str(exc),))
-
-    def _remove(
-        self,
-        article: CanonicalArticle,
-        previous_country_id: int | None = None,
-        previous_root_topic_id: int | None = None,
-    ) -> None:
-        self.redis.delete(_article_key(article.article_id))
-        self.redis.zrem("feed:global", article.article_id)
-        for country_id in _coalesce_ids(article.country_id, previous_country_id):
-            self.redis.zrem(f"feed:country:{country_id}", article.article_id)
-        for root_topic_id in _coalesce_ids(article.root_topic_id, previous_root_topic_id):
-            self._remove_topic_membership(article.article_id, root_topic_id, article.country_id)
-            self._remove_topic_membership(article.article_id, root_topic_id, previous_country_id)
 
     def update_topic_membership(
         self,
@@ -86,12 +60,7 @@ class RedisFeedProjector:
         previous_country_id: int | None = None,
     ) -> RedisProjectionResult:
         try:
-            if (
-                article.is_deleted
-                or not article.is_visible
-                or article.classification_status != "classified"
-                or article.root_topic_id is None
-            ):
+            if article.classification_status != "classified" or article.root_topic_id is None:
                 self._remove_topic_membership(
                     article.article_id,
                     previous_root_topic_id or article.root_topic_id,
@@ -107,7 +76,7 @@ class RedisFeedProjector:
             return RedisProjectionResult(projected=False, removed=False, errors=(str(exc),))
 
     def _eligible_for_global_feed(self, article: CanonicalArticle) -> bool:
-        return bool(article.title and article.url and (article.published_at or article.crawled_at))
+        return bool(article.title and article.url and article.body_text_clean and (article.published_at or article.crawled_at))
 
     def _write_topic_membership(self, article: CanonicalArticle, score: float) -> None:
         if article.root_topic_id is None:
@@ -201,11 +170,3 @@ def _iso_or_none(value: datetime | None) -> str | None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat()
 
-
-def _coalesce_ids(current: int | None, previous: int | None) -> tuple[int, ...]:
-    values = []
-    if current is not None:
-        values.append(current)
-    if previous is not None and previous != current:
-        values.append(previous)
-    return tuple(values)

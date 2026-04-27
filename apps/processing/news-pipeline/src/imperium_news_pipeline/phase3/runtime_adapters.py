@@ -10,7 +10,7 @@ from imperium_news_pipeline.phase3.canonical import CanonicalArticle
 from imperium_news_pipeline.phase3.pending_feed_runtime import PendingCanonicalFeedRuntime
 from imperium_news_pipeline.phase3.postgres import PostgresCleanedArticleRepository
 from imperium_news_pipeline.phase3.redis_projection import RedisFeedProjector
-from imperium_news_pipeline.phase3.runtime_config import Phase3RuntimeConfig
+from imperium_news_pipeline.phase3.runtime_config import NvidiaRuntimeConfig, Phase3RuntimeConfig
 from imperium_news_pipeline.phase3.dimensions import DimensionRecord
 from imperium_news_pipeline.phase3.postgres import ConnectionFactory
 from imperium_news_pipeline.phase3.projection_state import ProjectionState
@@ -42,16 +42,39 @@ class KafkaCanonicalArticleProducer:
             flush()
 
 
+@dataclass
+class KafkaJsonProducer:
+    producer: Any
+    topic: str
+
+    def emit(self, key: str, payload: Mapping[str, object]) -> None:
+        self.producer.produce(
+            self.topic,
+            key=str(key).encode("utf-8"),
+            value=json.dumps(payload, sort_keys=True).encode("utf-8"),
+        )
+        flush = getattr(self.producer, "flush", None)
+        if flush is not None:
+            flush()
+
+
 def build_pending_feed_runtime(config: Phase3RuntimeConfig) -> PendingCanonicalFeedRuntime:
     dimension_repository = PostgresDimensionRepository(_postgres_connection_factory(config.postgres.dsn))
     return PendingCanonicalFeedRuntime.from_repositories(
         dimension_repository=dimension_repository,
-        cleaned_articles=PostgresCleanedArticleRepository(_postgres_connection_factory(config.postgres.dsn)),
+        cleaned_articles=PostgresCleanedArticleRepository(
+            _postgres_connection_factory(config.postgres.dsn),
+            article_table=config.postgres.article_table,
+        ),
         canonical_producer=KafkaCanonicalArticleProducer(
             producer=_kafka_producer(config.kafka.bootstrap_servers),
             topic=config.kafka.canonical_topic,
         ),
         redis_projector=RedisFeedProjector(build_redis_client(config.redis.url)),
+        dlq_producer=KafkaJsonProducer(
+            producer=_kafka_producer(config.kafka.bootstrap_servers),
+            topic=config.kafka.canonical_dlq_topic,
+        ),
         window_days=config.window_days,
     )
 
@@ -73,23 +96,31 @@ def build_qdrant_client(config: Phase3RuntimeConfig) -> QdrantRuntimeClient:
     )
 
 
-def build_embedding_gateway(config: Phase3RuntimeConfig):
+def build_embedding_gateway(config: Phase3RuntimeConfig, nvidia_config: NvidiaRuntimeConfig | None = None):
     from imperium_news_pipeline.phase3.embedding_gateway import (
         EmbeddingGateway,
         EmbeddingGatewayConfig,
         NvidiaEmbeddingProvider,
     )
 
+    active_nvidia = nvidia_config or config.nvidia
     api_key = _get_required_env("NVIDIA_API_KEY")
     gateway_config = EmbeddingGatewayConfig(
-        base_url=config.nvidia.base_url,
+        base_url=active_nvidia.base_url,
         api_key=api_key,
-        model=config.nvidia.embedding_model,
-        batch_size=config.nvidia.batch_size,
-        rate_limit_rpm=config.nvidia.rate_limit_rpm,
+        model=active_nvidia.embedding_model,
+        batch_size=active_nvidia.batch_size,
+        rate_limit_rpm=active_nvidia.rate_limit_rpm,
+        max_retries=active_nvidia.max_retries,
+        initial_backoff_seconds=active_nvidia.initial_backoff_seconds,
+        split_on_failure=active_nvidia.split_on_failure,
     )
     return EmbeddingGateway(
-        provider=NvidiaEmbeddingProvider(base_url=config.nvidia.base_url, api_key=api_key),
+        provider=NvidiaEmbeddingProvider(
+            base_url=active_nvidia.base_url,
+            api_key=api_key,
+            timeout_seconds=active_nvidia.timeout_seconds,
+        ),
         config=gateway_config,
     )
 
@@ -147,6 +178,7 @@ class InMemoryCanonicalTopic:
 @dataclass
 class PostgresDimensionRepository:
     connection_factory: ConnectionFactory
+    cache: dict[tuple[str, int], DimensionRecord | None] = field(default_factory=dict)
 
     def upsert(self, record: DimensionRecord) -> bool:
         self.upsert_many((record,))
@@ -185,11 +217,16 @@ class PostgresDimensionRepository:
                     for param in params:
                         cursor.execute(sql, param)
         connection.commit()
+        for record in records:
+            self.cache[(record.dimension_type, record.dimension_id)] = record if record.is_active else None
         return len(records)
 
     def get(self, dimension_type: str, dimension_id: int | None) -> DimensionRecord | None:
         if dimension_id is None:
             return None
+        cache_key = (dimension_type, dimension_id)
+        if cache_key in self.cache:
+            return self.cache[cache_key]
         table, id_column = _dimension_table(dimension_type)
         connection = self.connection_factory()
         with connection.cursor() as cursor:
@@ -199,25 +236,72 @@ class PostgresDimensionRepository:
             )
             row = cursor.fetchone()
         if row is None or not row[1]:
+            self.cache[cache_key] = None
             return None
-        return DimensionRecord(
+        record = DimensionRecord(
             dimension_type=dimension_type,
             dimension_id=dimension_id,
             payload=_json_mapping(row[0]),
             is_active=bool(row[1]),
             updated_at=row[2],
         )
+        self.cache[cache_key] = record
+        return record
+
+    def get_many(self, dimension_type: str, dimension_ids: tuple[int, ...]) -> Mapping[int, DimensionRecord]:
+        if not dimension_ids:
+            return {}
+        cached_rows: dict[int, DimensionRecord] = {}
+        missing_ids: list[int] = []
+        for dimension_id in dimension_ids:
+            cache_key = (dimension_type, dimension_id)
+            if cache_key in self.cache:
+                cached = self.cache[cache_key]
+                if cached is not None:
+                    cached_rows[dimension_id] = cached
+            else:
+                missing_ids.append(dimension_id)
+        if not missing_ids:
+            return cached_rows
+        table, id_column = _dimension_table(dimension_type)
+        connection = self.connection_factory()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT {id_column}, payload, is_active, updated_at FROM {table} WHERE {id_column} = ANY(%(dimension_ids)s)",
+                {"dimension_ids": missing_ids},
+            )
+            rows = _fetchall(cursor)
+        found_ids = set()
+        loaded_rows = {
+            int(row[0]): DimensionRecord(
+                dimension_type=dimension_type,
+                dimension_id=int(row[0]),
+                payload=_json_mapping(row[1]),
+                is_active=bool(row[2]),
+                updated_at=row[3],
+            )
+            for row in rows
+            if bool(row[2])
+        }
+        for dimension_id, record in loaded_rows.items():
+            found_ids.add(dimension_id)
+            self.cache[(dimension_type, dimension_id)] = record
+        for dimension_id in missing_ids:
+            if dimension_id not in found_ids:
+                self.cache[(dimension_type, dimension_id)] = None
+        return {**cached_rows, **loaded_rows}
 
 
 @dataclass
 class PostgresTopicTaxonomyRepository:
     connection_factory: ConnectionFactory
+    table_name: str = "imperium_topic_taxonomy"
 
     def list_active_topics(self, taxonomy_version: str | None = None) -> Sequence[Topic]:
         query = """
         SELECT topic_id, topic_key, display_name, description, tags, sub_topics, translations,
                model_hint, taxonomy_version, parent_topic_id, is_active
-        FROM phase3_topic_taxonomy
+        FROM {table_name}
         WHERE is_active = true
         """
         params: dict[str, Any] = {}
@@ -226,7 +310,7 @@ class PostgresTopicTaxonomyRepository:
             params["taxonomy_version"] = taxonomy_version
         connection = self.connection_factory()
         with connection.cursor() as cursor:
-            cursor.execute(query, params)
+            cursor.execute(query.format(table_name=self.table_name), params)
             rows = _fetchall(cursor)
         return tuple(
             Topic(
@@ -249,6 +333,7 @@ class PostgresTopicTaxonomyRepository:
 @dataclass
 class PostgresTopicEmbeddingRepository:
     connection_factory: ConnectionFactory
+    table_name: str = "imperium_topic_embeddings"
 
     def list_active_embeddings(
         self,
@@ -259,7 +344,7 @@ class PostgresTopicEmbeddingRepository:
         query = """
         SELECT topic_id, taxonomy_version, embedding_model, embedding_dimension,
                embedding_input_text, embedding_input_hash, embedding_vector, is_active
-        FROM phase3_topic_embeddings
+        FROM {table_name}
         WHERE is_active = true
         """
         params: dict[str, Any] = {}
@@ -271,7 +356,7 @@ class PostgresTopicEmbeddingRepository:
             params["embedding_model"] = embedding_model
         connection = self.connection_factory()
         with connection.cursor() as cursor:
-            cursor.execute(query, params)
+            cursor.execute(query.format(table_name=self.table_name), params)
             rows = _fetchall(cursor)
         return tuple(
             TopicEmbedding(
@@ -291,16 +376,17 @@ class PostgresTopicEmbeddingRepository:
 @dataclass
 class PostgresProjectionStateRepository:
     connection_factory: ConnectionFactory
+    table_name: str = "imperium_projection_state"
 
     def get(self, article_id: str) -> ProjectionState | None:
         connection = self.connection_factory()
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT article_id, country_id, root_topic_id, published_at, is_visible, is_deleted
-                FROM phase3_projection_state
+                SELECT article_id, country_id, root_topic_id, published_at
+                FROM {table_name}
                 WHERE article_id = %(article_id)s
-                """,
+                """.format(table_name=self.table_name),
                 {"article_id": article_id},
             )
             row = cursor.fetchone()
@@ -311,8 +397,6 @@ class PostgresProjectionStateRepository:
             country_id=row[1],
             root_topic_id=row[2],
             published_at=row[3],
-            is_visible=bool(row[4]),
-            is_deleted=bool(row[5]),
         )
 
     def upsert(self, state: ProjectionState) -> None:
@@ -320,28 +404,23 @@ class PostgresProjectionStateRepository:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO phase3_projection_state (
-                    article_id, country_id, root_topic_id, published_at, is_visible, is_deleted
+                INSERT INTO {table_name} (
+                    article_id, country_id, root_topic_id, published_at
                 )
                 VALUES (
-                    %(article_id)s, %(country_id)s, %(root_topic_id)s, %(published_at)s,
-                    %(is_visible)s, %(is_deleted)s
+                    %(article_id)s, %(country_id)s, %(root_topic_id)s, %(published_at)s
                 )
                 ON CONFLICT (article_id) DO UPDATE SET
                     country_id = EXCLUDED.country_id,
                     root_topic_id = EXCLUDED.root_topic_id,
                     published_at = EXCLUDED.published_at,
-                    is_visible = EXCLUDED.is_visible,
-                    is_deleted = EXCLUDED.is_deleted,
                     updated_at = now()
-                """,
+                """.format(table_name=self.table_name),
                 {
                     "article_id": state.article_id,
                     "country_id": state.country_id,
                     "root_topic_id": state.root_topic_id,
                     "published_at": state.published_at,
-                    "is_visible": state.is_visible,
-                    "is_deleted": state.is_deleted,
                 },
             )
         connection.commit()
@@ -419,12 +498,12 @@ def assert_protocol_shapes(redis: RedisClient, qdrant: QdrantClient) -> None:
 
 def _dimension_table(dimension_type: str) -> tuple[str, str]:
     mapping = {
-        "links": ("phase3_dim_links", "link_id"),
-        "authorities": ("phase3_dim_authorities", "authority_id"),
-        "seditions": ("phase3_dim_seditions", "sedition_id"),
-        "countries": ("phase3_dim_countries", "country_id"),
-        "rubrics": ("phase3_dim_rubrics", "rubric_id"),
-        "languages": ("phase3_dim_languages", "language_id"),
+        "links": ("imperium_dim_links", "link_id"),
+        "authorities": ("imperium_dim_authorities", "authority_id"),
+        "seditions": ("imperium_dim_seditions", "sedition_id"),
+        "countries": ("imperium_dim_countries", "country_id"),
+        "rubrics": ("imperium_dim_rubrics", "rubric_id"),
+        "languages": ("imperium_dim_languages", "language_id"),
     }
     try:
         return mapping[dimension_type]

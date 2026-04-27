@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS phase3_dim_links
+CREATE TABLE IF NOT EXISTS imperium_dim_links
 (
     link_id integer PRIMARY KEY,
     url text,
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS phase3_dim_links
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS phase3_dim_authorities
+CREATE TABLE IF NOT EXISTS imperium_dim_authorities
 (
     authority_id integer PRIMARY KEY,
     source_name text,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS phase3_dim_authorities
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS phase3_dim_seditions
+CREATE TABLE IF NOT EXISTS imperium_dim_seditions
 (
     sedition_id integer PRIMARY KEY,
     country_id integer,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS phase3_dim_seditions
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS phase3_dim_countries
+CREATE TABLE IF NOT EXISTS imperium_dim_countries
 (
     country_id integer PRIMARY KEY,
     country_name text,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS phase3_dim_countries
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS phase3_dim_rubrics
+CREATE TABLE IF NOT EXISTS imperium_dim_rubrics
 (
     rubric_id integer PRIMARY KEY,
     rubric_title text,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS phase3_dim_rubrics
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS phase3_dim_languages
+CREATE TABLE IF NOT EXISTS imperium_dim_languages
 (
     language_id integer PRIMARY KEY,
     language_code text,

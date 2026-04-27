@@ -10,7 +10,7 @@ from imperium_news_pipeline.phase3.canonical import canonical_article_from_event
 from imperium_news_pipeline.phase3.redis_projection import RedisFeedProjector
 from imperium_news_pipeline.phase3.runtime_adapters import build_redis_client
 from imperium_news_pipeline.phase3.runtime_config import Phase3RuntimeConfig
-from imperium_news_pipeline.phase3.streaming import apply_trigger_options
+from imperium_news_pipeline.phase3.streaming import apply_trigger_processing_time
 
 
 def process_batch(rows: DataFrame, batch_id: int, projector: RedisFeedProjector) -> None:
@@ -18,33 +18,34 @@ def process_batch(rows: DataFrame, batch_id: int, projector: RedisFeedProjector)
     skipped = 0
     for row in rows.collect():
         event = json.loads(row.value)
-        result = projector.project(canonical_article_from_event(event))
-        projected += int(result.projected or result.removed or result.updated_topic_feeds)
-        if not (result.projected or result.removed or result.updated_topic_feeds):
+        result = projector.project_cards_and_feeds(canonical_article_from_event(event))
+        projected += int(result.projected)
+        if not result.projected:
             skipped += 1
-    print(f"phase3-redis-pending-projector batch={batch_id} projected={projected} skipped={skipped}")
+    print(f"imperium-redis-cards-feeds batch={batch_id} projected={projected} skipped={skipped}")
 
 
 def main() -> None:
+    env = os.environ
     config = Phase3RuntimeConfig.from_env()
-    spark = SparkSession.builder.appName("phase3-redis-projector").getOrCreate()
+    spark = SparkSession.builder.appName("imperium-redis-driver").getOrCreate()
     projector = RedisFeedProjector(build_redis_client(config.redis.url))
     raw_reader = (
         spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers)
         .option("subscribe", config.kafka.canonical_topic)
-        .option("startingOffsets", os.getenv("PHASE3_STARTING_OFFSETS", "earliest"))
+        .option("startingOffsets", config.stream_starting_offsets(env, "redis"))
     )
-    max_offsets = os.getenv("PHASE3_MAX_OFFSETS_PER_TRIGGER")
+    max_offsets = config.stream_max_offsets_per_trigger(env, "redis")
     if max_offsets:
         raw_reader = raw_reader.option("maxOffsetsPerTrigger", max_offsets)
     raw = raw_reader.load()
     stream = raw.select(col("key").cast("string").alias("key"), col("value").cast("string").alias("value"))
     writer = stream.writeStream.foreachBatch(lambda rows, batch_id: process_batch(rows, batch_id, projector)).option(
         "checkpointLocation",
-        config.checkpoints.for_job("phase3-redis-projector"),
+        config.checkpoints.for_job("imperium-redis-driver"),
     )
-    writer = apply_trigger_options(writer)
+    writer = apply_trigger_processing_time(writer, config.stream_trigger_processing_time(env, "redis"))
     query = writer.start()
     query.awaitTermination()
 

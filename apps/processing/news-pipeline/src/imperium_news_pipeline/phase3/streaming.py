@@ -12,3 +12,9 @@ def apply_trigger_options(writer):
     if processing_time:
         return writer.trigger(processingTime=processing_time)
     return writer
+
+
+def apply_trigger_processing_time(writer, processing_time: str | None):
+    if processing_time and processing_time.strip():
+        return writer.trigger(processingTime=processing_time.strip())
+    return apply_trigger_options(writer)

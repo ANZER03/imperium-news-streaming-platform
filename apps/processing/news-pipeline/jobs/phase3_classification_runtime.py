@@ -19,36 +19,43 @@ from imperium_news_pipeline.phase3.runtime_adapters import (
 from imperium_news_pipeline.phase3.postgres import PostgresCleanedArticleRepository
 from imperium_news_pipeline.phase3.runtime_config import Phase3RuntimeConfig
 from imperium_news_pipeline.phase3.canonical import SystemClock
-from imperium_news_pipeline.phase3.streaming import apply_trigger_options
+from imperium_news_pipeline.phase3.streaming import apply_trigger_processing_time
 from imperium_news_pipeline.phase3.topics import TopicTaxonomyService
 
 
 def process_batch(rows: DataFrame, batch_id: int, processor: ArticleClassificationProcessor) -> None:
-    pending_articles = []
+    enriched_articles = []
     for row in rows.collect():
         event = json.loads(row.value)
-        if event.get("classification_status") != "pending":
+        if event.get("classification_status") != "enriched":
             continue
-        pending_articles.append(canonical_article_from_event(event))
+        enriched_articles.append(canonical_article_from_event(event))
 
-    decisions = processor.process_many(tuple(pending_articles))
+    decisions = processor.process_many(tuple(enriched_articles))
     emitted = sum(1 for decision in decisions if decision)
-    skipped = len(pending_articles) - emitted
-    print(f"phase3-classification-runtime batch={batch_id} classified={emitted} skipped={skipped}")
+    skipped = len(enriched_articles) - emitted
+    print(f"imperium-classification-runtime batch={batch_id} classified={emitted} skipped={skipped}")
 
 
 def main() -> None:
+    env = os.environ
     config = Phase3RuntimeConfig.from_env()
-    spark = SparkSession.builder.appName("phase3-classification-runtime").getOrCreate()
+    spark = SparkSession.builder.appName("imperium-classification-driver").getOrCreate()
+    nvidia_config = config.job_nvidia_config(env, "classification")
     connection_factory = _postgres_connection_factory(config.postgres.dsn)
     processor = ArticleClassificationProcessor(
         classifier=EmbeddingSimilarityClassifier(
-            gateway=build_embedding_gateway(config),
-            taxonomy_service=TopicTaxonomyService(PostgresTopicTaxonomyRepository(connection_factory)),
-            topic_embedding_repository=PostgresTopicEmbeddingRepository(connection_factory),
-            embedding_model=config.nvidia.embedding_model,
+            gateway=build_embedding_gateway(config, nvidia_config),
+            taxonomy_service=TopicTaxonomyService(
+                PostgresTopicTaxonomyRepository(connection_factory, table_name=config.postgres.topic_taxonomy_table)
+            ),
+            topic_embedding_repository=PostgresTopicEmbeddingRepository(
+                connection_factory,
+                table_name=config.postgres.topic_embeddings_table,
+            ),
+            embedding_model=nvidia_config.embedding_model,
         ),
-        repository=PostgresCleanedArticleRepository(connection_factory),
+        repository=PostgresCleanedArticleRepository(connection_factory, article_table=config.postgres.article_table),
         producer=KafkaCanonicalArticleProducer(
             producer=_kafka_producer(config.kafka.bootstrap_servers),
             topic=config.kafka.canonical_topic,
@@ -60,18 +67,18 @@ def main() -> None:
         spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers)
         .option("subscribe", config.kafka.canonical_topic)
-        .option("startingOffsets", os.getenv("PHASE3_STARTING_OFFSETS", "latest"))
+        .option("startingOffsets", config.stream_starting_offsets(env, "classification"))
     )
-    max_offsets = os.getenv("PHASE3_MAX_OFFSETS_PER_TRIGGER")
+    max_offsets = config.stream_max_offsets_per_trigger(env, "classification")
     if max_offsets:
         raw_reader = raw_reader.option("maxOffsetsPerTrigger", max_offsets)
     raw = raw_reader.load()
     stream = raw.select(col("key").cast("string").alias("key"), col("value").cast("string").alias("value"))
     writer = stream.writeStream.foreachBatch(lambda rows, batch_id: process_batch(rows, batch_id, processor)).option(
         "checkpointLocation",
-        config.checkpoints.for_job("phase3-classification-runtime"),
+        config.checkpoints.for_job("imperium-classification-driver"),
     )
-    writer = apply_trigger_options(writer)
+    writer = apply_trigger_processing_time(writer, config.stream_trigger_processing_time(env, "classification"))
     query = writer.start()
     query.awaitTermination()
 

@@ -53,7 +53,7 @@ def _config_from_env() -> EmbeddingGatewayConfig:
     api_key = os.environ.get("NVIDIA_API_KEY", "").strip()
     base_url = os.environ.get("NVIDIA_EMBEDDING_BASE_URL", "https://integrate.api.nvidia.com/v1").strip()
     model = os.environ.get("NVIDIA_EMBEDDING_MODEL", "baai/bge-m3").strip()
-    batch_size = int(os.environ.get("NVIDIA_EMBEDDING_BATCH_SIZE", "8192"))
+    batch_size = int(os.environ.get("NVIDIA_EMBEDDING_BATCH_SIZE", "8191"))
     rate_limit_rpm = int(os.environ.get("NVIDIA_EMBEDDING_RATE_LIMIT_RPM", "40"))
     truncate = os.environ.get("NVIDIA_EMBEDDING_TRUNCATE", "END").strip()
     if not api_key:

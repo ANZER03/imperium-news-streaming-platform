@@ -8,7 +8,7 @@ from typing import Any, Mapping, Protocol, Sequence
 
 
 SCHEMA_VERSION = 1
-CLASSIFICATION_STATUS_PENDING = "pending"
+CLASSIFICATION_STATUS_ENRICHED = "enriched"
 CLASSIFICATION_STATUS_CLASSIFIED = "classified"
 CLASSIFICATION_STATUS_FAILED = "failed"
 CLASSIFICATION_METHOD_EMBEDDING_SIMILARITY = "embedding_similarity"
@@ -106,9 +106,6 @@ class CanonicalArticle:
     meta_keywords: str | None
     meta_description: str | None
     is_video: bool
-    is_valid: bool
-    is_visible: bool
-    is_deleted: bool
     dimension_status: str
     missing_dimensions: tuple[str, ...]
     classification_model: str | None
@@ -153,9 +150,6 @@ class CanonicalArticle:
             "meta_keywords": self.meta_keywords,
             "meta_description": self.meta_description,
             "is_video": self.is_video,
-            "is_valid": self.is_valid,
-            "is_visible": self.is_visible,
-            "is_deleted": self.is_deleted,
             "dimension_status": self.dimension_status,
             "missing_dimensions": list(self.missing_dimensions),
             "classification_model": self.classification_model,
@@ -202,9 +196,6 @@ def canonical_article_from_event(event: Mapping[str, Any]) -> CanonicalArticle:
         meta_keywords=normalize_optional_text(event.get("meta_keywords")),
         meta_description=normalize_optional_text(event.get("meta_description")),
         is_video=bool(event.get("is_video", False)),
-        is_valid=bool(event.get("is_valid", False)),
-        is_visible=bool(event.get("is_visible", False)),
-        is_deleted=bool(event.get("is_deleted", False)),
         dimension_status=str(event.get("dimension_status") or ""),
         missing_dimensions=tuple(event.get("missing_dimensions") or ()),
         classification_model=normalize_optional_text(event.get("classification_model")),
@@ -256,7 +247,7 @@ class CanonicalArticleProducer(Protocol):
 
 class NewsArticleIdProvider:
     def article_id_for(self, source_news_id: int) -> str:
-        return f"news:{source_news_id}"
+        return str(source_news_id)
 
 
 class SystemClock:
@@ -296,9 +287,6 @@ class CanonicalArticleBuilder:
         else:
             dimension_status = DIMENSION_STATUS_COMPLETE
 
-        is_deleted = bool(raw.to_delete)
-        is_valid = bool(raw.valide) and not missing_required
-
         return CanonicalArticle(
             article_id=self.id_provider.article_id_for(raw.id),
             source_news_id=raw.id,
@@ -318,7 +306,7 @@ class CanonicalArticleBuilder:
             primary_topic_label=None,
             topic_confidence=None,
             topic_candidates=(),
-            classification_status=CLASSIFICATION_STATUS_PENDING,
+            classification_status=CLASSIFICATION_STATUS_ENRICHED,
             classification_method=None,
             title=title,
             url=url,
@@ -334,9 +322,6 @@ class CanonicalArticleBuilder:
             meta_keywords=normalize_optional_text(raw.more_meta_keywords),
             meta_description=normalize_optional_text(raw.more_meta_description),
             is_video=bool(raw.isvideo),
-            is_valid=is_valid,
-            is_visible=is_valid and not is_deleted,
-            is_deleted=is_deleted,
             dimension_status=dimension_status,
             missing_dimensions=tuple((*missing_required, *missing_dimensions)),
             classification_model=None,
@@ -360,11 +345,17 @@ class CanonicalArticleFirstEmitProcessor:
     def process_many(self, raws: Sequence[RawNewsRecord]) -> tuple[ProcessResult, ...]:
         if not raws:
             return ()
-        dimensions = None
         records: list[CleanedArticleRecord] = []
         articles: list[CanonicalArticle] = []
+        dimension_snapshots = None
+        if self.dimension_enrichment is not None and hasattr(self.dimension_enrichment, "snapshot_for_many"):
+            dimension_snapshots = self.dimension_enrichment.snapshot_for_many(
+                tuple((raw.link_id, raw.authority_id, raw.rubrique_id, raw.langue_id) for raw in raws)
+            )
         for raw in raws:
-            if self.dimension_enrichment is not None:
+            if dimension_snapshots is not None:
+                dimensions = dimension_snapshots[len(articles)]
+            elif self.dimension_enrichment is not None:
                 dimensions = self.dimension_enrichment.snapshot_for(
                     link_id=raw.link_id,
                     authority_id=raw.authority_id,

@@ -27,9 +27,15 @@ not block independent projectors.
 The central embedding gateway slice implements GitHub issue `#18`: Spark jobs
 and topic embedding refresh code call an internal gateway abstraction instead of
 holding provider credentials in executor code. The gateway owns NVIDIA
-`baai/bge-m3` configuration, 8192-item batch limits, global 40 RPM throttling,
+`baai/bge-m3` configuration, 8191-item batch limits, global 40 RPM throttling,
 retry/backoff behavior for 429 and 5xx provider failures, split-before-final
 item failure, and request metrics.
+
+Local operator UIs are available under the `ui` compose profile:
+
+- Kafka UI on `${KAFKA_UI_EXTERNAL_PORT:-48089}`
+- RedisInsight on `${REDIS_UI_EXTERNAL_PORT:-48090}`
+- Adminer on `${PG_UI_EXTERNAL_PORT:-48084}`
 
 The embedding similarity classification slice implements GitHub issue `#19`:
 classify pending canonical articles by embedding the title plus the first 30
@@ -71,12 +77,13 @@ into stable table-change records, Kafka topic bootstrap specs define canonical
 and DLQ topic behavior, and concrete adapter boundaries exist for PostgreSQL,
 Kafka, Redis, Qdrant, and NVIDIA runtime wiring.
 
-The pending feed runtime slice starts GitHub issue `#26`: decoded Debezium CDC
-dimension changes are materialized into curated dimension records, decoded news
-changes in the 5-day MVP window become pending canonical articles enriched from
-curated dimensions, pending canonical events are emitted by `article_id`, and
-Redis writes compact `article:{article_id}`, `feed:global`, and
-`feed:country:{country_id}` state before classification.
+The simplified real-processing runtime slice starts GitHub issue `#26`: decoded
+Debezium CDC dimension changes are materialized into curated dimension records,
+decoded news changes in the 5-day MVP window become enriched canonical
+articles, delete events are ignored, empty normalized content is routed to the
+DLQ, canonical events are emitted by raw news ID, and Redis writes compact
+`article:{article_id}`, `feed:global`, and `feed:country:{country_id}` state
+before classification.
 
 ## Local Tests
 
@@ -132,7 +139,8 @@ choose the concrete driver without changing core processing.
 `imperium_news_pipeline.phase3.topics` owns taxonomy and topic embedding domain
 contracts. The seed taxonomy is intentionally small and should be reviewed by a
 human before broad use. PostgreSQL stores the durable source of truth in
-`phase3_topic_taxonomy` and active topic vectors in `phase3_topic_embeddings`;
+`imperium_topic_taxonomy` and active topic vectors in
+`imperium_topic_embeddings`;
 classification loads active embeddings from PostgreSQL instead of Qdrant.
 
 `imperium_news_pipeline.phase3.dimensions` owns curated dimension projection,
@@ -195,8 +203,8 @@ at the runtime edge while preserving the existing testable repository and
 projector abstractions.
 
 `imperium_news_pipeline.phase3.topic_bootstrap` defines the local runtime Kafka
-topic specs. `phase3.canonical-articles` is compacted with bounded retention;
-`phase3.canonical-articles.dlq` is delete-retained for runtime failures. The
+topic specs. `imperium.canonical-articles` is compacted with bounded retention;
+`imperium.canonical-articles.dlq` is delete-retained for runtime failures. The
 foundation smoke validates the spec shape; later runtime jobs should use the
 admin adapter against the live Kafka cluster before consuming or producing.
 
@@ -255,21 +263,28 @@ only.
 
 The local runtime now has one dedicated driver container per Phase 3 job:
 
-- `phase3-topic-embedding-driver`
-- `phase3-dimension-driver`
-- `phase3-canonical-driver`
-- `phase3-classification-driver`
-- `phase3-redis-driver`
-- `phase3-qdrant-driver`
+- `imperium-topic-embedding-driver`
+- `imperium-dimension-driver`
+- `imperium-canonical-driver`
+- `imperium-classification-driver`
+- `imperium-redis-driver`
+- `imperium-redis-topics-driver`
+- `imperium-qdrant-driver`
 - `spark-history-server`
 - `spark-worker-1`
 - `spark-worker-2`
 - `spark-worker-3`
 
 Runtime cadence:
-- dimension materializer runs as fast as it can on its own trigger loop
+- dimension materializer runs as fast as it can with three independent query
+  groups: reference dimensions, authority, and links
+- links and authority use separate checkpoints and offset windows so the two
+  million-row topics progress independently
+- dimension rows are decoded on Spark executor partitions and written to
+  PostgreSQL with bounded batch upserts; the driver only receives partition
+  counts
 - canonical news processing uses a 5 second processing-time trigger
-- classification, Redis, and Qdrant projection use 15 second processing-time triggers
+- classification, both Redis jobs, and Qdrant projection use 15 second processing-time triggers
 - this keeps dimensions ahead of news without depending on source-order luck
 
 Bring up the full real runtime with:
@@ -283,17 +298,21 @@ docker-compose --env-file .env \
   --profile processing \
   up -d \
   spark-history-server \
-  phase3-topic-embedding-driver \
-  phase3-dimension-driver \
-  phase3-canonical-driver \
-  phase3-classification-driver \
-  phase3-redis-driver \
-  phase3-qdrant-driver
+  imperium-topic-embedding-driver \
+  imperium-dimension-driver \
+  imperium-canonical-driver \
+  imperium-classification-driver \
+  imperium-redis-driver \
+  imperium-redis-topics-driver \
+  imperium-qdrant-driver
 ```
 
 Notes:
 
-- Each driver keeps its own checkpoint under `/tmp/imperium/phase3/checkpoints`.
+- Each processing driver keeps its own checkpoint under
+  `/tmp/imperium/checkpoints/processing`.
+- The dimension driver keeps its preserved checkpoint state under
+  `/tmp/imperium/checkpoints/dimensions`.
 - Spark event logs are written to the shared `spark-events` volume.
 - Spark History Server reads those logs and exposes the UI on the configured
   host port.

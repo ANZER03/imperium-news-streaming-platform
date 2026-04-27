@@ -42,10 +42,9 @@ class ProjectionFanout:
             previous_country_id if previous_country_id is not None else (stored_state.country_id if stored_state else None)
         )
 
-        redis_result = self.redis.project(
+        redis_result = self.redis.project_cards_and_feeds(
             article,
             previous_country_id=known_previous_country_id,
-            previous_root_topic_id=known_previous_root_topic_id,
         )
         if article.classification_status == "classified" or known_previous_root_topic_id is not None:
             redis_result = self.redis.update_topic_membership(

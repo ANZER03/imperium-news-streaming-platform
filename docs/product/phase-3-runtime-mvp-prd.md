@@ -59,7 +59,7 @@ The runtime will keep the Phase 3 PRD boundaries:
 - Qdrant stores article vectors and filter payloads for semantic retrieval.
 - Redis and Qdrant projection jobs run separately so one store failure does not
   block the other.
-- One `phase3.canonical-articles` topic carries both pending and classified
+- One `imperium.canonical-articles` topic carries both pending and classified
   canonical article versions. Consumers use `article_id` and projection state so
   latest state wins and replay remains idempotent.
 - Real NVIDIA embeddings are used from the start for MVP classification and

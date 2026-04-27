@@ -391,8 +391,8 @@ Embedding provider:
 - model: `baai/bge-m3`
 - encoding format: `float`
 - truncate: `NONE`
-- maximum API batch size: `8192`
-- default configured batch size: `8192`
+- maximum API batch size: `8191`
+- default configured batch size: `8191`
 - global rate limit: `40` requests per minute
 
 Input:

@@ -9,8 +9,8 @@ from urllib import error, request
 from imperium_news_pipeline.phase3.topics import DEFAULT_EMBEDDING_MODEL
 
 
-DEFAULT_EMBEDDING_BATCH_SIZE = 8192
-MAX_EMBEDDING_BATCH_SIZE = 8192
+DEFAULT_EMBEDDING_BATCH_SIZE = 8191
+MAX_EMBEDDING_BATCH_SIZE = 8191
 DEFAULT_NVIDIA_RPM_LIMIT = 40
 DEFAULT_TRUNCATE_MODE = "END"
 
@@ -25,6 +25,7 @@ class EmbeddingGatewayConfig:
     truncate: str = DEFAULT_TRUNCATE_MODE
     max_retries: int = 3
     initial_backoff_seconds: float = 1.0
+    split_on_failure: bool = True
 
     def __post_init__(self) -> None:
         if not self.base_url:
@@ -146,7 +147,7 @@ class EmbeddingGateway:
         try:
             vectors = self._call_with_retries(batch)
         except Exception as exc:
-            if len(batch) > 1:
+            if self.config.split_on_failure and len(batch) > 1:
                 midpoint = len(batch) // 2
                 self._embed_batch(batch[:midpoint], embeddings, failures)
                 self._embed_batch(batch[midpoint:], embeddings, failures)

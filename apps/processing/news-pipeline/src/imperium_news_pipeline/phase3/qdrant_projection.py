@@ -84,7 +84,6 @@ def qdrant_payload(article: CanonicalArticle) -> dict[str, Any]:
         "language_id": article.language_id,
         "rubric_id": article.rubric_id,
         "published_at": article.published_at.isoformat() if article.published_at else None,
-        "is_visible": article.is_visible and not article.is_deleted,
         "source_domain": article.source_domain,
     }
     return payload

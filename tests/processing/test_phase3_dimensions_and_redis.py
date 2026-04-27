@@ -23,6 +23,7 @@ from imperium_news_pipeline.phase3.dimensions import (
     rubric_dimension,
     sedition_dimension,
 )
+from imperium_news_pipeline.phase3.projection_state import InMemoryProjectionStateRepository, ProjectionState
 from imperium_news_pipeline.phase3.redis_projection import InMemoryRedisClient, RedisFeedProjector
 
 
@@ -233,6 +234,36 @@ class DimensionAndRedisProjectionTests(unittest.TestCase):
         self.assertTrue(removed.removed)
         self.assertNotIn("news:77", redis.sorted_sets["feed:topic:11000000"])
         self.assertNotIn("news:77", redis.sorted_sets["feed:country:250:topic:11000000"])
+
+    def test_projection_state_replay_skip_and_previous_membership_inputs(self) -> None:
+        article = _classified_article(root_topic_id=11000000, country_id=504)
+        redis = InMemoryRedisClient()
+        projector = RedisFeedProjector(redis)
+        state = InMemoryProjectionStateRepository()
+
+        first = projector.update_topic_membership(article)
+        state.upsert(ProjectionState.from_article(article))
+        replay = state.get(article.article_id)
+        changed = type(article)(
+            **{
+                **article.__dict__,
+                "country_id": 250,
+                "country_name": "France",
+                "root_topic_id": 13000000,
+                "root_topic_label": "Science and technology",
+            }
+        )
+        second = projector.update_topic_membership(
+            changed,
+            previous_root_topic_id=replay.root_topic_id,
+            previous_country_id=replay.country_id,
+        )
+
+        self.assertTrue(first.updated_topic_feeds)
+        self.assertTrue(replay.matches(article))
+        self.assertTrue(second.updated_topic_feeds)
+        self.assertIn("news:77", redis.sorted_sets["feed:country:250:topic:13000000"])
+        self.assertNotIn("news:77", redis.sorted_sets["feed:country:504:topic:11000000"])
 
 
 def _classified_article(root_topic_id: int, country_id: int):

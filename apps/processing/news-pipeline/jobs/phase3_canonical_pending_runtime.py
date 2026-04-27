@@ -9,7 +9,7 @@ from imperium_news_pipeline.phase3.pending_feed_runtime import PendingCanonicalF
 from imperium_news_pipeline.phase3.runtime_adapters import build_pending_feed_runtime
 from imperium_news_pipeline.phase3.runtime_config import Phase3RuntimeConfig
 from imperium_news_pipeline.phase3.spark_cdc import read_debezium_avro_stream
-from imperium_news_pipeline.phase3.streaming import apply_trigger_options
+from imperium_news_pipeline.phase3.streaming import apply_trigger_processing_time
 
 
 NEWS_TOPIC = "imperium.news.public.table_news"
@@ -46,27 +46,28 @@ def process_batch(rows: DataFrame, batch_id: int, runtime: PendingCanonicalFeedR
     results = runtime.apply_news_changes(decoded_changes, project_redis=False)
     emitted = sum(1 for result in results if result.emitted)
     skipped = len(results) - emitted
-    print(f"phase3-canonical-pending batch={batch_id} emitted={emitted} skipped={skipped}")
+    print(f"imperium-canonical-enrich batch={batch_id} emitted={emitted} skipped={skipped}")
 
 
 def main() -> None:
+    env = os.environ
     config = Phase3RuntimeConfig.from_env()
-    spark = SparkSession.builder.appName("phase3-canonical-article-processor").getOrCreate()
+    spark = SparkSession.builder.appName("imperium-canonical-driver").getOrCreate()
     runtime = build_pending_feed_runtime(config)
     stream = read_debezium_avro_stream(
         spark,
         bootstrap_servers=config.kafka.bootstrap_servers,
         schema_registry_url=config.kafka.schema_registry_url,
         topics=(NEWS_TOPIC,),
-        starting_offsets=os.getenv("PHASE3_STARTING_OFFSETS", "earliest"),
-        max_offsets_per_trigger=os.getenv("PHASE3_MAX_OFFSETS_PER_TRIGGER"),
+        starting_offsets=config.stream_starting_offsets(env, "canonical"),
+        max_offsets_per_trigger=config.stream_max_offsets_per_trigger(env, "canonical"),
         payload_fields_by_topic=NEWS_FIELDS,
     )
     writer = stream.writeStream.foreachBatch(lambda rows, batch_id: process_batch(rows, batch_id, runtime)).option(
         "checkpointLocation",
-        config.checkpoints.for_job("phase3-canonical-article-processor"),
+        config.checkpoints.for_job("imperium-canonical-driver"),
     )
-    writer = apply_trigger_options(writer)
+    writer = apply_trigger_processing_time(writer, config.stream_trigger_processing_time(env, "canonical"))
     query = writer.start()
     query.awaitTermination()
 

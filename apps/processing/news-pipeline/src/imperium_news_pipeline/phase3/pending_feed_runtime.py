@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Callable
+from typing import Callable, Mapping, Protocol
 
 from imperium_news_pipeline.phase3.canonical import (
     CanonicalArticle,
@@ -40,6 +40,11 @@ DIMENSION_BUILDERS_BY_SOURCE_TABLE: dict[str, Callable[[dict], DimensionRecord]]
 }
 
 
+class DlqProducer(Protocol):
+    def emit(self, key: str, payload: Mapping[str, object]) -> None:
+        ...
+
+
 @dataclass(frozen=True)
 class PendingFeedResult:
     article: CanonicalArticle | None
@@ -54,6 +59,7 @@ class PendingCanonicalFeedRuntime:
     cleaned_articles: CleanedArticleRepository
     canonical_producer: CanonicalArticleProducer
     redis_projector: RedisFeedProjector
+    dlq_producer: DlqProducer | None
     dimension_repository: DimensionRepository
     clock: SystemClock
     window_days: int = 5
@@ -66,6 +72,7 @@ class PendingCanonicalFeedRuntime:
         cleaned_articles: CleanedArticleRepository,
         canonical_producer: CanonicalArticleProducer,
         redis_projector: RedisFeedProjector,
+        dlq_producer: DlqProducer | None = None,
         clock: SystemClock | None = None,
         window_days: int = 5,
     ) -> PendingCanonicalFeedRuntime:
@@ -74,6 +81,7 @@ class PendingCanonicalFeedRuntime:
             cleaned_articles=cleaned_articles,
             canonical_producer=canonical_producer,
             redis_projector=redis_projector,
+            dlq_producer=dlq_producer,
             dimension_repository=dimension_repository,
             clock=clock or SystemClock(),
             window_days=window_days,
@@ -106,6 +114,20 @@ class PendingCanonicalFeedRuntime:
             if not news_in_window(raw, now=now, window_days=self.window_days):
                 results[index] = PendingFeedResult(article=None, emitted=False, redis=None, skipped_reason="outside-window")
                 continue
+            if not raw_has_usable_content(raw):
+                article_id = NewsArticleIdProvider().article_id_for(raw.id)
+                if self.dlq_producer is not None:
+                    self.dlq_producer.emit(
+                        article_id,
+                        {
+                            "article_id": article_id,
+                            "source_news_id": raw.id,
+                            "reason": "empty-content",
+                            "processed_at": self.clock.now().isoformat(),
+                        },
+                    )
+                results[index] = PendingFeedResult(article=None, emitted=False, redis=None, skipped_reason="empty-content")
+                continue
             indexed_raws.append((index, raw))
 
         if not indexed_raws:
@@ -119,7 +141,9 @@ class PendingCanonicalFeedRuntime:
         )
         batch_results = processor.process_many(tuple(raw for _, raw in indexed_raws))
         for (index, _raw), result in zip(indexed_raws, batch_results):
-            redis_result = self.redis_projector.project(result.article) if result.emitted and project_redis else None
+            redis_result = (
+                self.redis_projector.project_cards_and_feeds(result.article) if result.emitted and project_redis else None
+            )
             results[index] = PendingFeedResult(article=result.article, emitted=result.emitted, redis=redis_result)
         return tuple(results)  # type: ignore[arg-type]
 
@@ -136,11 +160,9 @@ def dimension_record_from_change(change: TableChangeRecord) -> DimensionRecord:
 
 
 def raw_news_from_change(change: TableChangeRecord) -> RawNewsRecord | None:
-    if change.source_table != "public.table_news":
+    if change.source_table != "public.table_news" or change.is_delete:
         return None
     payload = dict(change.current_payload or {})
-    if change.is_delete:
-        payload["to_delete"] = True
     return RawNewsRecord.from_mapping(payload)
 
 
@@ -153,3 +175,7 @@ def news_in_window(raw: RawNewsRecord, *, now: datetime, window_days: int) -> bo
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     return newest_timestamp >= now - timedelta(days=window_days)
+
+
+def raw_has_usable_content(raw: RawNewsRecord) -> bool:
+    return bool((raw.more_title or "").strip() or (raw.more_inner_text or "").strip())

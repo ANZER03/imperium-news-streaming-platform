@@ -13,8 +13,6 @@ class ProjectionState:
     country_id: int | None
     root_topic_id: int | None
     published_at: datetime | None
-    is_visible: bool
-    is_deleted: bool
 
     @classmethod
     def from_article(cls, article: CanonicalArticle) -> ProjectionState:
@@ -23,8 +21,6 @@ class ProjectionState:
             country_id=article.country_id,
             root_topic_id=article.root_topic_id,
             published_at=article.published_at,
-            is_visible=article.is_visible,
-            is_deleted=article.is_deleted,
         )
 
     def matches(self, article: CanonicalArticle) -> bool:
