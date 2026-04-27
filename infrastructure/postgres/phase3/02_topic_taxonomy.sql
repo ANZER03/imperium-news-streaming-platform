@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS imperium_topic_taxonomy
 (
-    topic_id integer PRIMARY KEY,
-    parent_topic_id integer REFERENCES imperium_topic_taxonomy (topic_id),
+    topic_id text PRIMARY KEY,
+    parent_topic_id text REFERENCES imperium_topic_taxonomy (topic_id),
     topic_key text NOT NULL,
     display_name text NOT NULL,
     description text NOT NULL,
@@ -30,7 +30,7 @@ CREATE INDEX IF NOT EXISTS imperium_topic_taxonomy_active_version_idx
 
 CREATE TABLE IF NOT EXISTS imperium_topic_embeddings
 (
-    topic_id integer NOT NULL REFERENCES imperium_topic_taxonomy (topic_id),
+    topic_id text NOT NULL REFERENCES imperium_topic_taxonomy (topic_id),
     taxonomy_version text NOT NULL,
     embedding_model text NOT NULL,
     embedding_dimension integer NOT NULL,

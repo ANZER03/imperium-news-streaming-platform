@@ -31,7 +31,7 @@ class TopicTranslation:
 
 @dataclass(frozen=True)
 class Topic:
-    topic_id: int
+    topic_id: str
     topic_key: str
     display_name: str
     description: str
@@ -40,7 +40,7 @@ class Topic:
     translations: tuple[TopicTranslation, ...] = ()
     model_hint: str = ""
     taxonomy_version: str = DEFAULT_TAXONOMY_VERSION
-    parent_topic_id: int | None = None
+    parent_topic_id: str | None = None
     is_active: bool = True
 
     @property
@@ -54,7 +54,7 @@ class Topic:
 
 @dataclass(frozen=True)
 class TopicEmbeddingInput:
-    topic_id: int
+    topic_id: str
     taxonomy_version: str
     embedding_model: str
     input_text: str
@@ -63,7 +63,7 @@ class TopicEmbeddingInput:
 
 @dataclass(frozen=True)
 class TopicEmbedding:
-    topic_id: int
+    topic_id: str
     taxonomy_version: str
     embedding_model: str
     embedding_dimension: int
@@ -97,7 +97,7 @@ class TopicTaxonomyService:
         parent_ids = {topic.parent_topic_id for topic in topics if topic.parent_topic_id is not None}
         return tuple(topic for topic in topics if topic.is_active and topic.topic_id not in parent_ids)
 
-    def root_for_leaf(self, leaf_topic_id: int, taxonomy_version: str | None = None) -> Topic:
+    def root_for_leaf(self, leaf_topic_id: str, taxonomy_version: str | None = None) -> Topic:
         topics_by_id = {
             topic.topic_id: topic
             for topic in self.repository.list_active_topics(taxonomy_version)
@@ -199,14 +199,14 @@ def load_medtop_topics(taxonomy_version: str = DEFAULT_TAXONOMY_VERSION) -> tupl
     path = Path(__file__).resolve().parents[3] / "resources" / "news_topic_taxonomy_medtop_en_us.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     topics = []
-    for item in data:
+    for item in data.get("categories", []):
         topic = Topic(
-            topic_id=_medtop_topic_id(item["id"]),
-            topic_key=_slugify_topic_key(item["name"]),
+            topic_id=item["id"],
+            topic_key=item["id"],
             display_name=item["name"],
             description=item.get("description", ""),
             tags=tuple(item.get("tags", ())),
-            sub_topics=tuple(item.get("sub_topics", ())),
+            sub_topics=tuple(item.get("sub_categories", ())),
             translations=(),
             model_hint="",
             taxonomy_version=taxonomy_version,
@@ -258,9 +258,8 @@ def _translations_text(translations: tuple[TopicTranslation, ...]) -> str:
     return "Translations:\n" + "\n".join(lines)
 
 
-def _medtop_topic_id(topic_code: str) -> int:
-    numeric = topic_code.split(":", 1)[-1]
-    return int(numeric)
+def _medtop_topic_id(topic_code: str) -> str:
+    return topic_code
 
 
 def _slugify_topic_key(name: str) -> str:

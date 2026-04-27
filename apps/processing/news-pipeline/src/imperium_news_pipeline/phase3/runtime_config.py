@@ -108,7 +108,7 @@ class Phase3RuntimeConfig:
             ),
             nvidia=NvidiaRuntimeConfig(
                 api_key_present=bool(values.get("NVIDIA_API_KEY", "").strip()),
-                base_url=_get(values, "NVIDIA_EMBEDDING_BASE_URL", "https://integrate.api.nvidia.com/v1"),
+                base_url=_get(values, "NVIDIA_EMBEDDING_BASE_URL", "http://llama-cpp:8080/v1"),
                 embedding_model=_get(values, "NVIDIA_EMBEDDING_MODEL", "baai/bge-m3"),
                 batch_size=_positive_int(values, "NVIDIA_EMBEDDING_BATCH_SIZE", 8191),
                 rate_limit_rpm=_positive_int(values, "NVIDIA_EMBEDDING_RATE_LIMIT_RPM", 40),
