@@ -10,6 +10,12 @@ CONNECTOR_NAME="${NEWS_CDC_CONNECTOR_NAME:-imperium-news-cdc}"
 SIGNAL_TOPIC="${NEWS_CDC_SIGNAL_TOPIC:-imperium.news.signals}"
 MODE="${1:---dry-run}"
 
+ENV_FILE_PATH="${ENV_FILE:-.env}"
+# shellcheck source=../../../../scripts/load-env.sh
+source "${ROOT_DIR}/scripts/load-env.sh"
+load_env_file "${ENV_FILE_PATH}"
+load_env_file "${ROOT_DIR}/${ENV_FILE_PATH}"
+
 # shellcheck source=../common/connect-signal-guard.sh
 source "$ROOT_DIR/apps/ingestion/connector-bootstrap/common/connect-signal-guard.sh"
 

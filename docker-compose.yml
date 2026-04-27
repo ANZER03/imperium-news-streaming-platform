@@ -374,10 +374,10 @@ services:
       /opt/imperium/news-pipeline/jobs/phase3_topic_embedding_refresh.py
       '
 
-  imperium-dimension-driver:
+  imperium-dimension-reference-driver:
     <<: *phase3-driver-defaults
-    container_name: imperium-dimension-driver
-    hostname: imperium-dimension-driver
+    container_name: imperium-dimension-reference-driver
+    hostname: imperium-dimension-reference-driver
     environment:
       PYTHONPATH: /opt/imperium/news-pipeline/src
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
@@ -387,9 +387,8 @@ services:
       PHASE3_QDRANT_URL: http://qdrant:6333
       PHASE3_CHECKPOINT_ROOT: /tmp/imperium/checkpoints/dimensions
       PHASE3_STARTING_OFFSETS: earliest
+      PHASE3_REFERENCE_TRIGGER_PROCESSING_TIME: 5 seconds
       PHASE3_REFERENCE_MAX_OFFSETS_PER_TRIGGER: 10000
-      PHASE3_AUTHORITY_MAX_OFFSETS_PER_TRIGGER: 50000
-      PHASE3_LINKS_MAX_OFFSETS_PER_TRIGGER: 50000
       PHASE3_DIMENSION_DB_BATCH_SIZE: 5000
       SPARK_EVENTLOG_DIR: file:/tmp/spark-events
     command: >
@@ -398,11 +397,77 @@ services:
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
       --conf spark.cores.max=2
+      --conf spark.executor.memory=2g
+      --conf spark.driver.memory=2g
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.eventLog.enabled=true
       --conf spark.eventLog.dir=file:/tmp/spark-events
-      /opt/imperium/news-pipeline/jobs/phase3_dimension_materializer_runtime.py
+      /opt/imperium/news-pipeline/jobs/dimensions/reference.py
+      '
+
+  imperium-dimension-authority-driver:
+    <<: *phase3-driver-defaults
+    container_name: imperium-dimension-authority-driver
+    hostname: imperium-dimension-authority-driver
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      PHASE3_POSTGRES_DSN: postgresql://postgres:postgres@postgres-source:5432/imperium-news-source
+      PHASE3_REDIS_URL: redis://redis:6379/0
+      PHASE3_QDRANT_URL: http://qdrant:6333
+      PHASE3_CHECKPOINT_ROOT: /tmp/imperium/checkpoints/dimensions
+      PHASE3_STARTING_OFFSETS: earliest
+      PHASE3_AUTHORITY_TRIGGER_PROCESSING_TIME: 5 seconds
+      PHASE3_AUTHORITY_MAX_OFFSETS_PER_TRIGGER: 200000
+      PHASE3_DIMENSION_DB_BATCH_SIZE: 5000
+      SPARK_EVENTLOG_DIR: file:/tmp/spark-events
+    command: >
+      bash -lc '
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.executor.cores=1
+      --conf spark.cores.max=3
+      --conf spark.executor.memory=2g
+      --conf spark.driver.memory=2g
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.eventLog.enabled=true
+      --conf spark.eventLog.dir=file:/tmp/spark-events
+      /opt/imperium/news-pipeline/jobs/dimensions/authority.py
+      '
+
+  imperium-dimension-links-driver:
+    <<: *phase3-driver-defaults
+    container_name: imperium-dimension-links-driver
+    hostname: imperium-dimension-links-driver
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      PHASE3_POSTGRES_DSN: postgresql://postgres:postgres@postgres-source:5432/imperium-news-source
+      PHASE3_REDIS_URL: redis://redis:6379/0
+      PHASE3_QDRANT_URL: http://qdrant:6333
+      PHASE3_CHECKPOINT_ROOT: /tmp/imperium/checkpoints/dimensions
+      PHASE3_STARTING_OFFSETS: earliest
+      PHASE3_LINKS_TRIGGER_PROCESSING_TIME: 5 seconds
+      PHASE3_LINKS_MAX_OFFSETS_PER_TRIGGER: 200000
+      PHASE3_DIMENSION_DB_BATCH_SIZE: 5000
+      SPARK_EVENTLOG_DIR: file:/tmp/spark-events
+    command: >
+      bash -lc '
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.executor.cores=1
+      --conf spark.cores.max=3
+      --conf spark.executor.memory=2g
+      --conf spark.driver.memory=2g
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.eventLog.enabled=true
+      --conf spark.eventLog.dir=file:/tmp/spark-events
+      /opt/imperium/news-pipeline/jobs/dimensions/links.py
       '
 
   imperium-canonical-driver:

@@ -9,7 +9,15 @@ NEWS_CDC_SCHEMA_HISTORY_TOPIC="${NEWS_CDC_SCHEMA_HISTORY_TOPIC:-imperium.news.sc
 NEWS_CDC_SIGNAL_TOPIC="${NEWS_CDC_SIGNAL_TOPIC:-imperium.news.signals}"
 NEWS_CDC_HEARTBEAT_TOPIC="${NEWS_CDC_HEARTBEAT_TOPIC:-__debezium-heartbeat.imperium.news}"
 
-kafka-topics \
+kafka_topics_cmd() {
+  if command -v kafka-topics >/dev/null 2>&1; then
+    kafka-topics "$@"
+  else
+    docker exec -i imperium-kafka-1 kafka-topics "$@"
+  fi
+}
+
+kafka_topics_cmd \
   --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
   --create \
   --if-not-exists \
@@ -17,7 +25,7 @@ kafka-topics \
   --partitions "$NEWS_CDC_TOPIC_PARTITIONS" \
   --replication-factor "$KAFKA_REPLICATION_FACTOR"
 
-kafka-topics \
+kafka_topics_cmd \
   --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
   --create \
   --if-not-exists \
@@ -27,7 +35,7 @@ kafka-topics \
   --config cleanup.policy=compact
 
 for topic in "$NEWS_CDC_SCHEMA_HISTORY_TOPIC" "$NEWS_CDC_SIGNAL_TOPIC" "$NEWS_CDC_HEARTBEAT_TOPIC"; do
-  kafka-topics \
+  kafka_topics_cmd \
     --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
     --create \
     --if-not-exists \

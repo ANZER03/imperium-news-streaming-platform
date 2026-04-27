@@ -18,7 +18,9 @@ background.
 
 Live runtime containers:
 
-- `imperium-dimension-driver`
+- `imperium-dimension-reference-driver`
+- `imperium-dimension-authority-driver`
+- `imperium-dimension-links-driver`
 - `imperium-canonical-driver`
 - `imperium-classification-driver`
 - `imperium-redis-driver`
@@ -60,7 +62,8 @@ Spark cluster status:
 - Removed driver-side `collect()` for dimension processing.
 - Dimension rows are written to PostgreSQL in bounded batches from Spark
   partitions.
-- Dimension driver now runs with 2 Spark cores.
+- Reference dimension driver runs with 2 Spark cores.
+- Authority and links dimension drivers run with 3 Spark cores each.
 
 ### Qdrant runtime
 

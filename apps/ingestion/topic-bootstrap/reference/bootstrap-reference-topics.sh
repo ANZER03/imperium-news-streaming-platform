@@ -7,6 +7,14 @@ KAFKA_REPLICATION_FACTOR="${KAFKA_REPLICATION_FACTOR:-2}"
 REFERENCE_CDC_TOPIC_PARTITIONS="${REFERENCE_CDC_TOPIC_PARTITIONS:-1}"
 REFERENCE_CDC_SCHEMA_HISTORY_TOPIC="${REFERENCE_CDC_SCHEMA_HISTORY_TOPIC:-imperium.reference.schema-history}"
 
+kafka_topics_cmd() {
+  if command -v kafka-topics >/dev/null 2>&1; then
+    kafka-topics "$@"
+  else
+    docker exec -i imperium-kafka-1 kafka-topics "$@"
+  fi
+}
+
 topics=(
   "imperium.reference.public.table_pays"
   "imperium.reference.public.table_langue"
@@ -15,7 +23,7 @@ topics=(
 )
 
 for topic in "${topics[@]}"; do
-  kafka-topics \
+  kafka_topics_cmd \
     --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
     --create \
     --if-not-exists \
@@ -24,7 +32,7 @@ for topic in "${topics[@]}"; do
     --replication-factor "$KAFKA_REPLICATION_FACTOR"
 done
 
-kafka-topics \
+kafka_topics_cmd \
   --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
   --create \
   --if-not-exists \

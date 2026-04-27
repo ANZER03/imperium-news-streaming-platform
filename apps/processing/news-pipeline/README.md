@@ -264,7 +264,9 @@ only.
 The local runtime now has one dedicated driver container per Phase 3 job:
 
 - `imperium-topic-embedding-driver`
-- `imperium-dimension-driver`
+- `imperium-dimension-reference-driver`
+- `imperium-dimension-authority-driver`
+- `imperium-dimension-links-driver`
 - `imperium-canonical-driver`
 - `imperium-classification-driver`
 - `imperium-redis-driver`
@@ -276,10 +278,11 @@ The local runtime now has one dedicated driver container per Phase 3 job:
 - `spark-worker-3`
 
 Runtime cadence:
-- dimension materializer runs as fast as it can with three independent query
-  groups: reference dimensions, authority, and links
-- links and authority use separate checkpoints and offset windows so the two
-  million-row topics progress independently
+- the dimension materializer is split into three dedicated drivers:
+  reference, authority, and links
+- links and authority use separate checkpoints, triggers, and offset windows
+  so the large topics progress independently
+- reference keeps a smaller offset window because those tables are much smaller
 - dimension rows are decoded on Spark executor partitions and written to
   PostgreSQL with bounded batch upserts; the driver only receives partition
   counts
@@ -299,7 +302,9 @@ docker-compose --env-file .env \
   up -d \
   spark-history-server \
   imperium-topic-embedding-driver \
-  imperium-dimension-driver \
+  imperium-dimension-reference-driver \
+  imperium-dimension-authority-driver \
+  imperium-dimension-links-driver \
   imperium-canonical-driver \
   imperium-classification-driver \
   imperium-redis-driver \
@@ -311,8 +316,8 @@ Notes:
 
 - Each processing driver keeps its own checkpoint under
   `/tmp/imperium/checkpoints/processing`.
-- The dimension driver keeps its preserved checkpoint state under
-  `/tmp/imperium/checkpoints/dimensions`.
+- The three dimension drivers keep preserved checkpoint state under
+  `/tmp/imperium/checkpoints/dimensions`, one stable subdirectory per driver.
 - Spark event logs are written to the shared `spark-events` volume.
 - Spark History Server reads those logs and exposes the UI on the configured
   host port.

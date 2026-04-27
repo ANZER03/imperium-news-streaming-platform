@@ -4,6 +4,9 @@ Use the root `Makefile` targets to reset only the processing-owned state after
 CDC, preserve the expensive curated dimensions and taxonomy assets, and restart
 the live replay in a fixed order.
 
+For a true from-source rebuild of both CDC and processing state, use
+[`full-cdc-rebootstrap-runbook.md`](./full-cdc-rebootstrap-runbook.md).
+
 ## Targets
 
 - `make processing-config`: render the compose config after the `imperium_*`
@@ -13,6 +16,9 @@ the live replay in a fixed order.
   downstream processing state, recreate canonical topics, recreate the Qdrant
   collection, delete processing-only consumer groups/checkpoints, and preserve
   dimension checkpoints.
+- `make processing-clean-full`: delete all processing-owned PostgreSQL state,
+  canonical topics, Redis serving keys, Qdrant projection state, processing
+  consumer groups, and processing checkpoints, then leave processing stopped.
 - `make processing-up`: start backbone and serving dependencies, then restart
   the drivers in replay order.
 - `make processing-reset-and-run`: run `down`, `clean`, `up`, then validation.
@@ -66,12 +72,14 @@ the live replay in a fixed order.
    `imperium.canonical-articles.dlq`
 5. recreate `imperium_articles` in Qdrant
 6. start backbone services if needed
-7. start `imperium-dimension-driver`
-8. start `imperium-canonical-driver`
-9. start `imperium-classification-driver`
-10. start `imperium-redis-driver`
-11. start `imperium-redis-topics-driver`
-12. start `imperium-qdrant-driver`
+7. start `imperium-dimension-reference-driver`
+8. start `imperium-dimension-authority-driver`
+9. start `imperium-dimension-links-driver`
+10. start `imperium-canonical-driver`
+11. start `imperium-classification-driver`
+12. start `imperium-redis-driver`
+13. start `imperium-redis-topics-driver`
+14. start `imperium-qdrant-driver`
 
 ## Expected Validation Shape
 

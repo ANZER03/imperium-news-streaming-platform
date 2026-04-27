@@ -1,0 +1,14 @@
+{
+  "id": "${CDC_SIGNAL_ID}",
+  "type": "execute-snapshot",
+  "data": {
+    "data-collections": ["${NEWS_CDC_TABLE}"],
+    "type": "INCREMENTAL",
+    "additional-conditions": [
+      {
+        "data-collection": "${NEWS_CDC_TABLE}",
+        "filter": "added_in >= NOW() - interval '5 days'"
+      }
+    ]
+  }
+}

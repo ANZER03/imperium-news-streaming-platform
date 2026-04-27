@@ -82,6 +82,15 @@ set +a
 bash ./apps/ingestion/connector-bootstrap/news/emit-recent-backfill-signal.sh run
 ```
 
+Full news rebootstrap only:
+
+```bash
+set -a
+source <(grep -E '^(NEWS_|SOURCE_|KAFKA_BOOTSTRAP_SERVERS=)' .env)
+set +a
+bash ./apps/ingestion/connector-bootstrap/news/emit-full-backfill-signal.sh run
+```
+
 Important:
 - Every signal must use a fresh generated `id`.
 - Do not replay old retained signal messages.
@@ -200,4 +209,6 @@ After sending a signal, verify all of the following:
 
 Use the source DB as the truth:
 - metadata should converge to full table counts
-- news should match the bounded 5-day window, not the full table
+- news should match the bounded 5-day window during normal bounded replays
+- news should match the full `table_news` count during the full clean rebuild in
+  [`full-cdc-rebootstrap-runbook.md`](./full-cdc-rebootstrap-runbook.md)

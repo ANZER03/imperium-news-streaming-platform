@@ -32,7 +32,9 @@ Use these first during replay:
 
 - Canonical driver: `imperium-canonical-driver`
 - Classification driver: `imperium-classification-driver`
-- Dimension driver: `imperium-dimension-driver`
+- Dimension reference driver: `imperium-dimension-reference-driver`
+- Dimension authority driver: `imperium-dimension-authority-driver`
+- Dimension links driver: `imperium-dimension-links-driver`
 - Redis cards/global-country driver: `imperium-redis-driver`
 - Redis topics driver: `imperium-redis-topics-driver`
 - Qdrant projector driver: `imperium-qdrant-driver`

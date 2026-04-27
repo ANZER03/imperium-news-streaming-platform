@@ -103,3 +103,9 @@ Record one of these outcomes:
 The dedicated news connector uses Kafka signals for bounded incremental
 backfill. The backfill window is intentionally limited (default: 5 days) and
 must not fall back to a full historical snapshot.
+
+Exception:
+- the full local rebootstrap workflow in
+  [`full-cdc-rebootstrap-runbook.md`](./full-cdc-rebootstrap-runbook.md) uses a
+  deliberate full `table_news` incremental snapshot after a complete CDC clean,
+  so Kafka can converge 1:1 with the source tables again.

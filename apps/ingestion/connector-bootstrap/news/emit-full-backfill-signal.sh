@@ -5,9 +5,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 MODE="${1:---dry-run}"
-TOPIC_PREFIX="${METADATA_CDC_TOPIC_PREFIX:-imperium.metadata}"
-SIGNAL_TOPIC="${METADATA_CDC_SIGNAL_TOPIC:-imperium.metadata.signals}"
+TOPIC_PREFIX="${NEWS_CDC_TOPIC_PREFIX:-imperium.news}"
+SIGNAL_TOPIC="${NEWS_CDC_SIGNAL_TOPIC:-imperium.news.signals}"
 BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092,kafka-broker-2:29092}"
+NEWS_CDC_TABLE="${NEWS_CDC_TABLE:-public.table_news}"
 
 ENV_FILE_PATH="${ENV_FILE:-.env}"
 # shellcheck source=../../../../scripts/load-env.sh
@@ -24,7 +25,7 @@ import sys
 import uuid
 
 template = Path(sys.argv[1]).read_text()
-os.environ.setdefault('CDC_SIGNAL_ID', f"metadata-backfill-{uuid.uuid4()}")
+os.environ.setdefault('CDC_SIGNAL_ID', f"news-backfill-{uuid.uuid4()}")
 substituted = Template(template).substitute(os.environ)
 parsed = json.loads(substituted)
 print(json.dumps(parsed, separators=(',', ':')))

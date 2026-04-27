@@ -30,6 +30,7 @@ infra/source-db-clone/.state/
 infra/source-db-clone/.tmp/
 infra/source-db-clone/exports/
 infra/source-db-clone/*.csv
+.state/
 
 # Dependency caches
 node_modules/
