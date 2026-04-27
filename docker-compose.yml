@@ -476,12 +476,12 @@ services:
       /opt/imperium/news-pipeline/jobs/dimensions/links.py
       '
 
-  imperium-canonical-driver:
+  imperium-canonical-enrichment-driver:
     <<: *phase3-driver-defaults
-    container_name: imperium-canonical-driver
-    hostname: imperium-canonical-driver
+    container_name: imperium-canonical-enrichment-driver
+    hostname: imperium-canonical-enrichment-driver
     environment:
-      PYTHONPATH: /opt/imperium/news-pipeline/src
+      PYTHONPATH: /opt/imperium/news-pipeline/src:/opt/imperium/news-pipeline/jobs/enrichment
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       PHASE3_POSTGRES_DSN: postgresql://postgres:postgres@postgres-source:5432/imperium-news-source
@@ -502,18 +502,18 @@ services:
       /opt/spark/bin/spark-submit
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
-      --conf spark.cores.max=2
+      --conf spark.cores.max=4
       --conf spark.executor.memory=2g
       --conf spark.driver.memory=2g
       --conf spark.driver.bindAddress=0.0.0.0
       --conf spark.driver.port=31000
       --conf spark.blockManager.port=32000
       --conf spark.ui.port=4040
-      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src:/opt/imperium/news-pipeline/jobs/enrichment
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src:/opt/imperium/news-pipeline/jobs/enrichment
       --conf spark.eventLog.enabled=true
       --conf spark.eventLog.dir=file:/tmp/spark-events
-      /opt/imperium/news-pipeline/jobs/phase3_canonical_pending_runtime.py
+      /opt/imperium/news-pipeline/jobs/enrichment/driver.py
       '
 
   imperium-classification-driver:

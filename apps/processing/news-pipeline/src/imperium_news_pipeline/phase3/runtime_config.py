@@ -14,6 +14,7 @@ class KafkaRuntimeConfig:
     schema_registry_url: str
     canonical_topic: str
     canonical_dlq_topic: str
+    canonical_retry_topic: str
     source_topic_prefix: str
 
     def source_topic(self, table_name: str) -> str:
@@ -87,6 +88,7 @@ class Phase3RuntimeConfig:
                 schema_registry_url=_get(values, "SCHEMA_REGISTRY_URL", "http://localhost:48081"),
                 canonical_topic=_get(values, "PHASE3_CANONICAL_TOPIC", "imperium.canonical-articles"),
                 canonical_dlq_topic=_get(values, "PHASE3_CANONICAL_DLQ_TOPIC", "imperium.canonical-articles.dlq"),
+                canonical_retry_topic=_get(values, "PHASE3_CANONICAL_RETRY_TOPIC", "imperium.canonical-articles.retry"),
                 source_topic_prefix=_get(values, "PHASE3_SOURCE_TOPIC_PREFIX", DEFAULT_SOURCE_TOPIC_PREFIX),
             ),
             postgres=PostgresRuntimeConfig(
