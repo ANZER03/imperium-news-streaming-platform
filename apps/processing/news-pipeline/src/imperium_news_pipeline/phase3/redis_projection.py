@@ -43,11 +43,11 @@ class RedisFeedProjector:
                 return RedisProjectionResult(projected=False, removed=False)
 
             score = _score(article.published_at or article.crawled_at)
+            country_id = article.country_id if article.country_id is not None else 0
             self.redis.hset(_article_key(article.article_id), _feed_card(article))
             self.redis.zadd("feed:global", {article.article_id: score})
-            if article.country_id is not None:
-                self.redis.zadd(f"feed:country:{article.country_id}", {article.article_id: score})
-            if previous_country_id is not None and previous_country_id != article.country_id:
+            self.redis.zadd(f"feed:country:{country_id}", {article.article_id: score})
+            if previous_country_id is not None and previous_country_id != country_id:
                 self.redis.zrem(f"feed:country:{previous_country_id}", article.article_id)
             return RedisProjectionResult(projected=True, removed=False)
         except Exception as exc:  # pragma: no cover - branch asserted via behavior, exact client error varies.
@@ -82,8 +82,8 @@ class RedisFeedProjector:
         if article.root_topic_id is None:
             return
         self.redis.zadd(f"feed:topic:{article.root_topic_id}", {article.article_id: score})
-        if article.country_id is not None:
-            self.redis.zadd(f"feed:country:{article.country_id}:topic:{article.root_topic_id}", {article.article_id: score})
+        country_id = article.country_id if article.country_id is not None else 0
+        self.redis.zadd(f"feed:country:{country_id}:topic:{article.root_topic_id}", {article.article_id: score})
 
     def _remove_topic_membership(
         self,
@@ -94,8 +94,8 @@ class RedisFeedProjector:
         if root_topic_id is None:
             return
         self.redis.zrem(f"feed:topic:{root_topic_id}", article_id)
-        if country_id is not None:
-            self.redis.zrem(f"feed:country:{country_id}:topic:{root_topic_id}", article_id)
+        effective_country_id = country_id if country_id is not None else 0
+        self.redis.zrem(f"feed:country:{effective_country_id}:topic:{root_topic_id}", article_id)
 
 
 @dataclass
@@ -138,17 +138,17 @@ def _feed_card(article: CanonicalArticle) -> dict[str, str]:
         "source_name": article.source_name,
         "source_domain": article.source_domain,
         "rubric_title": article.rubric_title,
-        "country_id": article.country_id,
+        "country_id": article.country_id if article.country_id is not None else 0,
         "country_name": article.country_name,
         "root_topic_id": article.root_topic_id,
         "root_topic_label": article.root_topic_label,
         "topic_confidence": article.topic_confidence,
-        "published_at": _iso_or_none(article.published_at),
+        "published_at": _iso_or_none(article.published_at or article.crawled_at or article.processed_at),
         "ingested_at": _iso_or_none(article.processed_at),
         "is_video": article.is_video,
         "has_image": bool(article.image_url),
     }
-    return {key: str(value) for key, value in fields.items() if value is not None}
+    return {key: str(value if value is not None else "") for key, value in fields.items()}
 
 
 def _article_key(article_id: str) -> str:
