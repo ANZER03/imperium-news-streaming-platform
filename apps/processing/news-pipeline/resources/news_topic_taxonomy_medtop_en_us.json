@@ -1,0 +1,858 @@
+{
+  "taxonomy_version": "news-taxonomy-v1",
+  "description": "App-oriented news classification taxonomy derived from the provided IPTC-style media topic list. Similar topics are merged into user-facing categories while preserving source topic mappings, tags, and classification guidance.",
+  "classification_mode": {
+    "recommended": "hybrid_hierarchical_multilabel",
+    "levels": [
+      "main_category",
+      "sub_category",
+      "tags"
+    ],
+    "supports_secondary_categories": true,
+    "recommended_confidence_thresholds": {
+      "strong_accept": 0.75,
+      "weak_accept": 0.5,
+      "review_below": 0.5
+    },
+    "strategy": [
+      "Classify first into main_category.",
+      "Classify second into sub_category inside the selected main_category.",
+      "Extract tags from the allowed tag list.",
+      "Allow secondary_categories when the article clearly spans multiple categories.",
+      "Use enrichment metadata such as source rubric, URL path, authority, country, language, and edition as confidence signals.",
+      "Use rules as confidence boosts, not hard overrides, unless the signal is highly reliable.",
+      "Send low-confidence or conflicting classifications to review/retry flow."
+    ]
+  },
+  "categories": [
+    {
+      "id": "politics_government",
+      "name": "Politics & Government",
+      "description": "Government, elections, public policy, diplomacy, political institutions, and civic rights.",
+      "source_topics": [
+        "Politics and government",
+        "Society",
+        "Conflict, war and peace"
+      ],
+      "source_topic_ids": [
+        "medtop:11000000",
+        "medtop:14000000",
+        "medtop:16000000"
+      ],
+      "sub_categories": [
+        "Elections",
+        "Government policy",
+        "Parliament",
+        "Presidency",
+        "Diplomacy",
+        "Local government",
+        "Human rights",
+        "Public administration",
+        "Political parties"
+      ],
+      "tags": [
+        "elections",
+        "parliament",
+        "president",
+        "policy",
+        "diplomacy",
+        "democracy",
+        "voting",
+        "corruption",
+        "local government",
+        "international relations",
+        "government policy",
+        "human rights",
+        "civil rights",
+        "public administration",
+        "minister",
+        "prime minister",
+        "political party",
+        "constitution",
+        "referendum",
+        "public reform",
+        "state budget"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of elections, presidents, ministers, parliament, government decisions, public policies, diplomacy, political parties, or state institutions",
+          "source rubric or URL path contains politics, government, election, parliament, diplomacy"
+        ],
+        "negative_signals": [
+          "military operations or terrorism should usually go to War & Security",
+          "court trials or arrests should usually go to Crime & Justice",
+          "public health policy may be primary Health with secondary Politics & Government"
+        ]
+      }
+    },
+    {
+      "id": "war_security",
+      "name": "War & Security",
+      "description": "Armed conflict, terrorism, military operations, defense, national security, and peace negotiations.",
+      "source_topics": [
+        "Conflict, war and peace",
+        "Politics and government"
+      ],
+      "source_topic_ids": [
+        "medtop:16000000",
+        "medtop:11000000"
+      ],
+      "sub_categories": [
+        "War",
+        "Armed forces",
+        "Terrorism",
+        "Internal conflict",
+        "Defense",
+        "Peace treaty",
+        "Arms control",
+        "National security"
+      ],
+      "tags": [
+        "war",
+        "army",
+        "navy",
+        "air force",
+        "peace treaty",
+        "civil war",
+        "terrorism",
+        "defense",
+        "military",
+        "armed forces",
+        "internal conflict",
+        "arms control",
+        "national security",
+        "border conflict",
+        "militia",
+        "ceasefire",
+        "weapons",
+        "security forces"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of war, military, army, terrorism, ceasefire, weapons, armed conflict, attacks, militias, or national security",
+          "breaking updates from conflict zones"
+        ],
+        "negative_signals": [
+          "normal diplomatic meetings without active conflict should usually go to Politics & Government",
+          "ordinary police crime should usually go to Crime & Justice"
+        ]
+      }
+    },
+    {
+      "id": "crime_justice",
+      "name": "Crime & Justice",
+      "description": "Crime, law enforcement, courts, legal disputes, investigations, punishment, and justice system.",
+      "source_topics": [
+        "Crime, law and justice"
+      ],
+      "source_topic_ids": [
+        "medtop:02000000"
+      ],
+      "sub_categories": [
+        "Crime",
+        "Law enforcement",
+        "Judiciary",
+        "Legal system",
+        "Punishment",
+        "Investigations",
+        "Fraud",
+        "Court cases"
+      ],
+      "tags": [
+        "police",
+        "court",
+        "prison",
+        "murder",
+        "theft",
+        "fraud",
+        "lawsuit",
+        "judge",
+        "attorney",
+        "investigation",
+        "crime",
+        "judiciary",
+        "law enforcement",
+        "punishment",
+        "legal system",
+        "trial",
+        "arrest",
+        "prosecutor",
+        "sentence",
+        "corruption case"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of arrests, courts, judges, police, prison, lawsuit, investigation, fraud, murder, theft, or sentencing"
+        ],
+        "negative_signals": [
+          "political corruption policy debate should go to Politics & Government",
+          "war crimes in active conflict may need secondary War & Security"
+        ]
+      }
+    },
+    {
+      "id": "business_economy",
+      "name": "Business & Economy",
+      "description": "Markets, companies, banking, finance, macroeconomics, jobs, employment, strikes, and labor conditions.",
+      "source_topics": [
+        "Economy, business and finance",
+        "Labour"
+      ],
+      "source_topic_ids": [
+        "medtop:04000000",
+        "medtop:09000000"
+      ],
+      "sub_categories": [
+        "Business",
+        "Finance",
+        "Markets",
+        "Macroeconomics",
+        "Real estate",
+        "Employment",
+        "Industrial relations",
+        "Unions",
+        "Startups"
+      ],
+      "tags": [
+        "market",
+        "stocks",
+        "company",
+        "bank",
+        "investment",
+        "trade",
+        "industry",
+        "revenue",
+        "fiscal policy",
+        "entrepreneurship",
+        "business",
+        "finance",
+        "macroeconomics",
+        "markets",
+        "real estate",
+        "jobs",
+        "unemployment",
+        "strikes",
+        "unions",
+        "salary",
+        "workforce",
+        "retirement",
+        "recruitment",
+        "working conditions",
+        "inflation",
+        "interest rates",
+        "currency",
+        "exports",
+        "imports",
+        "startup"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of markets, banks, companies, revenue, investment, inflation, jobs, strikes, salaries, unemployment, trade, startups, or fiscal policy"
+        ],
+        "negative_signals": [
+          "education training programs should usually go to Education unless employment is the main angle",
+          "technology company product launches may be primary Science & Technology with secondary Business & Economy"
+        ]
+      }
+    },
+    {
+      "id": "science_technology",
+      "name": "Science & Technology",
+      "description": "Scientific research, AI, computing, internet, space, engineering, innovation, robotics, and biotechnology.",
+      "source_topics": [
+        "Science and technology"
+      ],
+      "source_topic_ids": [
+        "medtop:13000000"
+      ],
+      "sub_categories": [
+        "Technology",
+        "Computing",
+        "AI",
+        "Space",
+        "Applied science",
+        "Natural science",
+        "Biotechnology",
+        "Robotics",
+        "Cybersecurity"
+      ],
+      "tags": [
+        "research",
+        "innovation",
+        "AI",
+        "space",
+        "computers",
+        "internet",
+        "biotechnology",
+        "physics",
+        "engineering",
+        "robotics",
+        "applied science",
+        "natural science",
+        "technology",
+        "computing",
+        "cybersecurity",
+        "software",
+        "hardware",
+        "startup technology",
+        "satellite",
+        "scientific discovery"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of AI, software, internet, research, space, robotics, biotechnology, computing, engineering, cybersecurity, or scientific discoveries"
+        ],
+        "negative_signals": [
+          "business funding for a tech company may need secondary Business & Economy",
+          "medical research may be primary Health with secondary Science & Technology"
+        ]
+      }
+    },
+    {
+      "id": "health",
+      "name": "Health",
+      "description": "Medicine, hospitals, diseases, public health, healthcare policy, mental health, surgery, nutrition, and pharmaceuticals.",
+      "source_topics": [
+        "Health"
+      ],
+      "source_topic_ids": [
+        "medtop:07000000"
+      ],
+      "sub_categories": [
+        "Diseases",
+        "Medical treatment",
+        "Healthcare policy",
+        "Mental health",
+        "Public health",
+        "Pharmaceuticals",
+        "Nutrition",
+        "Medical research"
+      ],
+      "tags": [
+        "medicine",
+        "doctor",
+        "hospital",
+        "disease",
+        "wellness",
+        "mental health",
+        "surgery",
+        "epidemic",
+        "pharmaceuticals",
+        "nutrition",
+        "medical treatment",
+        "healthcare policy",
+        "public health",
+        "vaccines",
+        "health ministry",
+        "medical research",
+        "patients",
+        "virus",
+        "pandemic"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of hospitals, doctors, diseases, epidemics, mental health, surgery, public health, medicine, vaccines, or healthcare policy"
+        ],
+        "negative_signals": [
+          "government announcement about health can be primary Health with secondary Politics & Government",
+          "biotech research can be secondary Science & Technology"
+        ]
+      }
+    },
+    {
+      "id": "sports",
+      "name": "Sports",
+      "description": "Sports competitions, athletes, teams, clubs, scores, tournaments, championships, and transfers.",
+      "source_topics": [
+        "Sport"
+      ],
+      "source_topic_ids": [
+        "medtop:15000000"
+      ],
+      "sub_categories": [
+        "Soccer",
+        "Basketball",
+        "Tennis",
+        "Motorsport",
+        "Olympic Games",
+        "Team sports",
+        "Winter sports",
+        "Transfers",
+        "Scores"
+      ],
+      "tags": [
+        "football",
+        "basketball",
+        "tennis",
+        "olympics",
+        "athlete",
+        "tournament",
+        "stadium",
+        "coaching",
+        "score",
+        "championship",
+        "soccer",
+        "motorsport",
+        "winter sports",
+        "olympic games",
+        "team sports",
+        "match",
+        "league",
+        "club",
+        "coach",
+        "transfer",
+        "world cup"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of matches, scores, players, clubs, coaches, transfers, tournaments, leagues, stadiums, championships, or sports names"
+        ],
+        "negative_signals": [
+          "sports business sponsorship may need secondary Business & Economy",
+          "athlete crime case may be primary Crime & Justice with secondary Sports"
+        ]
+      }
+    },
+    {
+      "id": "entertainment_culture",
+      "name": "Entertainment & Culture",
+      "description": "Movies, music, arts, celebrities, media, heritage, history, festivals, books, museums, and cultural events.",
+      "source_topics": [
+        "Arts, culture, entertainment and media"
+      ],
+      "source_topic_ids": [
+        "medtop:01000000"
+      ],
+      "sub_categories": [
+        "Cinema",
+        "Music",
+        "Theatre",
+        "Arts",
+        "Literature",
+        "Media",
+        "Heritage and history",
+        "Festivals",
+        "Celebrities"
+      ],
+      "tags": [
+        "cinema",
+        "music",
+        "theatre",
+        "painting",
+        "sculpture",
+        "literature",
+        "heritage",
+        "broadcasting",
+        "journalism",
+        "arts",
+        "entertainment",
+        "media",
+        "festivals",
+        "celebrations",
+        "history",
+        "film",
+        "celebrity",
+        "television",
+        "streaming",
+        "book",
+        "museum",
+        "concert"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of films, music, celebrities, culture, festivals, media, books, museums, concerts, art, or heritage"
+        ],
+        "negative_signals": [
+          "media regulation by government may be primary Politics & Government",
+          "journalist arrest may be primary Crime & Justice or Politics & Government depending on context"
+        ]
+      }
+    },
+    {
+      "id": "lifestyle_travel",
+      "name": "Lifestyle & Travel",
+      "description": "Fashion, food, travel, tourism, gaming, hobbies, shopping, home, luxury, and leisure.",
+      "source_topics": [
+        "Lifestyle and leisure"
+      ],
+      "source_topic_ids": [
+        "medtop:10000000"
+      ],
+      "sub_categories": [
+        "Fashion",
+        "Food and drink",
+        "Travel",
+        "Tourism",
+        "Gaming",
+        "Home",
+        "Shopping",
+        "Luxury",
+        "Hobbies"
+      ],
+      "tags": [
+        "fashion",
+        "food",
+        "travel",
+        "gaming",
+        "hobbies",
+        "home",
+        "gardening",
+        "shopping",
+        "luxury",
+        "food and drink",
+        "games",
+        "toys",
+        "tourism",
+        "restaurants",
+        "style",
+        "beauty",
+        "cars lifestyle",
+        "wellbeing",
+        "family lifestyle"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of travel, food, fashion, gaming, shopping, home, luxury, restaurants, tourism, or leisure"
+        ],
+        "negative_signals": [
+          "travel restrictions from government may be primary Politics & Government",
+          "airline accident should be Disasters & Accidents"
+        ]
+      }
+    },
+    {
+      "id": "education",
+      "name": "Education",
+      "description": "Schools, universities, students, teachers, curriculum, exams, scholarships, literacy, and training.",
+      "source_topics": [
+        "Education"
+      ],
+      "source_topic_ids": [
+        "medtop:05000000"
+      ],
+      "sub_categories": [
+        "Schools",
+        "Higher education",
+        "Vocational training",
+        "Adult education",
+        "Exams",
+        "Scholarships",
+        "Education policy"
+      ],
+      "tags": [
+        "school",
+        "university",
+        "student",
+        "teacher",
+        "curriculum",
+        "graduation",
+        "scholarship",
+        "vocational training",
+        "literacy",
+        "higher education",
+        "adult education",
+        "exam",
+        "ministry of education",
+        "campus",
+        "academic research",
+        "training"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of schools, universities, exams, students, teachers, scholarships, education policy, curriculum, or training"
+        ],
+        "negative_signals": [
+          "job recruitment should usually go to Business & Economy",
+          "scientific research by a university may be primary Science & Technology"
+        ]
+      }
+    },
+    {
+      "id": "environment_weather",
+      "name": "Environment & Weather",
+      "description": "Climate, pollution, nature, conservation, natural resources, forecasts, severe weather, storms, rain, snow, and warnings.",
+      "source_topics": [
+        "Environment",
+        "Weather"
+      ],
+      "source_topic_ids": [
+        "medtop:06000000",
+        "medtop:17000000"
+      ],
+      "sub_categories": [
+        "Climate change",
+        "Pollution",
+        "Conservation",
+        "Ecology",
+        "Natural resources",
+        "Weather forecasts",
+        "Severe weather",
+        "Climatology",
+        "Drought",
+        "Heatwave"
+      ],
+      "tags": [
+        "climate change",
+        "pollution",
+        "wildlife",
+        "sustainability",
+        "ecology",
+        "nature",
+        "conservation",
+        "energy saving",
+        "greenhouse effect",
+        "natural resources",
+        "forecast",
+        "temperature",
+        "storm",
+        "sunshine",
+        "rain",
+        "snow",
+        "meteorology",
+        "climate",
+        "warning",
+        "severe weather",
+        "climatology",
+        "drought",
+        "heatwave",
+        "environmental policy"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of climate, pollution, wildlife, sustainability, conservation, weather forecasts, storms, rain, snow, warnings, drought, or heatwaves"
+        ],
+        "negative_signals": [
+          "fatal earthquakes, floods, crashes, or fires should usually be Disasters & Accidents",
+          "environmental government policy can have secondary Politics & Government"
+        ]
+      }
+    },
+    {
+      "id": "disasters_accidents",
+      "name": "Disasters & Accidents",
+      "description": "Natural disasters, accidents, emergency incidents, rescue operations, crashes, fires, explosions, and casualties.",
+      "source_topics": [
+        "Disaster, accident and emergency incident"
+      ],
+      "source_topic_ids": [
+        "medtop:03000000"
+      ],
+      "sub_categories": [
+        "Natural disasters",
+        "Accidents",
+        "Emergency response",
+        "Man-made disasters",
+        "Crashes",
+        "Fires",
+        "Explosions",
+        "Rescue operations"
+      ],
+      "tags": [
+        "earthquake",
+        "flood",
+        "fire",
+        "accident",
+        "crash",
+        "emergency services",
+        "rescue",
+        "casualty",
+        "natural disaster",
+        "emergency response",
+        "man-made disasters",
+        "explosion",
+        "building collapse",
+        "road accident",
+        "aviation accident",
+        "train accident",
+        "industrial accident",
+        "evacuation"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of earthquake, flood, fire, crash, accident, explosion, casualties, rescue, evacuation, emergency services, or building collapse"
+        ],
+        "negative_signals": [
+          "weather forecast without damage should go to Environment & Weather",
+          "criminal arson may be primary Crime & Justice with secondary Disasters & Accidents"
+        ]
+      }
+    },
+    {
+      "id": "religion_society",
+      "name": "Religion & Society",
+      "description": "Religion, community, faith, migration, welfare, family, social issues, minorities, ethics, human-interest stories, and unusual events.",
+      "source_topics": [
+        "Religion",
+        "Society",
+        "Human interest"
+      ],
+      "source_topic_ids": [
+        "medtop:12000000",
+        "medtop:14000000",
+        "medtop:08000000"
+      ],
+      "sub_categories": [
+        "Religion",
+        "Islam",
+        "Christianity",
+        "Judaism",
+        "Buddhism",
+        "Hinduism",
+        "Secularism",
+        "Migration",
+        "Family",
+        "Social issues",
+        "Human interest",
+        "Animal stories",
+        "Curiosities"
+      ],
+      "tags": [
+        "church",
+        "mosque",
+        "temple",
+        "faith",
+        "theology",
+        "ritual",
+        "spiritual",
+        "clergy",
+        "pilgrimage",
+        "christianity",
+        "islam",
+        "judaism",
+        "buddhism",
+        "hinduism",
+        "secularism",
+        "demographics",
+        "migration",
+        "welfare",
+        "families",
+        "ethics",
+        "social issues",
+        "minorities",
+        "discrimination",
+        "people",
+        "unusual",
+        "heartwarming",
+        "bizarre",
+        "animals",
+        "humanity",
+        "personalities",
+        "local heroes"
+      ],
+      "classification_hints": {
+        "positive_signals": [
+          "mentions of religion, mosque, church, temple, pilgrimage, faith, migration, welfare, family, social issues, minorities, discrimination, human-interest stories, animals, unusual or heartwarming events"
+        ],
+        "negative_signals": [
+          "political human-rights policy should usually be Politics & Government",
+          "religion-related violence may be primary War & Security or Crime & Justice depending on context"
+        ]
+      }
+    }
+  ],
+  "source_topic_merge_map": {
+    "medtop:01000000": {
+      "source_name": "Arts, culture, entertainment and media",
+      "main_category_id": "entertainment_culture"
+    },
+    "medtop:02000000": {
+      "source_name": "Crime, law and justice",
+      "main_category_id": "crime_justice"
+    },
+    "medtop:03000000": {
+      "source_name": "Disaster, accident and emergency incident",
+      "main_category_id": "disasters_accidents"
+    },
+    "medtop:04000000": {
+      "source_name": "Economy, business and finance",
+      "main_category_id": "business_economy"
+    },
+    "medtop:05000000": {
+      "source_name": "Education",
+      "main_category_id": "education"
+    },
+    "medtop:06000000": {
+      "source_name": "Environment",
+      "main_category_id": "environment_weather"
+    },
+    "medtop:07000000": {
+      "source_name": "Health",
+      "main_category_id": "health"
+    },
+    "medtop:08000000": {
+      "source_name": "Human interest",
+      "main_category_id": "religion_society"
+    },
+    "medtop:09000000": {
+      "source_name": "Labour",
+      "main_category_id": "business_economy"
+    },
+    "medtop:10000000": {
+      "source_name": "Lifestyle and leisure",
+      "main_category_id": "lifestyle_travel"
+    },
+    "medtop:11000000": {
+      "source_name": "Politics and government",
+      "main_category_id": "politics_government"
+    },
+    "medtop:12000000": {
+      "source_name": "Religion",
+      "main_category_id": "religion_society"
+    },
+    "medtop:13000000": {
+      "source_name": "Science and technology",
+      "main_category_id": "science_technology"
+    },
+    "medtop:14000000": {
+      "source_name": "Society",
+      "main_category_id": "religion_society"
+    },
+    "medtop:15000000": {
+      "source_name": "Sport",
+      "main_category_id": "sports"
+    },
+    "medtop:16000000": {
+      "source_name": "Conflict, war and peace",
+      "main_category_id": "war_security"
+    },
+    "medtop:17000000": {
+      "source_name": "Weather",
+      "main_category_id": "environment_weather"
+    }
+  },
+  "classification_output_schema": {
+    "article_id": "string",
+    "classification": {
+      "taxonomy_version": "news-taxonomy-v1",
+      "primary_category": "string",
+      "primary_category_id": "string",
+      "secondary_categories": [
+        "string"
+      ],
+      "sub_category": "string",
+      "tags": [
+        "string"
+      ],
+      "confidence": "float",
+      "classification_status": "strong|weak|review",
+      "method": "hybrid_model_rules",
+      "signals": {
+        "text_model": {
+          "category": "string",
+          "confidence": "float"
+        },
+        "source_rubric": {
+          "category": "string",
+          "confidence_boost": "float"
+        },
+        "url_rule": {
+          "matched": "string",
+          "confidence_boost": "float"
+        }
+      },
+      "model_name": "string",
+      "model_version": "string",
+      "classified_at": "datetime"
+    }
+  }
+}

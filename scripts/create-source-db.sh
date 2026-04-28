@@ -31,7 +31,10 @@ for sql_file in \
   "$ROOT_DIR/infrastructure/postgres/initdb/02_table_links.sql" \
   "$ROOT_DIR/infrastructure/postgres/initdb/03_table_news.sql" \
   "$ROOT_DIR/infrastructure/postgres/initdb/04_debezium_signal.sql" \
-  "$ROOT_DIR/infrastructure/postgres/initdb/05_publications.sql"
+  "$ROOT_DIR/infrastructure/postgres/initdb/05_publications.sql" \
+  "$ROOT_DIR/infrastructure/postgres/initdb/06_phase3_cleaned_articles.sql" \
+  "$ROOT_DIR/infrastructure/postgres/initdb/07_phase3_curated_dimensions.sql" \
+  "$ROOT_DIR/infrastructure/postgres/initdb/08_phase3_projection_state.sql"
 do
   "${DOCKER_COMPOSE[@]}" exec -T postgres-source psql -U "$SOURCE_PG_USER" -d "$SOURCE_PG_DATABASE" -v ON_ERROR_STOP=1 -f - < "$sql_file"
 done

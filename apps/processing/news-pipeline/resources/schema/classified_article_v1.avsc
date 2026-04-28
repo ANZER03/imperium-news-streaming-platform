@@ -1,0 +1,70 @@
+{
+  "type": "record",
+  "name": "ClassifiedArticle",
+  "namespace": "imperium.news",
+  "doc": "Classified news article with embedding vector. Emitted by Phase 3 classification pipeline (schema v1).",
+  "fields": [
+    {"name": "article_id",            "type": "string"},
+    {"name": "source_news_id",        "type": ["null", "long"],    "default": null},
+    {"name": "link_id",               "type": ["null", "long"],    "default": null},
+    {"name": "authority_id",          "type": ["null", "long"],    "default": null},
+    {"name": "country_id",            "type": ["null", "int"],     "default": null},
+    {"name": "country_name",          "type": ["null", "string"],  "default": null},
+    {"name": "source_name",           "type": ["null", "string"],  "default": null},
+    {"name": "source_domain",         "type": ["null", "string"],  "default": null},
+    {"name": "rubric_id",             "type": ["null", "int"],     "default": null},
+    {"name": "rubric_title",          "type": ["null", "string"],  "default": null},
+    {"name": "language_id",           "type": ["null", "int"],     "default": null},
+    {"name": "language_code",         "type": ["null", "string"],  "default": null},
+    {"name": "classification_status", "type": "string"},
+    {"name": "classification_method", "type": ["null", "string"],  "default": null},
+    {"name": "classification_model",  "type": ["null", "string"],  "default": null},
+    {"name": "root_topic_id",         "type": ["null", "string"],  "default": null},
+    {"name": "root_topic_label",      "type": ["null", "string"],  "default": null},
+    {"name": "primary_topic_id",      "type": ["null", "string"],  "default": null},
+    {"name": "primary_topic_label",   "type": ["null", "string"],  "default": null},
+    {"name": "topic_confidence",      "type": ["null", "double"],  "default": null},
+    {
+      "name": "topic_candidates",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "TopicCandidate",
+          "fields": [
+            {"name": "topic_id",         "type": ["null", "string"], "default": null},
+            {"name": "topic_label",      "type": ["null", "string"], "default": null},
+            {"name": "root_topic_id",    "type": ["null", "string"], "default": null},
+            {"name": "root_topic_label", "type": ["null", "string"], "default": null},
+            {"name": "similarity",       "type": ["null", "string"], "default": null}
+          ]
+        }
+      },
+      "default": []
+    },
+    {"name": "title",             "type": "string",            "default": ""},
+    {"name": "url",               "type": "string",            "default": ""},
+    {"name": "body_text",         "type": "string",            "default": ""},
+    {"name": "body_text_clean",   "type": "string",            "default": ""},
+    {"name": "excerpt",           "type": "string",            "default": ""},
+    {"name": "image_url",         "type": ["null", "string"],  "default": null},
+    {"name": "video_url",         "type": ["null", "string"],  "default": null},
+    {"name": "reporter",          "type": ["null", "string"],  "default": null},
+    {"name": "source_date_text",  "type": ["null", "string"],  "default": null},
+    {"name": "published_at",      "type": ["null", "long"],    "default": null},
+    {"name": "crawled_at",        "type": ["null", "long"],    "default": null},
+    {"name": "is_video",          "type": ["null", "boolean"], "default": null},
+    {"name": "dimension_status",  "type": ["null", "string"],  "default": null},
+    {"name": "missing_dimensions","type": {"type": "array", "items": "string"}, "default": []},
+    {"name": "schema_version",    "type": ["null", "int"],     "default": null},
+    {"name": "processed_at",      "type": ["null", "string"],  "default": null},
+    {"name": "is_delete",         "type": ["null", "boolean"], "default": null},
+    {"name": "classified_at",     "type": ["null", "string"],  "default": null},
+    {
+      "name": "embedding_vector",
+      "type": {"type": "array", "items": "float"},
+      "doc": "Article embedding vector (float32). Computed during classification for reuse by downstream consumers (Qdrant projector).",
+      "default": []
+    }
+  ]
+}

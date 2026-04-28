@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "ArticleEmbedding",
+  "namespace": "imperium.news",
+  "doc": "Embedding vector produced for a news article during Phase 3 classification. Consumed by the Qdrant projector.",
+  "fields": [
+    {"name": "article_id",       "type": "string",
+     "doc": "Canonical article ID, matches article_id in ClassifiedArticle."},
+    {"name": "embedding_model",  "type": "string",
+     "doc": "Name of the embedding model that produced this vector."},
+    {"name": "embedding_vector", "type": {"type": "array", "items": "float"},
+     "doc": "Embedding vector encoded as 32-bit floats. Saves ~50% wire size vs float64."}
+  ]
+}

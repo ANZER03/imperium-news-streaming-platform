@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+MODE="${1:---dry-run}"
+TOPIC_PREFIX="${NEWS_CDC_TOPIC_PREFIX:-imperium.news}"
+SIGNAL_TOPIC="${NEWS_CDC_SIGNAL_TOPIC:-imperium.news.signals}"
+BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092,kafka-broker-2:29092}"
+NEWS_CDC_TABLE="${NEWS_CDC_TABLE:-public.table_news}"
+
+ENV_FILE_PATH="${ENV_FILE:-.env}"
+# shellcheck source=../../../../scripts/load-env.sh
+source "${ROOT_DIR}/scripts/load-env.sh"
+load_env_file "${ENV_FILE_PATH}"
+load_env_file "${ROOT_DIR}/${ENV_FILE_PATH}"
+
+payload="$(python3 - "$SCRIPT_DIR/full-backfill-signal.json" <<'PY'
+from pathlib import Path
+from string import Template
+import json
+import os
+import sys
+import uuid
+
+template = Path(sys.argv[1]).read_text()
+os.environ.setdefault('CDC_SIGNAL_ID', f"news-backfill-{uuid.uuid4()}")
+substituted = Template(template).substitute(os.environ)
+parsed = json.loads(substituted)
+print(json.dumps(parsed, separators=(',', ':')))
+PY
+)"
+
+if [[ "$MODE" == "--dry-run" ]]; then
+  printf '%s\n' "$payload"
+  exit 0
+fi
+
+if command -v kafka-console-producer >/dev/null 2>&1; then
+  printf '%s#%s\n' "$TOPIC_PREFIX" "$payload" | kafka-console-producer \
+    --bootstrap-server "$BOOTSTRAP_SERVERS" \
+    --topic "$SIGNAL_TOPIC" \
+    --property "parse.key=true" \
+    --property "key.separator=#" \
+    --producer-property "acks=all"
+else
+  printf '%s#%s\n' "$TOPIC_PREFIX" "$payload" | docker exec -i imperium-kafka-1 kafka-console-producer \
+    --bootstrap-server kafka:29092 \
+    --topic "$SIGNAL_TOPIC" \
+    --property "parse.key=true" \
+    --property "key.separator=#" \
+    --producer-property "acks=all"
+fi

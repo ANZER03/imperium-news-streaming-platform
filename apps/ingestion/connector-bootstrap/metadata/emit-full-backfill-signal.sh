@@ -3,10 +3,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 MODE="${1:---dry-run}"
 TOPIC_PREFIX="${METADATA_CDC_TOPIC_PREFIX:-imperium.metadata}"
 SIGNAL_TOPIC="${METADATA_CDC_SIGNAL_TOPIC:-imperium.metadata.signals}"
 BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092,kafka-broker-2:29092}"
+
+ENV_FILE_PATH="${ENV_FILE:-.env}"
+# shellcheck source=../../../../scripts/load-env.sh
+source "${ROOT_DIR}/scripts/load-env.sh"
+load_env_file "${ENV_FILE_PATH}"
+load_env_file "${ROOT_DIR}/${ENV_FILE_PATH}"
 
 payload="$(python3 - "$SCRIPT_DIR/full-backfill-signal.json" <<'PY'
 from pathlib import Path
@@ -31,14 +38,16 @@ fi
 
 if command -v kafka-console-producer >/dev/null 2>&1; then
   printf '%s#%s\n' "$TOPIC_PREFIX" "$payload" | kafka-console-producer \
-    --broker-list "$BOOTSTRAP_SERVERS" \
+    --bootstrap-server "$BOOTSTRAP_SERVERS" \
     --topic "$SIGNAL_TOPIC" \
     --property "parse.key=true" \
-    --property "key.separator=#"
+    --property "key.separator=#" \
+    --producer-property "acks=all"
 else
   printf '%s#%s\n' "$TOPIC_PREFIX" "$payload" | docker exec -i imperium-kafka-1 kafka-console-producer \
-    --broker-list kafka:29092 \
+    --bootstrap-server kafka:29092 \
     --topic "$SIGNAL_TOPIC" \
     --property "parse.key=true" \
-    --property "key.separator=#"
+    --property "key.separator=#" \
+    --producer-property "acks=all"
 fi

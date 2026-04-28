@@ -1,0 +1,346 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Mapping, Protocol
+
+
+DIMENSION_TOPIC_LINKS = "links"
+DIMENSION_TOPIC_AUTHORITIES = "authorities"
+DIMENSION_TOPIC_SEDITIONS = "seditions"
+DIMENSION_TOPIC_COUNTRIES = "countries"
+DIMENSION_TOPIC_RUBRICS = "rubrics"
+DIMENSION_TOPIC_LANGUAGES = "languages"
+
+
+@dataclass(frozen=True)
+class DimensionRecord:
+    dimension_type: str
+    dimension_id: int
+    payload: Mapping[str, Any]
+    is_active: bool = True
+    updated_at: datetime | None = None
+
+    @property
+    def compacted_topic_key(self) -> str:
+        return f"{self.dimension_type}:{self.dimension_id}"
+
+
+class DimensionRepository(Protocol):
+    def upsert(self, record: DimensionRecord) -> bool:
+        """Return True when the curated dimension state changed."""
+
+    def upsert_many(self, records: tuple[DimensionRecord, ...]) -> int:
+        """Return the number of records submitted in one batch."""
+
+    def get(self, dimension_type: str, dimension_id: int | None) -> DimensionRecord | None:
+        ...
+
+    def get_many(self, dimension_type: str, dimension_ids: tuple[int, ...]) -> Mapping[int, DimensionRecord]:
+        ...
+
+
+class DimensionEventProducer(Protocol):
+    def publish(self, record: DimensionRecord) -> None:
+        ...
+
+
+@dataclass(frozen=True)
+class DimensionSnapshot:
+    link: Mapping[str, Any] | None = None
+    authority: Mapping[str, Any] | None = None
+    sedition: Mapping[str, Any] | None = None
+    country: Mapping[str, Any] | None = None
+    rubric: Mapping[str, Any] | None = None
+    language: Mapping[str, Any] | None = None
+    missing_optional: tuple[str, ...] = ()
+
+    @property
+    def country_id(self) -> int | None:
+        return _optional_int(self.country, "country_id")
+
+    @property
+    def country_name(self) -> str | None:
+        return _optional_text(self.country, "country_name")
+
+    @property
+    def source_name(self) -> str | None:
+        return _optional_text(self.authority, "source_name") or _optional_text(self.link, "source_name")
+
+    @property
+    def source_domain(self) -> str | None:
+        return _optional_text(self.authority, "source_domain") or _optional_text(self.link, "source_domain")
+
+    @property
+    def rubric_title(self) -> str | None:
+        return _optional_text(self.rubric, "rubric_title")
+
+    @property
+    def language_id(self) -> int | None:
+        return _optional_int(self.language, "language_id")
+
+    @property
+    def language_code(self) -> str | None:
+        return _optional_text(self.language, "language_code")
+
+
+@dataclass
+class InMemoryDimensionRepository:
+    rows: dict[str, Mapping[int, DimensionRecord]] = field(default_factory=dict)
+
+    def upsert(self, record: DimensionRecord) -> bool:
+        typed_rows = dict(self.rows.get(record.dimension_type, {}))
+        existing = typed_rows.get(record.dimension_id)
+        if existing == record:
+            return False
+        typed_rows[record.dimension_id] = record
+        self.rows[record.dimension_type] = typed_rows
+        return True
+
+    def get(self, dimension_type: str, dimension_id: int | None) -> DimensionRecord | None:
+        if dimension_id is None:
+            return None
+        record = self.rows.get(dimension_type, {}).get(dimension_id)
+        if record is None or not record.is_active:
+            return None
+        return record
+
+    def upsert_many(self, records: tuple[DimensionRecord, ...]) -> int:
+        for record in records:
+            self.upsert(record)
+        return len(records)
+
+    def get_many(self, dimension_type: str, dimension_ids: tuple[int, ...]) -> Mapping[int, DimensionRecord]:
+        return {
+            dimension_id: record
+            for dimension_id in dimension_ids
+            if (record := self.get(dimension_type, dimension_id)) is not None
+        }
+
+
+@dataclass
+class InMemoryDimensionEventProducer:
+    published: list[DimensionRecord] = field(default_factory=list)
+
+    def publish(self, record: DimensionRecord) -> None:
+        self.published.append(record)
+
+
+@dataclass
+class DimensionMaterializer:
+    repository: DimensionRepository
+    event_producer: DimensionEventProducer | None = None
+
+    def materialize(self, record: DimensionRecord) -> bool:
+        changed = self.repository.upsert(record)
+        if changed and self.event_producer is not None:
+            self.event_producer.publish(record)
+        return changed
+
+    def materialize_many(self, records: tuple[DimensionRecord, ...]) -> int:
+        if not records:
+            return 0
+        count = self.repository.upsert_many(records)
+        if self.event_producer is not None:
+            for record in records:
+                self.event_producer.publish(record)
+        return count
+
+
+@dataclass
+class DimensionEnrichmentService:
+    repository: DimensionRepository
+
+    def snapshot_for(self, link_id: int | None, authority_id: int | None, rubric_id: int | None, language_id: int | None) -> DimensionSnapshot:
+        return self.snapshot_for_many(((link_id, authority_id, rubric_id, language_id),))[0]
+
+    def snapshot_for_many(
+        self,
+        refs: tuple[tuple[int | None, int | None, int | None, int | None], ...],
+    ) -> tuple[DimensionSnapshot, ...]:
+        if not refs:
+            return ()
+        link_ids = _distinct_ids(refs, 0)
+        authority_ids = _distinct_ids(refs, 1)
+        rubric_ids = _distinct_ids(refs, 2)
+        language_ids = _distinct_ids(refs, 3)
+
+        links = self.repository.get_many(DIMENSION_TOPIC_LINKS, link_ids)
+        authorities = self.repository.get_many(DIMENSION_TOPIC_AUTHORITIES, authority_ids)
+        rubrics = self.repository.get_many(DIMENSION_TOPIC_RUBRICS, rubric_ids)
+        languages = self.repository.get_many(DIMENSION_TOPIC_LANGUAGES, language_ids)
+
+        sedition_ids = tuple(
+            sorted(
+                {
+                    sedition_id
+                    for authority in authorities.values()
+                    if (sedition_id := _optional_int(authority.payload, "sedition_id")) is not None
+                }
+            )
+        )
+        seditions = self.repository.get_many(DIMENSION_TOPIC_SEDITIONS, sedition_ids)
+
+        country_ids = set()
+        for link_id, authority_id, _rubric_id, _language_id in refs:
+            link = links.get(link_id) if link_id is not None else None
+            authority = authorities.get(authority_id) if authority_id is not None else None
+            sedition_id = _optional_int(authority.payload if authority else None, "sedition_id")
+            sedition = seditions.get(sedition_id) if sedition_id is not None else None
+            country_id = _optional_int(sedition.payload if sedition else None, "country_id")
+            if country_id is None:
+                country_id = _optional_int(link.payload if link else None, "country_id")
+            if country_id is not None:
+                country_ids.add(country_id)
+        countries = self.repository.get_many(DIMENSION_TOPIC_COUNTRIES, tuple(sorted(country_ids)))
+
+        snapshots = []
+        for link_id, authority_id, rubric_id, language_id in refs:
+            link = links.get(link_id) if link_id is not None else None
+            authority = authorities.get(authority_id) if authority_id is not None else None
+            sedition_id = _optional_int(authority.payload if authority else None, "sedition_id")
+            sedition = seditions.get(sedition_id) if sedition_id is not None else None
+            country_id = _optional_int(sedition.payload if sedition else None, "country_id")
+            if country_id is None:
+                country_id = _optional_int(link.payload if link else None, "country_id")
+            country = countries.get(country_id) if country_id is not None else None
+            rubric = rubrics.get(rubric_id) if rubric_id is not None else None
+            language = languages.get(language_id) if language_id is not None else None
+
+            missing = []
+            if link_id is not None and link is None:
+                missing.append("link")
+            if authority_id is not None and authority is None:
+                missing.append("authority")
+            if country_id is not None and country is None:
+                missing.append("country")
+            if rubric_id is not None and rubric is None:
+                missing.append("rubric")
+            if language_id is not None and language is None:
+                missing.append("language")
+
+            snapshots.append(
+                DimensionSnapshot(
+                    link=link.payload if link else None,
+                    authority=authority.payload if authority else None,
+                    sedition=sedition.payload if sedition else None,
+                    country=country.payload if country else None,
+                    rubric=rubric.payload if rubric else None,
+                    language=language.payload if language else None,
+                    missing_optional=tuple(missing),
+                )
+            )
+        return tuple(snapshots)
+
+
+def _distinct_ids(
+    refs: tuple[tuple[int | None, int | None, int | None, int | None], ...],
+    index: int,
+) -> tuple[int, ...]:
+    return tuple(sorted({value for ref in refs if (value := ref[index]) is not None}))
+
+
+def link_dimension(row: Mapping[str, Any]) -> DimensionRecord:
+    return DimensionRecord(
+        dimension_type=DIMENSION_TOPIC_LINKS,
+        dimension_id=_required_int(row, "id"),
+        payload={
+            "link_id": _required_int(row, "id"),
+            "url": _optional_text(row, "url") or _optional_text(row, "link"),
+            "source_domain": _optional_text(row, "domain"),
+            "source_name": _optional_text(row, "source_name") or _optional_text(row, "title"),
+            "country_id": _optional_int(row, "pays_id"),
+        },
+        is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
+    )
+
+
+def authority_dimension(row: Mapping[str, Any]) -> DimensionRecord:
+    return DimensionRecord(
+        dimension_type=DIMENSION_TOPIC_AUTHORITIES,
+        dimension_id=_required_int(row, "id"),
+        payload={
+            "authority_id": _required_int(row, "id"),
+            "source_name": _optional_text(row, "name") or _optional_text(row, "authority") or _optional_text(row, "title"),
+            "source_domain": _optional_text(row, "domain"),
+            "sedition_id": _optional_int(row, "sedition_id"),
+        },
+        is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
+    )
+
+
+def country_dimension(row: Mapping[str, Any]) -> DimensionRecord:
+    return DimensionRecord(
+        dimension_type=DIMENSION_TOPIC_COUNTRIES,
+        dimension_id=_required_int(row, "id"),
+        payload={"country_id": _required_int(row, "id"), "country_name": _optional_text(row, "name") or _optional_text(row, "pays")},
+        is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
+    )
+
+
+def sedition_dimension(row: Mapping[str, Any]) -> DimensionRecord:
+    return DimensionRecord(
+        dimension_type=DIMENSION_TOPIC_SEDITIONS,
+        dimension_id=_required_int(row, "id"),
+        payload={"sedition_id": _required_int(row, "id"), "country_id": _optional_int(row, "pays_id")},
+        is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
+    )
+
+
+def rubric_dimension(row: Mapping[str, Any]) -> DimensionRecord:
+    return DimensionRecord(
+        dimension_type=DIMENSION_TOPIC_RUBRICS,
+        dimension_id=_required_int(row, "id"),
+        payload={"rubric_id": _required_int(row, "id"), "rubric_title": _optional_text(row, "title") or _optional_text(row, "rubrique")},
+        is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
+    )
+
+
+def language_dimension(row: Mapping[str, Any]) -> DimensionRecord:
+    return DimensionRecord(
+        dimension_type=DIMENSION_TOPIC_LANGUAGES,
+        dimension_id=_required_int(row, "id"),
+        payload={"language_id": _required_int(row, "id"), "language_code": _optional_text(row, "code") or _optional_text(row, "abr")},
+        is_active=not bool(row.get("__deleted", False)),
+        updated_at=_optional_datetime(row, "__event_timestamp"),
+    )
+
+
+def _required_int(row: Mapping[str, Any], key: str) -> int:
+    value = row.get(key)
+    if value is None:
+        raise ValueError(f"missing required dimension field: {key}")
+    return int(value)
+
+
+def _optional_int(row: Mapping[str, Any] | None, key: str) -> int | None:
+    if row is None:
+        return None
+    value = row.get(key)
+    if value in (None, "", 0, "0"):
+        return None
+    return int(value)
+
+
+def _optional_text(row: Mapping[str, Any] | None, key: str) -> str | None:
+    if row is None:
+        return None
+    value = row.get(key)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _optional_datetime(row: Mapping[str, Any] | None, key: str) -> datetime | None:
+    if row is None:
+        return None
+    value = row.get(key)
+    if value is None or isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(str(value))
