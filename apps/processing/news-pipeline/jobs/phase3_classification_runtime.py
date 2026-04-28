@@ -202,9 +202,10 @@ def process_batch(
 
     if result.failures:
         logger.warning(
-            f"batch={batch_id} embedding_failures={len(result.failures)} "
-            f"sample={[f.item_id for f in result.failures[:5]]}"
+            f"batch={batch_id} embedding_failures={len(result.failures)}"
         )
+        for fail in result.failures[:10]:
+            logger.warning(f"  item_id={fail.item_id} reason={fail.reason}")
 
     logger.info(f"batch={batch_id} embeddings_received={embed_count} skipped={skipped}")
 
