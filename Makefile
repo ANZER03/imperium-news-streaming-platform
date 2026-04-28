@@ -4,7 +4,7 @@ PROCESSING_PROFILE ?= processing
 ENV_FILE ?= .env
 PROCESSING_SERVICES := imperium-dimension-driver imperium-canonical-enrichment-driver imperium-classification-driver imperium-redis-projector imperium-postgres-projector imperium-qdrant-projector
 
-.PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test validate-reference-cdc validate-metadata-cdc validate-news-cdc source-db-refresh cdc-clean cdc-up cdc-verify cdc-reset-and-verify processing-config processing-down processing-clean processing-clean-full processing-up processing-reset-and-run processing-logs processing-validate clean-all-from-source
+.PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test validate-reference-cdc validate-metadata-cdc validate-news-cdc source-db-refresh cdc-clean cdc-up cdc-verify cdc-reset-and-verify processing-config processing-down processing-clean processing-clean-full processing-up processing-reset-and-run processing-logs processing-validate clean-all-from-source redis-projector-reset
 
 infra-config:
 	ENV_FILE=$(ENV_FILE) $(COMPOSE) --env-file $(ENV_FILE) config
@@ -57,6 +57,28 @@ foundation-down:
 
 foundation-logs:
 	ENV_FILE=$(ENV_FILE) $(COMPOSE) --env-file $(ENV_FILE) --profile $(FOUNDATION_PROFILE) logs -f
+
+redis-projector-reset:
+	@echo "==> Stopping redis projector..."
+	$(COMPOSE) --profile processing stop imperium-redis-projector
+	@echo "==> Deleting Kafka consumer group..."
+	@GROUP=$$(grep PHASE3_REDIS_PROJECTOR_GROUP_ID $(ENV_FILE) | cut -d= -f2); \
+	docker exec imperium-kafka-1 kafka-consumer-groups \
+	  --bootstrap-server kafka:29092 \
+	  --group "$$GROUP" --delete 2>/dev/null || true; \
+	echo "  Deleted group: $$GROUP"
+	@echo "==> Bumping group ID in $(ENV_FILE)..."
+	@CURRENT=$$(grep PHASE3_REDIS_PROJECTOR_GROUP_ID $(ENV_FILE) | cut -d= -f2); \
+	BASE=$$(echo "$$CURRENT" | sed 's/-v[0-9]*$$//'); \
+	VER=$$(echo "$$CURRENT" | grep -oE '[0-9]+$$'); \
+	NEW="$$BASE-v$$((VER + 1))"; \
+	sed -i "s/PHASE3_REDIS_PROJECTOR_GROUP_ID=.*/PHASE3_REDIS_PROJECTOR_GROUP_ID=$$NEW/" $(ENV_FILE); \
+	echo "  $$CURRENT --> $$NEW"
+	@echo "==> Flushing Redis..."
+	docker exec imperium-redis redis-cli FLUSHALL
+	@echo "==> Starting redis projector with new group..."
+	$(COMPOSE) --env-file $(ENV_FILE) --profile processing up -d imperium-redis-projector
+	@echo "==> Done. Follow logs with: docker logs -f imperium-redis-projector"
 
 smoke-test:
 	bash scripts/smoke-test.sh

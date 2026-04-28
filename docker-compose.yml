@@ -623,8 +623,8 @@ services:
       --auto-aof-rewrite-percentage 100 
       --auto-aof-rewrite-min-size 64mb 
       --aof-use-rdb-preamble yes 
-      --maxmemory 256mb 
-      --maxmemory-policy allkeys-lru
+      --maxmemory 4gb
+      --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG > /dev/null"]
       interval: 5s
