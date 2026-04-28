@@ -518,7 +518,7 @@ services:
 
   imperium-classification-driver:
     <<: *phase3-driver-defaults
-    restart: "no"
+    restart: unless-stopped
     container_name: imperium-classification-driver
     hostname: imperium-classification-driver
     environment:
@@ -573,6 +573,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       PHASE3_REDIS_URL: redis://redis:6379/0
+      PHASE3_KAFKA_GROUP_ID: ${PHASE3_REDIS_PROJECTOR_GROUP_ID:-imperium-redis-projector-group-v2}
     command: ["python", "redis_projector.py"]
 
   imperium-postgres-projector:
@@ -613,7 +614,17 @@ services:
       - serving
     ports:
       - "${REDIS_EXTERNAL_PORT:-46379}:6379"
-    command: redis-server --save 60 1 --loglevel warning --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server 
+      --save 60 1 
+      --loglevel warning 
+      --appendonly yes 
+      --appendfsync everysec 
+      --auto-aof-rewrite-percentage 100 
+      --auto-aof-rewrite-min-size 64mb 
+      --aof-use-rdb-preamble yes 
+      --maxmemory 256mb 
+      --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG > /dev/null"]
       interval: 5s
