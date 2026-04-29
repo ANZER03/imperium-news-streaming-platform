@@ -4,7 +4,10 @@ PROCESSING_PROFILE ?= processing
 ENV_FILE ?= .env
 PROCESSING_SERVICES := imperium-dimension-driver imperium-canonical-enrichment-driver imperium-classification-driver imperium-redis-projector imperium-postgres-projector imperium-qdrant-projector
 
-.PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test validate-reference-cdc validate-metadata-cdc validate-news-cdc source-db-refresh cdc-clean cdc-up cdc-verify cdc-reset-and-verify processing-config processing-down processing-clean processing-clean-full processing-up processing-reset-and-run processing-logs processing-validate clean-all-from-source redis-projector-reset
+BACKEND_SERVICES := kafka kafka-broker-2 schema-registry postgres-source redis qdrant imperium-redis-projector imperium-postgres-projector imperium-qdrant-projector redis-ui
+BACKEND_PROFILES := --profile backbone --profile source --profile serving --profile processing
+
+.PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test validate-reference-cdc validate-metadata-cdc validate-news-cdc source-db-refresh cdc-clean cdc-up cdc-verify cdc-reset-and-verify processing-config processing-down processing-clean processing-clean-full processing-up processing-reset-and-run processing-logs processing-validate clean-all-from-source redis-projector-reset backend-up backend-down backend-logs
 
 infra-config:
 	ENV_FILE=$(ENV_FILE) $(COMPOSE) --env-file $(ENV_FILE) config
@@ -76,9 +79,20 @@ redis-projector-reset:
 	echo "  $$CURRENT --> $$NEW"
 	@echo "==> Flushing Redis..."
 	docker exec imperium-redis redis-cli FLUSHALL
+	@echo "==> Building redis projector image..."
+	$(COMPOSE) --profile processing build imperium-redis-projector
 	@echo "==> Starting redis projector with new group..."
 	$(COMPOSE) --env-file $(ENV_FILE) --profile processing up -d imperium-redis-projector
 	@echo "==> Done. Follow logs with: docker logs -f imperium-redis-projector"
+
+backend-up:
+	$(COMPOSE) --env-file $(ENV_FILE) $(BACKEND_PROFILES) up -d $(BACKEND_SERVICES)
+
+backend-down:
+	$(COMPOSE) --env-file $(ENV_FILE) $(BACKEND_PROFILES) stop $(BACKEND_SERVICES)
+
+backend-logs:
+	$(COMPOSE) --env-file $(ENV_FILE) $(BACKEND_PROFILES) logs -f $(BACKEND_SERVICES)
 
 smoke-test:
 	bash scripts/smoke-test.sh

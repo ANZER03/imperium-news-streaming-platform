@@ -171,3 +171,6 @@ Kafka offsets higher than DB counts after a supposed clean rebuild:
 - symptom: exact parity fails in `make cdc-verify`
 - fix: treat the rebuild as incomplete or dirty state; rerun the full clean
   instead of patching individual topics by hand
+
+
+  docker-compose --profile source --profile backbone --profile serving --profile processing --profile ui up -d

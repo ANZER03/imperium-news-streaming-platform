@@ -1,0 +1,47 @@
+server:
+  port: 8999
+spring:
+  application:
+    name: news-app
+  
+  # R2DBC Reactive PostgreSQL
+  r2dbc:
+    url: r2dbc:postgresql://localhost:35432/imperium-news-source
+    username: postgres
+    password: postgres
+    pool:
+      initial-size: 5
+      max-size: 20
+
+  # Reactive Redis
+  data:
+    redis:
+      host: localhost
+      port: 46379
+      password: 
+      timeout: 2000ms
+
+  # Spring AI / Qdrant
+  ai:
+    vectorstore:
+      qdrant:
+        host: localhost
+        port: 46334 # gRPC port for Qdrant
+        api-key: 
+        collection-name: imperium_articles
+
+  # Exclude Spring AI Auto-configurations
+  autoconfigure:
+    exclude: 
+      - org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration
+      - org.springframework.ai.ollama.autoconfigure.OllamaAutoConfiguration
+
+# Actuator Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always

@@ -1,0 +1,192 @@
+### =============================================================
+### Imperium News API — Endpoint Tests
+### Base URL: http://localhost:8999
+### Topics from imperium_topic_taxonomy:
+###   politics_government | war_security | crime_justice
+###   business_economy | science_technology | health
+###   sports | entertainment_culture | lifestyle_travel
+###   education | environment_weather | disasters_accidents
+###   religion_society
+### =============================================================
+
+@baseUrl = http://localhost:8999/api/v1
+
+### ——————————————————————————————————————————————
+### TOPICS — Onboarding picker
+### ——————————————————————————————————————————————
+
+### 0a. Get all active topics (cache-aside: Redis → Postgres)
+### Expected: [{ "topicId": "politics_government", "displayName": "Politics & Government" }, ...]
+GET {{baseUrl}}/topics
+Accept: application/json
+
+###
+
+### ——————————————————————————————————————————————
+### STAGE 1: USER ONBOARDING
+### ——————————————————————————————————————————————
+
+### 1a. Onboard — single topic (Science & Technology)
+POST {{baseUrl}}/users/onboard
+Content-Type: application/json
+
+{
+  "topics": [ "science_technology" , "health" , "war_security" ],
+  "countryId": 1
+}
+
+###
+
+### 1b. Onboard — multiple topics (Politics + Business)
+POST {{baseUrl}}/users/onboard
+Content-Type: application/json
+
+{
+  "topics": ["politics_government", "business_economy"],
+  "countryId": 1
+}
+
+###
+
+### 1c. Onboard — Health + Sports user
+POST {{baseUrl}}/users/onboard
+Content-Type: application/json
+
+{
+  "topics": ["health", "sports"],
+  "countryId": 2
+}
+
+###
+
+### 1d. Onboard — all major topics
+POST {{baseUrl}}/users/onboard
+Content-Type: application/json
+
+{
+  "topics": [
+    "politics_government",
+    "war_security",
+    "crime_justice",
+    "business_economy",
+    "science_technology",
+    "health",
+    "sports",
+    "entertainment_culture",
+    "lifestyle_travel",
+    "education",
+    "environment_weather",
+    "disasters_accidents",
+    "religion_society"
+  ],
+  "countryId": 1
+}
+
+###
+
+### ——————————————————————————————————————————————
+### STAGE 2: FEED ENGINE
+### ——————————————————————————————————————————————
+### NOTE: Replace {{userId}} with the UUID returned from onboarding above.
+
+@userId = 33598717-e778-4ffc-bfbf-22312bd526fb
+
+### 2a. Get initial feed — default limit (20)
+GET {{baseUrl}}/feed?userId={{userId}}
+Accept: application/json
+
+###
+
+### 2b. Get initial feed — custom limit of 5
+GET {{baseUrl}}/feed?userId={{userId}}&limit=10
+Accept: application/json
+
+###
+
+### 2c. Get next page — cursor scrolling
+### Replace cursor value with the `nextCursor` from the previous response
+@cursor = 1777315086
+
+GET {{baseUrl}}/feed?userId={{userId}}&limit=10&cursor={{cursor}}
+Accept: application/json
+
+###
+
+### 2d. Get next page — second scroll
+### Replace cursor with the `nextCursor` from the previous page 2 response
+@cursor2 = 1777314725274
+
+GET {{baseUrl}}/feed?userId={{userId}}&limit=5&cursor={{cursor2}}
+Accept: application/json
+
+###
+
+### ——————————————————————————————————————————————
+### STAGE 2: VIEW TRACKING
+### ——————————————————————————————————————————————
+
+### 3a. Mark articles as viewed — single article
+POST {{baseUrl}}/feed/views
+Content-Type: application/json
+
+{
+  "userId": "REPLACE_WITH_UUID_FROM_ONBOARDING",
+  "articleIds": ["REPLACE_WITH_ARTICLE_ID_FROM_FEED"]
+}
+
+###
+
+### 3b. Mark articles as viewed — multiple articles (batch)
+POST {{baseUrl}}/feed/views
+Content-Type: application/json
+
+{
+  "userId": "REPLACE_WITH_UUID_FROM_ONBOARDING",
+  "articleIds": [
+    "REPLACE_WITH_ARTICLE_ID_1",
+    "REPLACE_WITH_ARTICLE_ID_2",
+    "REPLACE_WITH_ARTICLE_ID_3"
+  ]
+}
+
+###
+
+### 3c. Get feed again — viewed articles should NOT appear
+GET {{baseUrl}}/feed?userId={{userId}}&limit=5
+Accept: application/json
+
+###
+### ——————————————————————————————————————————————
+### STAGE 3: ARTICLE DOMAIN & BOOKMARKS
+### ——————————————————————————————————————————————
+### NOTE: Replace {{articleId}} with a real ID from the feed response.
+
+@articleId = 565300956
+
+### 4a. Fetch Full Article Details (Cache-aside)
+GET {{baseUrl}}/articles/{{articleId}}
+Accept: application/json
+
+###
+
+### 4b. Bookmark an Article
+POST {{baseUrl}}/users/{{userId}}/bookmarks/{{articleId}}
+Accept: application/json
+
+###
+
+### 4c. Fetch User's Saved Articles (Bookmarks)
+GET {{baseUrl}}/users/{{userId}}/bookmarks
+Accept: application/json
+
+###
+
+### 4d. Remove a Bookmark
+DELETE {{baseUrl}}/users/{{userId}}/bookmarks/{{articleId}}
+Accept: application/json
+
+###
+
+### 4e. Verify Bookmarks after removal
+GET {{baseUrl}}/users/{{userId}}/bookmarks
+Accept: application/json

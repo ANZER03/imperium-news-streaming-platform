@@ -19,19 +19,74 @@ def get_redis_client():
 
 def parse_iso_or_ts(val: Any) -> float:
     """Returns unix timestamp from integer or ISO string."""
-    if not val:
+    if val is None:
         return time.time()
-    if isinstance(val, (int, float)):
-        # If it's a huge integer (milliseconds), convert to seconds
-        if val > 2e10:
-            return float(val) / 1000.0
-        return float(val)
+    
     if isinstance(val, str):
+        val = val.strip()
+        if not val or val.lower() == "null":
+            return time.time()
         try:
             return datetime.fromisoformat(val.replace("Z", "+00:00")).timestamp()
         except ValueError:
-            return time.time()
+            # If it's a numeric string, convert to float and continue to numeric logic
+            try:
+                val = float(val)
+            except ValueError:
+                return time.time()
+
+    if isinstance(val, (int, float)):
+        if val > 2e13:       # microseconds → seconds
+            return float(val) / 1_000_000.0
+        if val > 2e10:       # milliseconds → seconds
+            return float(val) / 1000.0
+        return float(val)
+    
     return time.time()
+
+def get_first_valid(*vals):
+    """Returns the first non-None, non-empty, and non-whitespace-only value."""
+    for v in vals:
+        if v is None:
+            continue
+        if isinstance(v, str):
+            v_strip = v.strip()
+            if v_strip and v_strip.lower() != "null":
+                return v_strip
+            continue
+        # For non-strings (int/float), 0 is valid if it's a timestamp (though unlikely)
+        # but usually we just care about truthiness for numeric types here
+        if v:
+            return v
+    return None
+
+def is_valid_timestamp(val: Any) -> bool:
+    """True if val parses as an ISO date string or a plausible numeric unix ts."""
+    if val is None:
+        return False
+    if isinstance(val, str):
+        s = val.strip()
+        if not s or s.lower() == "null":
+            return False
+        try:
+            datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return True
+        except ValueError:
+            try:
+                val = float(s)
+            except ValueError:
+                return False
+    if isinstance(val, (int, float)):
+        # Reject 0/negatives; accept seconds (>= ~2001) or milliseconds
+        return val > 1_000_000_000
+    return False
+
+def get_first_valid_timestamp(*vals):
+    """Returns the first value that parses as a valid timestamp, else None."""
+    for v in vals:
+        if is_valid_timestamp(v):
+            return v.strip() if isinstance(v, str) else v
+    return None
 
 def _safe_str(val: Any, default: str = "") -> str:
     """Convert any value to string, returning default for None/missing."""
@@ -85,7 +140,9 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
                     "country_id":    str(country_id),
                     "country_name":  _safe_str(data.get("country_name")),
                     "language_code": _safe_str(data.get("language_code")),
-                    "published_at":  _safe_str(data.get("published_at")),
+                    "published_at":  _safe_str(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at"))),
+                    "crawled_at":    _safe_str(data.get("crawled_at")),
+                    "processed_at":  _safe_str(data.get("processed_at")),
                     "is_video":      "1" if data.get("is_video") else "0",
                 }
 
@@ -95,7 +152,7 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
                 pipeline.expire(hash_key, TTL_SECONDS)
 
                 # Feeds
-                score = parse_iso_or_ts(data.get("published_at") or data.get("crawled_at"))
+                score = parse_iso_or_ts(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at")))
 
                 global_feed = "feed:global"
                 pipeline.zadd(global_feed, {article_id_str: score})
@@ -142,7 +199,7 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
                 pipeline.expire(hash_key, TTL_SECONDS)
 
                 if root_topic_id:
-                    score = parse_iso_or_ts(data.get("published_at") or data.get("classified_at"))
+                    score = parse_iso_or_ts(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at"), data.get("classified_at")))
                     effective_country_id = int(raw_country_id) if raw_country_id is not None else 0
 
                     topic_feed = f"feed:topic:{root_topic_id}"

@@ -1,0 +1,22 @@
+### 1. Get Initial Feed (Page 1)
+GET http://localhost:8999/api/v1/feed?userId=user123&limit=10
+Accept: application/json
+
+### 2. Get Next Page (using cursor from previous response)
+# Note: You'll need to manually replace the cursor here with the one from the first response.
+# For testing logic, we'll use a known timestamp from our seed (e.g., now - 1000)
+GET http://localhost:8999/api/v1/feed?userId=user123&limit=10&cursor=1714278000
+Accept: application/json
+
+### 3. Track Views
+POST http://localhost:8999/api/v1/feed/views
+Content-Type: application/json
+
+{
+  "userId": "user123",
+  "articleIds": ["art_0", "art_1", "art_2"]
+}
+
+### 4. Get Feed Again (art_0, art_1, art_2 should be filtered out)
+GET http://localhost:8999/api/v1/feed?userId=user123&limit=10
+Accept: application/json
