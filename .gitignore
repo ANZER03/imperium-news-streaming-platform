@@ -39,3 +39,7 @@ venv/
 __pycache__/
 *.pyc
 models/
+
+.agent
+node_modules
+.next
