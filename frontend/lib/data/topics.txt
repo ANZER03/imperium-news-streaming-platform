@@ -1,0 +1,14 @@
+[
+  { "id": "tech", "name": "Technology" },
+  { "id": "biz", "name": "Business" },
+  { "id": "world", "name": "World News" },
+  { "id": "sci", "name": "Science" },
+  { "id": "sport", "name": "Sports" },
+  { "id": "pol", "name": "Politics" },
+  { "id": "health", "name": "Health" },
+  { "id": "ent", "name": "Entertainment" },
+  { "id": "fin", "name": "Finance" },
+  { "id": "cli", "name": "Climate" },
+  { "id": "ai", "name": "AI & Tech" },
+  { "id": "start", "name": "Startups" }
+]

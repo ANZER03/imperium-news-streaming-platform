@@ -14,8 +14,9 @@
   --color-editorial-border: #E9E6F2;
   --color-editorial-surface: #F7F5FB;
 
-  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-playfair), ui-serif, Georgia, serif;
+  --font-tight: var(--font-inter-tight), sans-serif;
 
   --animate-shimmer: shimmer 2s infinite;
 

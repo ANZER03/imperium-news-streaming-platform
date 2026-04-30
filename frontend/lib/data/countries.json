@@ -1,0 +1,1302 @@
+[
+ {
+   "id": 1,
+   "pays": "Maroc",
+   "abr": "MA"
+ },
+ {
+   "id": 2,
+   "pays": "Algérie",
+   "abr": "DZ"
+ },
+ {
+   "id": 3,
+   "pays": "Tunisie",
+   "abr": "TN"
+ },
+ {
+   "id": 4,
+   "pays": "Sénégal",
+   "abr": "SN"
+ },
+ {
+   "id": 5,
+   "pays": "Côte d'Ivoire",
+   "abr": "CI"
+ },
+ {
+   "id": 6,
+   "pays": "Cameroun",
+   "abr": "CM"
+ },
+ {
+   "id": 7,
+   "pays": "Burkina Faso",
+   "abr": "BF"
+ },
+ {
+   "id": 10,
+   "pays": "Île de l’Ascension",
+   "abr": "AC"
+ },
+ {
+   "id": 11,
+   "pays": "Andorre",
+   "abr": "AD"
+ },
+ {
+   "id": 12,
+   "pays": "Émirats Arabes Unis",
+   "abr": "AE"
+ },
+ {
+   "id": 13,
+   "pays": "Afghanistan",
+   "abr": "AF"
+ },
+ {
+   "id": 14,
+   "pays": "Antigua-et-Barbuda",
+   "abr": "AG"
+ },
+ {
+   "id": 15,
+   "pays": "Anguilla",
+   "abr": "AI"
+ },
+ {
+   "id": 16,
+   "pays": "Albanie",
+   "abr": "AL"
+ },
+ {
+   "id": 17,
+   "pays": "Arménie",
+   "abr": "AM"
+ },
+ {
+   "id": 18,
+   "pays": "Antilles Néerlandaises",
+   "abr": "AN"
+ },
+ {
+   "id": 19,
+   "pays": "Angola",
+   "abr": "AO"
+ },
+ {
+   "id": 20,
+   "pays": "Antarctique",
+   "abr": "AQ"
+ },
+ {
+   "id": 21,
+   "pays": "Argentine",
+   "abr": "AR"
+ },
+ {
+   "id": 22,
+   "pays": "Samoa Américaines",
+   "abr": "AS"
+ },
+ {
+   "id": 23,
+   "pays": "Autriche",
+   "abr": "AT"
+ },
+ {
+   "id": 24,
+   "pays": "Australie",
+   "abr": "AU"
+ },
+ {
+   "id": 25,
+   "pays": "Aruba",
+   "abr": "AW"
+ },
+ {
+   "id": 26,
+   "pays": "Åland",
+   "abr": "AX"
+ },
+ {
+   "id": 27,
+   "pays": "Azerbaïdjan",
+   "abr": "AZ"
+ },
+ {
+   "id": 28,
+   "pays": "Bosnie-Herzégovine",
+   "abr": "BA"
+ },
+ {
+   "id": 29,
+   "pays": "Barbade",
+   "abr": "BB"
+ },
+ {
+   "id": 30,
+   "pays": "Bangladesh",
+   "abr": "BD"
+ },
+ {
+   "id": 31,
+   "pays": "Belgique",
+   "abr": "BE"
+ },
+ {
+   "id": 32,
+   "pays": "EXBurkina Faso",
+   "abr": "EXBF"
+ },
+ {
+   "id": 33,
+   "pays": "Bulgarie",
+   "abr": "BG"
+ },
+ {
+   "id": 34,
+   "pays": "Bahreïn",
+   "abr": "BH"
+ },
+ {
+   "id": 35,
+   "pays": "Burundi",
+   "abr": "BI"
+ },
+ {
+   "id": 36,
+   "pays": "Bénin",
+   "abr": "BJ"
+ },
+ {
+   "id": 37,
+   "pays": "Bermudes",
+   "abr": "BM"
+ },
+ {
+   "id": 38,
+   "pays": "Brunei",
+   "abr": "BN"
+ },
+ {
+   "id": 39,
+   "pays": "Bolivie",
+   "abr": "BO"
+ },
+ {
+   "id": 40,
+   "pays": "Brésil",
+   "abr": "BR"
+ },
+ {
+   "id": 41,
+   "pays": "Bahamas",
+   "abr": "BS"
+ },
+ {
+   "id": 42,
+   "pays": "Bhoutan",
+   "abr": "BT"
+ },
+ {
+   "id": 43,
+   "pays": "Île Bouvet",
+   "abr": "BV"
+ },
+ {
+   "id": 44,
+   "pays": "Botswana",
+   "abr": "BW"
+ },
+ {
+   "id": 45,
+   "pays": "Biélorussie",
+   "abr": "BY"
+ },
+ {
+   "id": 46,
+   "pays": "Belize",
+   "abr": "BZ"
+ },
+ {
+   "id": 47,
+   "pays": "Canada",
+   "abr": "CA"
+ },
+ {
+   "id": 48,
+   "pays": "Îles Cocos",
+   "abr": "CC"
+ },
+ {
+   "id": 49,
+   "pays": "République démocratique du Congo",
+   "abr": "CD"
+ },
+ {
+   "id": 50,
+   "pays": "République centrafricaine",
+   "abr": "CF"
+ },
+ {
+   "id": 51,
+   "pays": "Congo",
+   "abr": "CG"
+ },
+ {
+   "id": 52,
+   "pays": "Suisse",
+   "abr": "CH"
+ },
+ {
+   "id": 53,
+   "pays": "EXCôte d'Ivoire",
+   "abr": "EXCI"
+ },
+ {
+   "id": 54,
+   "pays": "Îles Cook",
+   "abr": "CK"
+ },
+ {
+   "id": 55,
+   "pays": "Chili",
+   "abr": "CL"
+ },
+ {
+   "id": 56,
+   "pays": "EXCameroun",
+   "abr": "EXCM"
+ },
+ {
+   "id": 57,
+   "pays": "Chine",
+   "abr": "CN"
+ },
+ {
+   "id": 58,
+   "pays": "Colombie",
+   "abr": "CO"
+ },
+ {
+   "id": 59,
+   "pays": "Costa Rica",
+   "abr": "CR"
+ },
+ {
+   "id": 60,
+   "pays": "ex Serbie-et-Monténégro",
+   "abr": "CS"
+ },
+ {
+   "id": 61,
+   "pays": "ex Tchécoslovaquie",
+   "abr": "E "
+ },
+ {
+   "id": 62,
+   "pays": "Cuba",
+   "abr": "CU"
+ },
+ {
+   "id": 63,
+   "pays": "Cap-Vert",
+   "abr": "CV"
+ },
+ {
+   "id": 64,
+   "pays": "Île Christmas",
+   "abr": "CX"
+ },
+ {
+   "id": 65,
+   "pays": "Chypre",
+   "abr": "CY"
+ },
+ {
+   "id": 66,
+   "pays": "République tchèque",
+   "abr": "CZ"
+ },
+ {
+   "id": 70,
+   "pays": "Allemagne",
+   "abr": "DE"
+ },
+ {
+   "id": 71,
+   "pays": "Djibouti",
+   "abr": "DJ"
+ },
+ {
+   "id": 72,
+   "pays": "Danemark",
+   "abr": "DK"
+ },
+ {
+   "id": 73,
+   "pays": "Dominique",
+   "abr": "DM"
+ },
+ {
+   "id": 74,
+   "pays": "République dominicaine",
+   "abr": "DO"
+ },
+ {
+   "id": 76,
+   "pays": "Équateur",
+   "abr": "EC"
+ },
+ {
+   "id": 77,
+   "pays": "Estonie",
+   "abr": "EE"
+ },
+ {
+   "id": 78,
+   "pays": "Égypte",
+   "abr": "EG"
+ },
+ {
+   "id": 79,
+   "pays": "Sahara Marocain",
+   "abr": "EH"
+ },
+ {
+   "id": 80,
+   "pays": "Érythrée",
+   "abr": "ER"
+ },
+ {
+   "id": 81,
+   "pays": "Espagne",
+   "abr": "ES"
+ },
+ {
+   "id": 82,
+   "pays": "Éthiopie",
+   "abr": "ET"
+ },
+ {
+   "id": 83,
+   "pays": "Union européenne",
+   "abr": "EU"
+ },
+ {
+   "id": 84,
+   "pays": "Finlande",
+   "abr": "FI"
+ },
+ {
+   "id": 85,
+   "pays": "Fidji",
+   "abr": "FJ"
+ },
+ {
+   "id": 86,
+   "pays": "Îles Malouines",
+   "abr": "FK"
+ },
+ {
+   "id": 87,
+   "pays": "Micronésie",
+   "abr": "FM"
+ },
+ {
+   "id": 88,
+   "pays": "Îles Féroé",
+   "abr": "FO"
+ },
+ {
+   "id": 89,
+   "pays": "France",
+   "abr": "FR"
+ },
+ {
+   "id": 93,
+   "pays": "Gabon",
+   "abr": "GA"
+ },
+ {
+   "id": 94,
+   "pays": "Royaume-Uni",
+   "abr": "GB"
+ },
+ {
+   "id": 95,
+   "pays": "Grenade",
+   "abr": "GD"
+ },
+ {
+   "id": 96,
+   "pays": "Géorgie",
+   "abr": "GE"
+ },
+ {
+   "id": 97,
+   "pays": "Guyane française",
+   "abr": "GF"
+ },
+ {
+   "id": 98,
+   "pays": "Guernesey",
+   "abr": "GG"
+ },
+ {
+   "id": 99,
+   "pays": "Ghana",
+   "abr": "GH"
+ },
+ {
+   "id": 100,
+   "pays": "Gibraltar",
+   "abr": "GI"
+ },
+ {
+   "id": 101,
+   "pays": "Groenland",
+   "abr": "GL"
+ },
+ {
+   "id": 102,
+   "pays": "Gambie",
+   "abr": "GM"
+ },
+ {
+   "id": 103,
+   "pays": "Guinée",
+   "abr": "GN"
+ },
+ {
+   "id": 104,
+   "pays": "Guadeloupe",
+   "abr": "GP"
+ },
+ {
+   "id": 105,
+   "pays": "Guinée équatoriale",
+   "abr": "GQ"
+ },
+ {
+   "id": 106,
+   "pays": "Grèce",
+   "abr": "GR"
+ },
+ {
+   "id": 107,
+   "pays": "Géorgie du Sud et les îles Sandwich du Sud",
+   "abr": "GS"
+ },
+ {
+   "id": 108,
+   "pays": "Guatemala",
+   "abr": "GT"
+ },
+ {
+   "id": 109,
+   "pays": "Guam",
+   "abr": "GU"
+ },
+ {
+   "id": 110,
+   "pays": "Guinée-Bissau",
+   "abr": "GW"
+ },
+ {
+   "id": 111,
+   "pays": "Guyana",
+   "abr": "GY"
+ },
+ {
+   "id": 115,
+   "pays": "Hong Kong",
+   "abr": "HK"
+ },
+ {
+   "id": 116,
+   "pays": "Île Heard et îles McDonald",
+   "abr": "HM"
+ },
+ {
+   "id": 117,
+   "pays": "Honduras",
+   "abr": "HN"
+ },
+ {
+   "id": 118,
+   "pays": "Croatie (Hrvatska)",
+   "abr": "HR"
+ },
+ {
+   "id": 119,
+   "pays": "Haïti",
+   "abr": "HT"
+ },
+ {
+   "id": 120,
+   "pays": "Hongrie",
+   "abr": "HU"
+ },
+ {
+   "id": 121,
+   "pays": "Indonésie",
+   "abr": "ID"
+ },
+ {
+   "id": 122,
+   "pays": "Irlande",
+   "abr": "IE"
+ },
+ {
+   "id": 123,
+   "pays": "Israël",
+   "abr": "IL"
+ },
+ {
+   "id": 124,
+   "pays": "Île de Man",
+   "abr": "IM"
+ },
+ {
+   "id": 125,
+   "pays": "Inde",
+   "abr": "IN"
+ },
+ {
+   "id": 126,
+   "pays": "Territoire britannique de l'océan Indien",
+   "abr": "IO"
+ },
+ {
+   "id": 127,
+   "pays": "Irak",
+   "abr": "IQ"
+ },
+ {
+   "id": 128,
+   "pays": "Iran",
+   "abr": "IR"
+ },
+ {
+   "id": 129,
+   "pays": "Islande",
+   "abr": "IS"
+ },
+ {
+   "id": 130,
+   "pays": "Italie",
+   "abr": "IT"
+ },
+ {
+   "id": 131,
+   "pays": "Jersey",
+   "abr": "JE"
+ },
+ {
+   "id": 132,
+   "pays": "Jamaïque",
+   "abr": "JM"
+ },
+ {
+   "id": 133,
+   "pays": "Jordanie",
+   "abr": "JO"
+ },
+ {
+   "id": 134,
+   "pays": "Japon",
+   "abr": "JP"
+ },
+ {
+   "id": 138,
+   "pays": "Kenya",
+   "abr": "KE"
+ },
+ {
+   "id": 139,
+   "pays": "Kirghizstan",
+   "abr": "KG"
+ },
+ {
+   "id": 140,
+   "pays": "Cambodge",
+   "abr": "KH"
+ },
+ {
+   "id": 141,
+   "pays": "Kiribati",
+   "abr": "KI"
+ },
+ {
+   "id": 142,
+   "pays": "Union des Comores",
+   "abr": "KM"
+ },
+ {
+   "id": 143,
+   "pays": "Saint-Christophe-et-Niévès",
+   "abr": "KN"
+ },
+ {
+   "id": 144,
+   "pays": "Corée du Nord",
+   "abr": "KP"
+ },
+ {
+   "id": 145,
+   "pays": "Corée du Sud",
+   "abr": "KR"
+ },
+ {
+   "id": 146,
+   "pays": "Koweït",
+   "abr": "KW"
+ },
+ {
+   "id": 147,
+   "pays": "Îles Caïmanes",
+   "abr": "KY"
+ },
+ {
+   "id": 148,
+   "pays": "Kazakhstan",
+   "abr": "KZ"
+ },
+ {
+   "id": 149,
+   "pays": "Laos",
+   "abr": "LA"
+ },
+ {
+   "id": 150,
+   "pays": "Liban",
+   "abr": "LB"
+ },
+ {
+   "id": 151,
+   "pays": "Sainte-Lucie",
+   "abr": "LC"
+ },
+ {
+   "id": 152,
+   "pays": "Liechtenstein",
+   "abr": "LI"
+ },
+ {
+   "id": 153,
+   "pays": "Sri Lanka",
+   "abr": "LK"
+ },
+ {
+   "id": 154,
+   "pays": "Libéria",
+   "abr": "LR"
+ },
+ {
+   "id": 155,
+   "pays": "Lesotho",
+   "abr": "LS"
+ },
+ {
+   "id": 156,
+   "pays": "Lituanie",
+   "abr": "LT"
+ },
+ {
+   "id": 157,
+   "pays": "Luxembourg",
+   "abr": "LU"
+ },
+ {
+   "id": 158,
+   "pays": "Lettonie",
+   "abr": "LV"
+ },
+ {
+   "id": 159,
+   "pays": "Libye",
+   "abr": "LY"
+ },
+ {
+   "id": 164,
+   "pays": "Monaco",
+   "abr": "MC"
+ },
+ {
+   "id": 165,
+   "pays": "Moldavie",
+   "abr": "MD"
+ },
+ {
+   "id": 166,
+   "pays": "Moyen Orient (Middle East)",
+   "abr": "ME"
+ },
+ {
+   "id": 167,
+   "pays": "Madagascar",
+   "abr": "MG"
+ },
+ {
+   "id": 168,
+   "pays": "Marshall",
+   "abr": "MH"
+ },
+ {
+   "id": 169,
+   "pays": "Macédoine",
+   "abr": "MK"
+ },
+ {
+   "id": 170,
+   "pays": "Mali",
+   "abr": "ML"
+ },
+ {
+   "id": 171,
+   "pays": "Birmanie (Myanmar)",
+   "abr": "MM"
+ },
+ {
+   "id": 172,
+   "pays": "Mongolie",
+   "abr": "MN"
+ },
+ {
+   "id": 173,
+   "pays": "Macao",
+   "abr": "MO"
+ },
+ {
+   "id": 174,
+   "pays": "îles Mariannes du Nord",
+   "abr": "MP"
+ },
+ {
+   "id": 175,
+   "pays": "Martinique",
+   "abr": "MQ"
+ },
+ {
+   "id": 176,
+   "pays": "Mauritanie",
+   "abr": "MR"
+ },
+ {
+   "id": 177,
+   "pays": "Montserrat",
+   "abr": "MS"
+ },
+ {
+   "id": 178,
+   "pays": "Malte",
+   "abr": "MT"
+ },
+ {
+   "id": 179,
+   "pays": "Maurice",
+   "abr": "MU"
+ },
+ {
+   "id": 180,
+   "pays": "Maldives",
+   "abr": "MV"
+ },
+ {
+   "id": 181,
+   "pays": "Malawi",
+   "abr": "MW"
+ },
+ {
+   "id": 182,
+   "pays": "Mexique",
+   "abr": "MX"
+ },
+ {
+   "id": 183,
+   "pays": "Malaisie",
+   "abr": "MY"
+ },
+ {
+   "id": 184,
+   "pays": "Mozambique",
+   "abr": "MZ"
+ },
+ {
+   "id": 188,
+   "pays": "Namibie",
+   "abr": "NA"
+ },
+ {
+   "id": 189,
+   "pays": "Nouvelle-Calédonie",
+   "abr": "NC"
+ },
+ {
+   "id": 190,
+   "pays": "Niger",
+   "abr": "NE"
+ },
+ {
+   "id": 191,
+   "pays": "Île de Norfolk",
+   "abr": "NF"
+ },
+ {
+   "id": 192,
+   "pays": "Nigeria",
+   "abr": "NG"
+ },
+ {
+   "id": 193,
+   "pays": "Nicaragua",
+   "abr": "NI"
+ },
+ {
+   "id": 194,
+   "pays": "Pays-Bas",
+   "abr": "NL"
+ },
+ {
+   "id": 195,
+   "pays": "Norvège",
+   "abr": "NO"
+ },
+ {
+   "id": 196,
+   "pays": "Népal",
+   "abr": "NP"
+ },
+ {
+   "id": 197,
+   "pays": "Nauru",
+   "abr": "NR"
+ },
+ {
+   "id": 198,
+   "pays": "Niue",
+   "abr": "NU"
+ },
+ {
+   "id": 199,
+   "pays": "Nouvelle-Zélande",
+   "abr": "NZ"
+ },
+ {
+   "id": 200,
+   "pays": "Oman",
+   "abr": "OM"
+ },
+ {
+   "id": 204,
+   "pays": "Panama",
+   "abr": "PA"
+ },
+ {
+   "id": 205,
+   "pays": "Pérou",
+   "abr": "PE"
+ },
+ {
+   "id": 206,
+   "pays": "Polynésie française",
+   "abr": "PF"
+ },
+ {
+   "id": 207,
+   "pays": "Papouasie-Nouvelle-Guinée",
+   "abr": "PG"
+ },
+ {
+   "id": 208,
+   "pays": "Philippines",
+   "abr": "PH"
+ },
+ {
+   "id": 209,
+   "pays": "Pakistan",
+   "abr": "PK"
+ },
+ {
+   "id": 210,
+   "pays": "Pologne",
+   "abr": "PL"
+ },
+ {
+   "id": 211,
+   "pays": "Saint-Pierre-et-Miquelon",
+   "abr": "PM"
+ },
+ {
+   "id": 212,
+   "pays": "Îles Pitcairn",
+   "abr": "PN"
+ },
+ {
+   "id": 213,
+   "pays": "Porto Rico",
+   "abr": "PR"
+ },
+ {
+   "id": 214,
+   "pays": "Palestine",
+   "abr": "PS"
+ },
+ {
+   "id": 215,
+   "pays": "Portugal",
+   "abr": "PT"
+ },
+ {
+   "id": 216,
+   "pays": "Palaos",
+   "abr": "PW"
+ },
+ {
+   "id": 217,
+   "pays": "Paraguay",
+   "abr": "PY"
+ },
+ {
+   "id": 218,
+   "pays": "Qatar",
+   "abr": "QA"
+ },
+ {
+   "id": 219,
+   "pays": "Réunion",
+   "abr": "RE"
+ },
+ {
+   "id": 220,
+   "pays": "Roumanie",
+   "abr": "RO"
+ },
+ {
+   "id": 221,
+   "pays": "Serbie",
+   "abr": "RS"
+ },
+ {
+   "id": 222,
+   "pays": "Russie",
+   "abr": "RU"
+ },
+ {
+   "id": 223,
+   "pays": "Rwanda",
+   "abr": "RW"
+ },
+ {
+   "id": 227,
+   "pays": "Arabie saoudite",
+   "abr": "SA"
+ },
+ {
+   "id": 228,
+   "pays": "Salomon",
+   "abr": "SB"
+ },
+ {
+   "id": 229,
+   "pays": "Seychelles",
+   "abr": "SC"
+ },
+ {
+   "id": 230,
+   "pays": "Soudan",
+   "abr": "SD"
+ },
+ {
+   "id": 231,
+   "pays": "Suède",
+   "abr": "SE"
+ },
+ {
+   "id": 232,
+   "pays": "Singapour",
+   "abr": "SG"
+ },
+ {
+   "id": 233,
+   "pays": "Sainte-Hélène",
+   "abr": "SH"
+ },
+ {
+   "id": 234,
+   "pays": "Slovénie",
+   "abr": "SI"
+ },
+ {
+   "id": 235,
+   "pays": "Svalbard et Jan Mayen",
+   "abr": "SJ"
+ },
+ {
+   "id": 236,
+   "pays": "Slovaquie",
+   "abr": "SK"
+ },
+ {
+   "id": 237,
+   "pays": "Sierra Leone",
+   "abr": "SL"
+ },
+ {
+   "id": 238,
+   "pays": "Saint-Marin",
+   "abr": "SM"
+ },
+ {
+   "id": 239,
+   "pays": "EX Sénégal",
+   "abr": "EXSN"
+ },
+ {
+   "id": 240,
+   "pays": "Somalie",
+   "abr": "SO"
+ },
+ {
+   "id": 241,
+   "pays": "Suriname",
+   "abr": "SR"
+ },
+ {
+   "id": 242,
+   "pays": "Sao Tomé-et-Principe",
+   "abr": "ST"
+ },
+ {
+   "id": 243,
+   "pays": "CEI (ancien Union soviétique)",
+   "abr": "SU"
+ },
+ {
+   "id": 244,
+   "pays": "Salvador",
+   "abr": "SV"
+ },
+ {
+   "id": 245,
+   "pays": "Syrie",
+   "abr": "SY"
+ },
+ {
+   "id": 246,
+   "pays": "Swaziland",
+   "abr": "SZ"
+ },
+ {
+   "id": 250,
+   "pays": "Îles Turques et Caïques",
+   "abr": "TC"
+ },
+ {
+   "id": 251,
+   "pays": "Tchad",
+   "abr": "TD"
+ },
+ {
+   "id": 252,
+   "pays": "Terres australes et antarctiques françaises",
+   "abr": "TF"
+ },
+ {
+   "id": 253,
+   "pays": "Togo",
+   "abr": "TG"
+ },
+ {
+   "id": 254,
+   "pays": "Thaïlande",
+   "abr": "TH"
+ },
+ {
+   "id": 255,
+   "pays": "Tadjikistan",
+   "abr": "TJ"
+ },
+ {
+   "id": 256,
+   "pays": "Tokelau",
+   "abr": "TK"
+ },
+ {
+   "id": 257,
+   "pays": "Timor oriental&nbsp;; voir aussi .tp",
+   "abr": "TL"
+ },
+ {
+   "id": 258,
+   "pays": "Turkménistan",
+   "abr": "TM"
+ },
+ {
+   "id": 260,
+   "pays": "Tonga",
+   "abr": "TO"
+ },
+ {
+   "id": 261,
+   "pays": "Timor oriental",
+   "abr": "TP"
+ },
+ {
+   "id": 262,
+   "pays": "Turquie",
+   "abr": "TR"
+ },
+ {
+   "id": 263,
+   "pays": "Trinité-et-Tobago",
+   "abr": "TT"
+ },
+ {
+   "id": 264,
+   "pays": "Tuvalu",
+   "abr": "TV"
+ },
+ {
+   "id": 265,
+   "pays": "Taïwan",
+   "abr": "TW"
+ },
+ {
+   "id": 266,
+   "pays": "Tanzanie",
+   "abr": "TZ"
+ },
+ {
+   "id": 267,
+   "pays": "Ukraine",
+   "abr": "UA"
+ },
+ {
+   "id": 268,
+   "pays": "Ouganda",
+   "abr": "UG"
+ },
+ {
+   "id": 269,
+   "pays": "Royaume-Uni (United Kingdom)",
+   "abr": "UK"
+ },
+ {
+   "id": 270,
+   "pays": "Îles mineures éloignées des États-Unis",
+   "abr": "UM"
+ },
+ {
+   "id": 271,
+   "pays": "États-Unis (United States)",
+   "abr": "US"
+ },
+ {
+   "id": 272,
+   "pays": "Uruguay",
+   "abr": "UY"
+ },
+ {
+   "id": 273,
+   "pays": "Ouzbékistan",
+   "abr": "UZ"
+ },
+ {
+   "id": 274,
+   "pays": "Vatican",
+   "abr": "VA"
+ },
+ {
+   "id": 275,
+   "pays": "Saint-Vincent-et-les Grenadines",
+   "abr": "VC"
+ },
+ {
+   "id": 276,
+   "pays": "Venezuela",
+   "abr": "VE"
+ },
+ {
+   "id": 277,
+   "pays": "îles Vierges britanniques",
+   "abr": "VG"
+ },
+ {
+   "id": 278,
+   "pays": "îles Vierges américaines",
+   "abr": "VI"
+ },
+ {
+   "id": 279,
+   "pays": "Viêt Nam",
+   "abr": "VN"
+ },
+ {
+   "id": 280,
+   "pays": "Vanuatu",
+   "abr": "VU"
+ },
+ {
+   "id": 281,
+   "pays": "Wallis-et-Futuna",
+   "abr": "WF"
+ },
+ {
+   "id": 282,
+   "pays": "Samoa",
+   "abr": "WS"
+ },
+ {
+   "id": 283,
+   "pays": "Yémen",
+   "abr": "YE"
+ },
+ {
+   "id": 284,
+   "pays": "Mayotte",
+   "abr": "YT"
+ },
+ {
+   "id": 285,
+   "pays": "Serbie ou Monténégro",
+   "abr": "YU"
+ },
+ {
+   "id": 286,
+   "pays": "Afrique du Sud",
+   "abr": "ZA"
+ },
+ {
+   "id": 287,
+   "pays": "Zambie",
+   "abr": "ZM"
+ },
+ {
+   "id": 288,
+   "pays": "Zimbabwe",
+   "abr": "ZW"
+ },
+ {
+   "id": 300,
+   "pays": "Transnational Africain",
+   "abr": "TAF"
+ },
+ {
+   "id": 301,
+   "pays": "Transnational Arabe",
+   "abr": "TAR"
+ },
+ {
+   "id": 302,
+   "pays": "Transnational Européen",
+   "abr": "TEU"
+ },
+ {
+   "id": 303,
+   "pays": "Asie",
+   "abr": "TAS"
+ }
+]

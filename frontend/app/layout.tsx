@@ -1,5 +1,5 @@
 import type {Metadata} from 'next';
-import { Outfit, Playfair_Display } from 'next/font/google';
+import { Outfit, Playfair_Display, Inter, Inter_Tight } from 'next/font/google';
 import './globals.css'; // Global styles
 
 const outfit = Outfit({
@@ -12,6 +12,16 @@ const playfair = Playfair_Display({
   variable: '--font-playfair',
 });
 
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
+
+const interTight = Inter_Tight({
+  subsets: ['latin'],
+  variable: '--font-inter-tight',
+});
+
 export const metadata: Metadata = {
   title: 'Imperium News',
   description: 'Fast, clean, engaging news reading experience',
@@ -19,7 +29,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en" className={`${outfit.variable} ${playfair.variable}`}>
+    <html lang="en" className={`${outfit.variable} ${playfair.variable} ${inter.variable} ${interTight.variable}`}>
       <body className="bg-editorial-bg font-sans text-editorial-ink antialiased" suppressHydrationWarning>{children}</body>
     </html>
   );
