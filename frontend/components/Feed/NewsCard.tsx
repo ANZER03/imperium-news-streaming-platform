@@ -3,7 +3,7 @@ import { Article } from '@/lib/types';
 import Image from 'next/image';
 import { Bookmark, MoreHorizontal } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
-import { registerInteraction } from '@/lib/api';
+import { articleService } from '@/lib/services';
 import { useImpression } from '@/hooks/use-impression';
 
 const TOPIC_COLORS: Record<string, string> = {
@@ -25,7 +25,7 @@ export function NewsCard({ article }: { article: Article }) {
   const { elementRef } = useImpression(() => {
     if (userId) {
       console.log(`[Impression] Article viewed: ${article.title} (${article.id})`);
-      registerInteraction('view', article.id, userId);
+      articleService.registerInteraction('view', article.id, userId);
     }
   }, { threshold: 0.5, minVisibleTime: 1000 });
 
@@ -39,7 +39,7 @@ export function NewsCard({ article }: { article: Article }) {
     
     // Non-blocking save
     if (userId) {
-      registerInteraction('save', article.id, userId);
+      articleService.registerInteraction('save', article.id, userId);
     }
     toggleSaved(article.id);
   };

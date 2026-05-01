@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { v4 as uuidv4 } from 'uuid';
 import { Article } from './types';
 
 interface AppState {
@@ -14,7 +13,7 @@ interface AppState {
   activeTopic: string;
   searchQuery: string;
   
-  completeOnboarding: (interests: string[], country: string) => void;
+  completeOnboarding: (interests: string[], country: string, userId: string) => void;
   openArticle: (article: Article) => void;
   closeArticle: () => void;
   toggleSaved: (articleId: string) => void;
@@ -39,11 +38,11 @@ export const useAppStore = create<AppState>()(
       activeTopic: 'All',
       searchQuery: '',
 
-      completeOnboarding: (interests, country) => set((state) => ({ 
+      completeOnboarding: (interests, country, userId) => set(() => ({ 
         interests, 
         country, 
         isOnboarded: true,
-        userId: state.userId || uuidv4() 
+        userId
       })),
       
       openArticle: (article) => set({ selectedArticle: article }),

@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { fetchFeed } from '@/lib/api';
+import { feedService } from '@/lib/services';
 import { Article } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { NewsCard } from './NewsCard';
@@ -28,7 +28,7 @@ export function FeedList() {
     const initFetch = async () => {
       setLoading(true);
       try {
-        const data = await fetchFeed(activeTopic === 'All' ? interests : [activeTopic]);
+        const data = await feedService.getFeed(activeTopic === 'All' ? interests : [activeTopic]);
         
         let fetchedArticles = data;
         
@@ -79,7 +79,7 @@ export function FeedList() {
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     try {
-      const moreData = await fetchFeed(interests);
+      const moreData = await feedService.getFeed(interests);
       // Append more mock data with new IDs to avoid key collisions
       const newArticles = moreData.map(article => ({
         ...article,

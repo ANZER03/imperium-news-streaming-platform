@@ -89,7 +89,7 @@ Content-Type: application/json
 ### ——————————————————————————————————————————————
 ### NOTE: Replace {{userId}} with the UUID returned from onboarding above.
 
-@userId = 33598717-e778-4ffc-bfbf-22312bd526fb
+@userId = 69ef90ac-f20f-45f6-9dd7-f6f9ec04650b
 
 ### 2a. Get initial feed — default limit (20)
 GET {{baseUrl}}/feed?userId={{userId}}
@@ -105,7 +105,7 @@ Accept: application/json
 
 ### 2c. Get next page — cursor scrolling
 ### Replace cursor value with the `nextCursor` from the previous response
-@cursor = 1777315086
+@cursor = 1777314914
 
 GET {{baseUrl}}/feed?userId={{userId}}&limit=10&cursor={{cursor}}
 Accept: application/json

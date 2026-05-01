@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { ArrowLeft, Bookmark, Share2, MoreHorizontal } from 'lucide-react';
 import Image from 'next/image';
-import { registerInteraction } from '@/lib/api';
+import { articleService } from '@/lib/services';
 import { motion } from 'motion/react';
 
 export function ArticleView() {
@@ -13,7 +13,7 @@ export function ArticleView() {
   useEffect(() => {
     if (selectedArticle && userId) {
       console.log(`[Full Article View] ${selectedArticle.title}`);
-      registerInteraction('view', selectedArticle.id, userId);
+      articleService.registerInteraction('view', selectedArticle.id, userId);
     }
   }, [selectedArticle?.id, userId]);
 
@@ -37,7 +37,7 @@ export function ArticleView() {
     
     // Fire and forget interaction
     if (userId) {
-      registerInteraction('save', selectedArticle.id, userId);
+      articleService.registerInteraction('save', selectedArticle.id, userId);
     }
     
     // Update local state
