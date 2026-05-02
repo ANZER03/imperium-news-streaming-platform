@@ -40,6 +40,9 @@ __pycache__/
 *.pyc
 models/
 
-.agent
+.agents/
 node_modules
 .next
+
+skills-lock.json
+skills-index.json

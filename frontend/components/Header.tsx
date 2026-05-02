@@ -1,24 +1,28 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Search, Menu, ChevronLeft, ChevronRight, Bookmark, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAppStore } from '@/lib/store';
 import { AnimatePresence, motion } from 'motion/react';
+import { topicService } from '@/lib/services';
+import { Topic } from '@/lib/types';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
-const TOPICS = [
-  'For You', 'Latest', 'Trending', 'World', 'Business', 'Tech', 'Science', 'Sports', 'Entertainment', 'Health'
-];
+const SPECIAL_TOPICS = ['For You', 'Latest'];
 
 export function Header({ onMenuClick }: HeaderProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { activeTopic, activeView, setTopic, setView, interests } = useAppStore();
+  const { activeTopic, activeView, setTopic, setView } = useAppStore();
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [topics, setTopics] = useState<Topic[]>([]);
 
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = React.useState(false);
+  useEffect(() => {
+    topicService.getAll().then(setTopics).catch(() => {});
+  }, []);
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
@@ -38,56 +42,18 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* LOGO */}
         <div className="flex items-center shrink-0">
           <button onClick={() => setView('feed')} className="flex items-center">
-            {/* Desktop Logo (Text + Symbol) */}
-            <div className="hidden md:block relative h-8 md:h-10">
-              <img 
-                src="/imperium_logo.svg" 
-                alt="Imperium"
-                className="h-full w-auto object-contain"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-              <div className="hidden flex items-center gap-3">
-                <div className="grid h-10 w-10 grid-cols-3 gap-[3px] rounded-2xl bg-[#f4f7ff] p-[5px]">
-                  <span className="rounded-full bg-rose-500"></span>
-                  <span className="rounded-full bg-orange-400"></span>
-                  <span className="rounded-full bg-[#6F3FF5]"></span>
-                  <span className="rounded-full bg-emerald-400"></span>
-                  <span className="rounded-full bg-[#3A0A78]"></span>
-                  <span className="rounded-full bg-rose-400"></span>
-                  <span className="rounded-full bg-orange-300"></span>
-                  <span className="rounded-full bg-emerald-500"></span>
-                  <span className="rounded-full bg-[#4c3dde]"></span>
-                </div>
-                <span className="text-[2rem] font-bold tracking-tight text-editorial-ink font-sans">imperium</span>
-              </div>
-            </div>
-
-            {/* Mobile Logo (Symbol Only) */}
-            <div className="md:hidden relative h-10 w-10">
-              <img 
-                src="/logo.svg" 
-                alt="Imperium"
-                className="h-full w-full object-contain"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-              <div className="hidden grid h-full w-full grid-cols-3 gap-[2px] rounded-xl bg-[#f4f7ff] p-[4px]">
-                <span className="rounded-full bg-rose-500"></span>
-                <span className="rounded-full bg-orange-400"></span>
-                <span className="rounded-full bg-[#6F3FF5]"></span>
-                <span className="rounded-full bg-emerald-400"></span>
-                <span className="rounded-full bg-[#3A0A78]"></span>
-                <span className="rounded-full bg-rose-400"></span>
-                <span className="rounded-full bg-orange-300"></span>
-                <span className="rounded-full bg-emerald-500"></span>
-                <span className="rounded-full bg-[#4c3dde]"></span>
-              </div>
-            </div>
+            {/* Desktop Logo (with text) */}
+            <img 
+              src="/imperium_logo.svg" 
+              alt="Imperium"
+              className="hidden md:block h-8 md:h-10 w-auto object-contain"
+            />
+            {/* Mobile Logo (symbol only) */}
+            <img 
+              src="/logo.svg" 
+              alt="Imperium"
+              className="md:hidden h-10 w-auto object-contain"
+            />
           </button>
         </div>
 
@@ -174,43 +140,42 @@ export function Header({ onMenuClick }: HeaderProps) {
           className="flex-1 overflow-x-auto no-scrollbar scroll-smooth"
         >
           <div className="flex min-w-max items-center gap-6 md:gap-8 text-[15px] font-medium text-editorial-muted font-sans pb-0">
-            {TOPICS.map((topic) => {
-              const isSelected = activeView === 'feed' && (
-                (topic === 'For You' && activeTopic === 'All') || 
-                (activeTopic === topic)
-              );
+            {/* Special tabs: For You, Latest */}
+            {SPECIAL_TOPICS.map((label) => {
+              const key = label === 'For You' ? 'All' : label;
+              const isSelected = activeView === 'feed' && activeTopic === key;
               return (
-                <button 
-                  key={topic}
-                  onClick={() => {
-                    if (topic === 'For You') setTopic('All');
-                    else setTopic(topic);
-                  }}
+                <button
+                  key={label}
+                  onClick={() => setTopic(key)}
                   className={`py-3.5 transition font-sans ${
-                    isSelected 
-                      ? 'border-b-[3px] border-editorial-accent text-editorial-ink' 
+                    isSelected
+                      ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
                       : 'hover:text-editorial-ink'
                   }`}
                 >
-                  {topic}
+                  {label}
                 </button>
               );
             })}
-            
-            {/* Interests from onboarding */}
-            {interests.map(interest => (
-              <button 
-                key={interest}
-                onClick={() => setTopic(interest)}
-                className={`py-3.5 transition font-sans ${
-                  activeView === 'feed' && activeTopic === interest
-                    ? 'border-b-[3px] border-editorial-accent text-editorial-ink' 
-                    : 'hover:text-editorial-ink'
-                }`}
-              >
-                {interest}
-              </button>
-            ))}
+
+            {/* Topic tabs from API — same list as onboarding */}
+            {topics.map(({ topicId, displayName }) => {
+              const isSelected = activeView === 'feed' && activeTopic === topicId;
+              return (
+                <button
+                  key={topicId}
+                  onClick={() => setTopic(topicId)}
+                  className={`py-3.5 transition font-sans ${
+                    isSelected
+                      ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
+                      : 'hover:text-editorial-ink'
+                  }`}
+                >
+                  {displayName}
+                </button>
+              );
+            })}
           </div>
         </nav>
 

@@ -10,4 +10,5 @@ public class Constants {
     public static final String KEY_USER_SAVED = "user:%s:saved";  // bookmarked article IDs (no TTL)
     public static final String KEY_COUNTRIES_LIST = "countries:list";
     public static final String KEY_FEED_COUNTRY = "feed:country:%s";
+    public static final String KEY_FEED_COUNTRY_TOPIC = "feed:country:%s:topic:%s"; // %s = countryId, topicId
 }

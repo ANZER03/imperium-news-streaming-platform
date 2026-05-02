@@ -1,0 +1,54 @@
+[
+  {
+    "id": "politics_government",
+    "name": "Politics & Government"
+  },
+  {
+    "id": "war_security",
+    "name": "War & Security"
+  },
+  {
+    "id": "crime_justice",
+    "name": "Crime & Justice"
+  },
+  {
+    "id": "business_economy",
+    "name": "Business & Economy"
+  },
+  {
+    "id": "science_technology",
+    "name": "Science & Technology"
+  },
+  {
+    "id": "health",
+    "name": "Health"
+  },
+  {
+    "id": "sports",
+    "name": "Sports"
+  },
+  {
+    "id": "entertainment_culture",
+    "name": "Entertainment & Culture"
+  },
+  {
+    "id": "lifestyle_travel",
+    "name": "Lifestyle & Travel"
+  },
+  {
+    "id": "education",
+    "name": "Education"
+  },
+  {
+    "id": "environment_weather",
+    "name": "Environment & Weather"
+  },
+  {
+    "id": "disasters_accidents",
+    "name": "Disasters & Accidents"
+  },
+  {
+    "id": "religion_society",
+    "name": "Religion & Society"
+  }
+]

@@ -34,9 +34,9 @@ public class FeedService {
                     List<String> topics = prefs.getT1();
                     int countryId = prefs.getT2();
 
-                    // [2] PHASE 1 — fan-out to all user topic ZSETs in parallel
+                    // [2] PHASE 1 — fan-out to country+topic ZSETs in parallel
                     Mono<List<ScoredArticle>> phase1 = Flux.fromIterable(topics)
-                            .flatMap(topic -> feedRepository.getArticleIdsByTopicWithScores(topic, safeCursor, fetchPerSource))
+                            .flatMap(topic -> feedRepository.getArticleIdsByCountryAndTopicWithScores(countryId, topic, safeCursor, fetchPerSource))
                             .collectList();
 
                     return phase1.flatMap(topicCandidates -> {
@@ -110,6 +110,28 @@ public class FeedService {
                         return new PageResult<>(page, nextCursor);
                     });
         });
+    }
+
+    public Mono<PageResult<ArticleCardDto>> getByTopic(String userId, String topicId, Long cursor, int limit) {
+        long rawCursor = (cursor == null || cursor == 0) ? System.currentTimeMillis() : cursor;
+        double safeCursor = rawCursor > 20_000_000_000L ? rawCursor / 1000.0 : (double) rawCursor;
+
+        return feedRepository.getUserCountryId(userId).flatMap(countryId ->
+                feedRepository.getArticleIdsByCountryAndTopicWithScores(countryId, topicId, safeCursor, limit * 3)
+                        .collectList()
+                        .flatMap(candidates -> buildPage(userId, candidates, limit))
+        );
+    }
+
+    public Mono<PageResult<ArticleCardDto>> getLatest(String userId, Long cursor, int limit) {
+        long rawCursor = (cursor == null || cursor == 0) ? System.currentTimeMillis() : cursor;
+        double safeCursor = rawCursor > 20_000_000_000L ? rawCursor / 1000.0 : (double) rawCursor;
+
+        return feedRepository.getUserCountryId(userId).flatMap(countryId ->
+                feedRepository.getArticleIdsByCountryWithScores(countryId, safeCursor, limit * 3)
+                        .collectList()
+                        .flatMap(candidates -> buildPage(userId, candidates, limit))
+        );
     }
 
     public Mono<Void> trackViews(String userId, List<String> articleIds) {

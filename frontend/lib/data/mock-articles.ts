@@ -1,7 +1,6 @@
-import { Article } from './types';
+import { Article } from '../types';
 
-// Mock data
-const mockArticles: Article[] = [
+export const mockArticles: Article[] = [
   {
     id: '1',
     title: 'SpaceX launches next-gen rocket in historic mission',
@@ -67,29 +66,3 @@ const mockArticles: Article[] = [
     reactions: 2600,
   }
 ];
-
-export const fetchFeed = async (interests: string[], limit: number = 10): Promise<Article[]> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  return mockArticles.slice(0, limit);
-};
-
-export const fetchTrending = async (): Promise<Article[]> => {
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  return mockArticles.slice(0, 4);
-};
-
-export const fetchArticleDetails = async (id: string): Promise<Article | undefined> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  return mockArticles.find(a => a.id === id);
-};
-
-export const registerInteraction = async (type: 'view' | 'save' | 'like', articleId: string, userId: string) => {
-  // Fire and forget - simple async service with console.log tracking
-  return new Promise<void>((resolve) => {
-    setTimeout(() => {
-      console.log(`[Interaction Service] Tracked '${type.toUpperCase()}' action on article ${articleId} by user ${userId}`);
-      resolve();
-    }, 100);
-  });
-};

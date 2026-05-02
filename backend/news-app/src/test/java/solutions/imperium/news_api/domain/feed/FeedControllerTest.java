@@ -51,4 +51,42 @@ public class FeedControllerTest {
                 .jsonPath("$.data[0].id").isEqualTo("art1")
                 .jsonPath("$.nextCursor").isEqualTo(1000);
     }
+
+    @Test
+    public void testGetByTopic() {
+        ArticleCardDto dto = new ArticleCardDto();
+        dto.setId("t1");
+        dto.setTitle("Topic Article");
+        dto.setPublishedAt(1800L);
+
+        when(feedService.getByTopic(anyString(), anyString(), any(), anyInt()))
+                .thenReturn(Mono.just(new PageResult<>(List.of(dto), 1800L)));
+
+        webTestClient.get()
+                .uri("/api/v1/feed/topic?userId=user1&topicId=business_economy&limit=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data[0].id").isEqualTo("t1")
+                .jsonPath("$.nextCursor").isEqualTo(1800);
+    }
+
+    @Test
+    public void testGetLatest() {
+        ArticleCardDto dto = new ArticleCardDto();
+        dto.setId("l1");
+        dto.setTitle("Latest Article");
+        dto.setPublishedAt(2000L);
+
+        when(feedService.getLatest(anyString(), any(), anyInt()))
+                .thenReturn(Mono.just(new PageResult<>(List.of(dto), 2000L)));
+
+        webTestClient.get()
+                .uri("/api/v1/feed/latest?userId=user1&limit=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data[0].id").isEqualTo("l1")
+                .jsonPath("$.nextCursor").isEqualTo(2000);
+    }
 }
