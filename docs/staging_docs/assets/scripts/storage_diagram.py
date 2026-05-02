@@ -1,4 +1,6 @@
+import os
 from diagrams import Diagram, Cluster, Edge
+from diagrams.custom import Custom
 from diagrams.onprem.database import PostgreSQL
 from diagrams.onprem.queue import Kafka
 from diagrams.onprem.inmemory import Redis
@@ -24,12 +26,17 @@ cluster_redis   = {"bgcolor": "#FDEDEC", "style": "rounded,filled", "fontcolor":
 cluster_qdrant  = {"bgcolor": "#F5EEF8", "style": "rounded,filled", "fontcolor": "#512E5F", "pencolor": "#512E5F"}
 cluster_pg      = {"bgcolor": "#EBF5FB", "style": "rounded,filled", "fontcolor": "#154360", "pencolor": "#154360"}
 
+# Icon paths (absolute)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+assets_dir = os.path.join(current_dir, "..")
+topic_icon = os.path.join(assets_dir, "topic-queue.png")
+
 with Diagram(
     "Storage Stage",
     show=False,
     filename="../storage_arch",
     direction="LR",
-    outformat="svg",
+    outformat="png",
     graph_attr=graph_attr,
 ):
     # ── KAFKA INPUT ───────────────────────────────────────────────────────────
@@ -85,3 +92,5 @@ with Diagram(
 
     # ── REFERENCE: PostgreSQL canonical store ─────────────────────────────────
     pg_art >> Edge(color="#9E9E9E", style="dotted", label="read by backend API\n(cache-aside fallback)") >> r_user
+
+

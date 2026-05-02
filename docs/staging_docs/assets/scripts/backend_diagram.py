@@ -29,8 +29,8 @@ with Diagram(
     "Backend Serving Stage",
     show=False,
     filename="../backend_arch",
-    direction="TB",
-    outformat="svg",
+    direction="LR",
+    outformat="png",
     graph_attr=graph_attr,
 ):
     # ── CLIENT LAYER ──────────────────────────────────────────────────────────

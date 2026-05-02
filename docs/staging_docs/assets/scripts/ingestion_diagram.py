@@ -1,9 +1,10 @@
+import os
 from diagrams import Diagram, Cluster, Edge
+from diagrams.custom import Custom
 from diagrams.onprem.database import PostgreSQL
 from diagrams.onprem.queue import Kafka
-from diagrams.onprem.network import Kong, Zookeeper
+from diagrams.onprem.network import Zookeeper
 from diagrams.onprem.compute import Server
-from diagrams.onprem.registry import Harbor
 
 # ── Graph-level styling ─────────────────────────────────────────────────────
 graph_attr = {
@@ -24,6 +25,13 @@ cluster_schema  = {"bgcolor": "#EAFAF1", "style": "rounded,filled", "fontcolor":
 cluster_kafka   = {"bgcolor": "#FDF2F8", "style": "rounded,filled", "fontcolor": "#4A235A", "pencolor": "#4A235A"}
 cluster_backfill = {"bgcolor": "#FDFEFE", "style": "rounded,dashed", "fontcolor": "#616A6B", "pencolor": "#616A6B"}
 
+# Icon paths (absolute)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+assets_dir = os.path.join(current_dir, "..")
+debezium_icon = os.path.join(assets_dir, "Debezium-900x900-1.png")
+schema_reg_icon = os.path.join(assets_dir, "confluent-schema-reistry-logo.png")
+topic_icon = os.path.join(assets_dir, "topic-queue.png")
+
 # ── Edge style helpers ───────────────────────────────────────────────────────
 FLOW    = Edge(color="#1a73e8", style="bold")
 WAL     = Edge(color="#1a73e8", style="bold",   label="WAL / pgoutput\nlogical replication")
@@ -37,7 +45,7 @@ with Diagram(
     show=False,
     filename="../ingestion_arch",
     direction="LR",
-    outformat="svg",
+    outformat="png",
     graph_attr=graph_attr,
 ):
     # ── SOURCE LAYER ─────────────────────────────────────────────────────────
@@ -48,13 +56,13 @@ with Diagram(
 
     # ── KAFKA CONNECT / CDC LAYER ─────────────────────────────────────────────
     with Cluster("CDC Layer — Kafka Connect (Debezium 2.x)\nDebezium PostgreSQL Connector", graph_attr=cluster_connect):
-        news_conn = Kong("news-connector\nslot: NEWS_CDC_SLOT_NAME\npub: NEWS_CDC_PUBLICATION_NAME")
-        meta_conn = Kong("metadata-connector\n6 dimension tables")
-        ref_conn  = Kong("reference-connector")
+        news_conn = Custom("news-connector\nslot: NEWS_CDC_SLOT_NAME\npub: NEWS_CDC_PUBLICATION_NAME", debezium_icon)
+        meta_conn = Custom("metadata-connector\n6 dimension tables", debezium_icon)
+        ref_conn  = Custom("reference-connector", debezium_icon)
 
     # ── SCHEMA REGISTRY ───────────────────────────────────────────────────────
     with Cluster("Schema Management\nKarapace Schema Registry :8081", graph_attr=cluster_schema):
-        schema_reg = Harbor("Karapace\nSchema Registry")
+        schema_reg = Custom("Karapace\nSchema Registry", schema_reg_icon)
 
     # ── KAFKA OUTPUT TOPICS ───────────────────────────────────────────────────
     with Cluster("Kafka Cluster — KRaft (2 brokers)\nOutput Topics", graph_attr=cluster_kafka):
