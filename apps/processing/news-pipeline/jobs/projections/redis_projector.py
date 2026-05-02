@@ -110,7 +110,7 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
 
         if topic == CANONICAL_TOPIC:
             try:
-                data = decode_json(msg)
+                data = avro_deserializer(msg.value(), None)
                 if not data:
                     skipped_count += 1
                     continue

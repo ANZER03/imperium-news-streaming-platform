@@ -109,7 +109,7 @@ def process_batch(messages: List[Message], conn: psycopg.Connection, avro_deseri
         topic = msg.topic()
         
         if topic == CANONICAL_TOPIC:
-            data = decode_json(msg)
+            data = avro_deserializer(msg.value(), None)
             if not data: continue
             
             # Format missing_dimensions as JSONB

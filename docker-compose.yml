@@ -367,15 +367,23 @@ services:
     container_name: imperium-topic-embedding-driver
     hostname: imperium-topic-embedding-driver
     restart: "no"
+    depends_on:
+      postgres-source:
+        condition: service_healthy
+      llama-cpp:
+        condition: service_healthy
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      PHASE3_POSTGRES_DSN: postgresql://postgres:postgres@postgres-source:5432/imperium-news-source
+      PHASE3_TOPIC_TAXONOMY_TABLE: imperium_topic_taxonomy
+      PHASE3_TOPIC_EMBEDDINGS_TABLE: imperium_topic_embeddings
+      LLAMA_CPP_BASE_URL: http://llama-cpp:8080
+      NVIDIA_EMBEDDING_MODEL: embeddinggemma-300M-Q8_0.gguf
+      PHASE3_TAXONOMY_VERSION: medtop-v2
+      EMBEDDING_BATCH_SIZE: "13"
     command: >
       bash -lc '
-      /opt/spark/bin/spark-submit
-      --master spark://spark-master:7077
-      --conf spark.executor.cores=1
-      --conf spark.cores.max=1
-      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
-      /opt/imperium/news-pipeline/jobs/phase3_topic_embedding_refresh.py
+      python3 /opt/imperium/news-pipeline/jobs/phase3_topic_embedding_refresh.py
       '
 
   imperium-dimension-reference-driver:
@@ -650,6 +658,12 @@ services:
     environment:
       QDRANT__SERVICE__HTTP_PORT: 6333
       QDRANT__SERVICE__GRPC_PORT: 6334
+      # Store payload on disk — prevents OOM with large collections
+      QDRANT__STORAGE__ON_DISK_PAYLOAD: "true"
+      # Use mmap for vectors above this threshold (segments > 20K vectors go on disk)
+      QDRANT__STORAGE__PERFORMANCE__MEMMAP_THRESHOLD_KB: "200000"
+      # No upper bound on collection or segment count
+      QDRANT__STORAGE__OPTIMIZERS__MAX_SEGMENT_SIZE: "0"
     volumes:
       - qdrant-data:/qdrant/storage
 

@@ -298,9 +298,13 @@ class PostgresTopicTaxonomyRepository:
     table_name: str = "imperium_topic_taxonomy"
 
     def list_active_topics(self, taxonomy_version: str | None = None) -> Sequence[Topic]:
+        from imperium_news_pipeline.phase3.topics import TopicSignals, TopicDimensions
         query = """
-        SELECT topic_id, topic_key, display_name, description, tags, sub_topics, translations,
-               model_hint, taxonomy_version, parent_topic_id, is_active
+        SELECT topic_id, topic_key, display_name, description, taxonomy_version,
+               parent_topic_id, is_active,
+               embedding_seeds,
+               signals_strong, signals_medium, signals_weak,
+               dimensions_event, dimensions_impact, dimensions_actors
         FROM {table_name}
         WHERE is_active = true
         """
@@ -318,13 +322,20 @@ class PostgresTopicTaxonomyRepository:
                 topic_key=row[1],
                 display_name=row[2],
                 description=row[3],
-                tags=tuple(_json_sequence(row[4])),
-                sub_topics=tuple(_json_sequence(row[5])),
-                translations=(),
-                model_hint=row[7],
-                taxonomy_version=row[8],
-                parent_topic_id=row[9],
-                is_active=bool(row[10]),
+                taxonomy_version=row[4],
+                parent_topic_id=row[5],
+                is_active=bool(row[6]),
+                embedding_seeds=tuple(_json_sequence(row[7])),
+                signals=TopicSignals(
+                    strong=tuple(_json_sequence(row[8])),
+                    medium=tuple(_json_sequence(row[9])),
+                    weak=tuple(_json_sequence(row[10])),
+                ),
+                dimensions=TopicDimensions(
+                    event=tuple(_json_sequence(row[11])),
+                    impact=tuple(_json_sequence(row[12])),
+                    actors=tuple(_json_sequence(row[13])),
+                ),
             )
             for row in rows
         )
