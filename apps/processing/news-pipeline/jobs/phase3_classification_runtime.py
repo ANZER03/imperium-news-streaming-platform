@@ -24,13 +24,13 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql.functions import (
     broadcast, col, collect_list, concat, current_timestamp,
-    date_format, expr, from_json, lit, row_number, struct,
+    date_format, expr, lit, row_number, struct,
 )
 from pyspark.sql.types import (
-    ArrayType, BooleanType, DoubleType, FloatType,
-    IntegerType, LongType, StringType, StructField, StructType,
+    ArrayType, DoubleType, FloatType,
+    StringType, StructField, StructType,
 )
-from pyspark.sql.avro.functions import to_avro
+from pyspark.sql.avro.functions import from_avro, to_avro
 
 from imperium_news_pipeline.phase3.runtime_config import Phase3RuntimeConfig
 from imperium_news_pipeline.phase3.embedding_gateway import EmbeddingRequestItem
@@ -59,39 +59,10 @@ _SCHEMA_PATH = (
     / "resources" / "schema" / "classified_article_v1.avsc"
 )
 
-# Spark schema for the incoming JSON messages from the canonical topic
-_CANONICAL_SCHEMA = StructType([
-    StructField("article_id",          StringType(),          True),
-    StructField("source_news_id",      LongType(),            True),
-    StructField("link_id",             LongType(),            True),
-    StructField("authority_id",        LongType(),            True),
-    StructField("country_id",          IntegerType(),         True),
-    StructField("country_name",        StringType(),          True),
-    StructField("source_name",         StringType(),          True),
-    StructField("source_domain",       StringType(),          True),
-    StructField("rubric_id",           IntegerType(),         True),
-    StructField("rubric_title",        StringType(),          True),
-    StructField("language_id",         IntegerType(),         True),
-    StructField("language_code",       StringType(),          True),
-    StructField("classification_status", StringType(),        True),
-    StructField("title",               StringType(),          True),
-    StructField("url",                 StringType(),          True),
-    StructField("body_text",           StringType(),          True),
-    StructField("body_text_clean",     StringType(),          True),
-    StructField("excerpt",             StringType(),          True),
-    StructField("image_url",           StringType(),          True),
-    StructField("video_url",           StringType(),          True),
-    StructField("reporter",            StringType(),          True),
-    StructField("source_date_text",    StringType(),          True),
-    StructField("published_at",        LongType(),            True),
-    StructField("crawled_at",          LongType(),            True),
-    StructField("is_video",            BooleanType(),         True),
-    StructField("dimension_status",    StringType(),          True),
-    StructField("missing_dimensions",  ArrayType(StringType()), True),
-    StructField("schema_version",      IntegerType(),         True),
-    StructField("processed_at",        StringType(),          True),
-    StructField("is_delete",           BooleanType(),         True),
-])
+_CANONICAL_SCHEMA_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "resources" / "schema" / "canonical_article_v1.avsc"
+)
 
 # Cosine similarity using Spark SQL aggregate functions
 _COSINE_SIMILARITY_EXPR = """
@@ -354,6 +325,9 @@ def main() -> None:
     classified_schema_json = schema_path.read_text()
     logger.info(f"Loaded Avro schema from {schema_path}")
 
+    canonical_schema_path = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("PHASE3_CANONICAL_SCHEMA_PATH", str(_CANONICAL_SCHEMA_PATH)))
+    canonical_schema_json = canonical_schema_path.read_text()
+
     # Register schema with Schema Registry — idempotent, fails fast on error
     classified_subject = f"{config.kafka.classified_topic}-value"
     logger.info(f"Registering schema subject '{classified_subject}' ...")
@@ -367,7 +341,7 @@ def main() -> None:
 
     spark = (
         SparkSession.builder
-        .appName("imperium-classification-driver-v3")
+        .appName("imperium-classification-driver")
         .config("spark.sql.shuffle.partitions", "8")
         .config("spark.streaming.stopGracefullyOnShutdown", "true")
         .getOrCreate()
@@ -394,10 +368,10 @@ def main() -> None:
     raw = raw_reader.load()
     stream = raw.select(
         col("key").cast("string").alias("key"),
-        from_json(col("value").cast("string"), _CANONICAL_SCHEMA).alias("value_json"),
+        from_avro(expr("substring(value, 6)"), canonical_schema_json).alias("value_json"),
     )
 
-    checkpoint_path = f"{config.checkpoints.root}/classification-v3"
+    checkpoint_path = config.checkpoints.for_job("classification")
 
     writer = stream.writeStream.foreachBatch(
         lambda rows, batch_id: process_batch(

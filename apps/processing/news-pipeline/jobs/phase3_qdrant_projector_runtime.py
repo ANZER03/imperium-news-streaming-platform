@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Sequence
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.avro.functions import from_avro
+from pyspark.sql.functions import col, expr, to_json
 
 from imperium_news_pipeline.phase3.canonical import canonical_article_from_event
 from imperium_news_pipeline.phase3.embedding_gateway import EmbeddingRequestItem
@@ -92,6 +94,14 @@ def _chunks(items: Sequence, size: int):
 def main() -> None:
     env = os.environ
     config = Phase3RuntimeConfig.from_env()
+
+    _classified_schema_path = (
+        Path(__file__).resolve().parent.parent
+        / "resources" / "schema" / "classified_article_v1.avsc"
+    )
+    classified_schema_path = Path(os.getenv("CLASSIFIED_SCHEMA_PATH") or os.getenv("PHASE3_CLASSIFIED_SCHEMA_PATH", str(_classified_schema_path)))
+    classified_schema_json = classified_schema_path.read_text()
+
     spark = SparkSession.builder.appName("imperium-qdrant-driver").getOrCreate()
     qdrant = build_qdrant_client(config)
     qdrant.ensure_collection()
@@ -100,14 +110,17 @@ def main() -> None:
     raw_reader = (
         spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers)
-        .option("subscribe", config.kafka.canonical_topic)
+        .option("subscribe", config.kafka.classified_topic)
         .option("startingOffsets", config.stream_starting_offsets(env, "qdrant"))
     )
     max_offsets = config.stream_max_offsets_per_trigger(env, "qdrant")
     if max_offsets:
         raw_reader = raw_reader.option("maxOffsetsPerTrigger", max_offsets)
     raw = raw_reader.load()
-    stream = raw.select(col("key").cast("string").alias("key"), col("value").cast("string").alias("value"))
+    stream = raw.select(
+        col("key").cast("string").alias("key"),
+        to_json(from_avro(expr("substring(value, 6)"), classified_schema_json)).cast("string").alias("value"),
+    )
     writer = stream.writeStream.foreachBatch(
         lambda rows, batch_id: process_batch(rows, batch_id, projector, gateway)
     ).option(
