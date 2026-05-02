@@ -21,8 +21,9 @@ public class FeedController {
     public Mono<PageResult<ArticleCardDto>> getFeed(
             @RequestParam String userId,
             @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false) Long sessionCursor,
             @RequestParam(defaultValue = "20") int limit) {
-        return feedService.generateFeed(userId, cursor, limit);
+        return feedService.generateFeed(userId, cursor, sessionCursor, limit);
     }
 
     // Articles filtered by country+topic (header topic click)
@@ -31,8 +32,9 @@ public class FeedController {
             @RequestParam String userId,
             @RequestParam String topicId,
             @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false) Long sessionCursor,
             @RequestParam(defaultValue = "20") int limit) {
-        return feedService.getByTopic(userId, topicId, cursor, limit);
+        return feedService.getByTopic(userId, topicId, cursor, sessionCursor, limit);
     }
 
     // Latest articles from user's country (Latest tab)
@@ -40,8 +42,9 @@ public class FeedController {
     public Mono<PageResult<ArticleCardDto>> getLatest(
             @RequestParam String userId,
             @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false) Long sessionCursor,
             @RequestParam(defaultValue = "20") int limit) {
-        return feedService.getLatest(userId, cursor, limit);
+        return feedService.getLatest(userId, cursor, sessionCursor, limit);
     }
 
     // Track views (Called by frontend when user scrolls past cards)

@@ -17,20 +17,21 @@ export function FeedList() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null | undefined>(undefined);
+  const [sessionCursor, setSessionCursor] = useState<number | null | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const observerTarget = useRef<HTMLDivElement>(null);
   const activeKey = useRef('');
 
-  const fetchFeed = useCallback(async (cursor?: number) => {
+  const fetchFeed = useCallback(async (cursor?: number, sessCursor?: number) => {
     if (!userId) return null;
     try {
       if (activeTopic === 'All') {
-        return await feedService.getFeed(userId, cursor);
+        return await feedService.getFeed(userId, cursor, sessCursor);
       }
       if (activeTopic === 'Latest') {
-        return await feedService.getLatest(userId, cursor);
+        return await feedService.getLatest(userId, cursor, sessCursor);
       }
-      return await feedService.getByTopic(userId, resolveTopicId(activeTopic), cursor);
+      return await feedService.getByTopic(userId, resolveTopicId(activeTopic), cursor, sessCursor);
     } catch (err) {
       console.error('Feed fetch failed', err);
       return null;
@@ -70,12 +71,14 @@ export function FeedList() {
     setLoading(true);
     setArticles([]);
     setNextCursor(undefined);
+    setSessionCursor(undefined);
     setHasMore(true);
 
-    fetchFeed(undefined).then(res => {
+    fetchFeed(undefined, undefined).then(res => {
       if (!res || activeKey.current !== key) return;
       setArticles(res.data);
       setNextCursor(res.nextCursor);
+      setSessionCursor(res.sessionCursor);
       setHasMore(res.nextCursor !== null);
     }).finally(() => {
       if (activeKey.current === key) setLoading(false);
@@ -87,7 +90,7 @@ export function FeedList() {
     if (loadingMore || !hasMore || nextCursor === undefined || nextCursor === null) return;
     if (activeView !== 'feed') return;
     setLoadingMore(true);
-    const res = await fetchFeed(nextCursor);
+    const res = await fetchFeed(nextCursor, sessionCursor ?? undefined);
     if (res) {
       setArticles(prev => {
         const existingIds = new Set(prev.map(a => a.id));
@@ -98,18 +101,20 @@ export function FeedList() {
       setHasMore(res.nextCursor !== null);
     }
     setLoadingMore(false);
-  }, [loadingMore, hasMore, nextCursor, activeView, fetchFeed]);
+  }, [loadingMore, hasMore, nextCursor, sessionCursor, activeView, fetchFeed]);
 
   const handleRefresh = useCallback(() => {
     if (!userId || activeView !== 'feed') return;
     setLoading(true);
     setArticles([]);
     setNextCursor(undefined);
+    setSessionCursor(undefined);
     setHasMore(true);
-    fetchFeed(undefined).then(res => {
+    fetchFeed(undefined, undefined).then(res => {
       if (!res) return;
       setArticles(res.data);
       setNextCursor(res.nextCursor);
+      setSessionCursor(res.sessionCursor);
       setHasMore(res.nextCursor !== null);
     }).finally(() => setLoading(false));
   }, [userId, activeView, fetchFeed]);

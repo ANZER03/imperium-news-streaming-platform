@@ -41,7 +41,7 @@ public class FeedControllerTest {
 
         PageResult<ArticleCardDto> mockResult = new PageResult<>(List.of(dto), 1000L);
 
-        when(feedService.generateFeed(anyString(), any(), anyInt())).thenReturn(Mono.just(mockResult));
+        when(feedService.generateFeed(anyString(), any(), any(), anyInt())).thenReturn(Mono.just(mockResult));
 
         webTestClient.get()
                 .uri("/api/v1/feed?userId=user123&limit=10")
@@ -59,7 +59,7 @@ public class FeedControllerTest {
         dto.setTitle("Topic Article");
         dto.setPublishedAt(1800L);
 
-        when(feedService.getByTopic(anyString(), anyString(), any(), anyInt()))
+        when(feedService.getByTopic(anyString(), anyString(), any(), any(), anyInt()))
                 .thenReturn(Mono.just(new PageResult<>(List.of(dto), 1800L)));
 
         webTestClient.get()
@@ -78,7 +78,7 @@ public class FeedControllerTest {
         dto.setTitle("Latest Article");
         dto.setPublishedAt(2000L);
 
-        when(feedService.getLatest(anyString(), any(), anyInt()))
+        when(feedService.getLatest(anyString(), any(), any(), anyInt()))
                 .thenReturn(Mono.just(new PageResult<>(List.of(dto), 2000L)));
 
         webTestClient.get()

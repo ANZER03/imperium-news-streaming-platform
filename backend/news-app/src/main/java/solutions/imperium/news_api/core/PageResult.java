@@ -11,4 +11,10 @@ import java.util.List;
 public class PageResult<T> {
     private List<T> data;
     private Long nextCursor;
+    private Long sessionCursor;
+
+    public PageResult(List<T> data, Long nextCursor) {
+        this.data = data;
+        this.nextCursor = nextCursor;
+    }
 }

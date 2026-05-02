@@ -18,10 +18,15 @@ public class FeedService {
     private final FeedRepository feedRepository;
     private final ObjectMapper objectMapper;
 
-    public Mono<PageResult<ArticleCardDto>> generateFeed(String userId, Long cursor, int limit) {
+    public Mono<PageResult<ArticleCardDto>> generateFeed(String userId, Long cursor, Long sessionCursor, int limit) {
         // [0] Normalize cursor to epoch-seconds (handle ms input from clients)
         long rawCursor = (cursor == null || cursor == 0) ? System.currentTimeMillis() : cursor;
         double safeCursor = rawCursor > 20_000_000_000L ? rawCursor / 1000.0 : (double) rawCursor;
+
+        boolean isFirstPage = (sessionCursor == null || cursor == null || cursor == 0);
+        double safeSessionCursor = isFirstPage ? safeCursor
+                : (sessionCursor > 20_000_000_000L ? sessionCursor / 1000.0 : (double) sessionCursor);
+        long sessionCursorOut = (long) safeSessionCursor;
 
         int fetchPerSource = limit * 3;
 
@@ -39,26 +44,44 @@ public class FeedService {
                             .flatMap(topic -> feedRepository.getArticleIdsByCountryAndTopicWithScores(countryId, topic, safeCursor, fetchPerSource))
                             .collectList();
 
-                    return phase1.flatMap(topicCandidates -> {
+                    // [2b] New articles since session start (only on subsequent pages)
+                    Mono<List<ScoredArticle>> newArticlesMono = isFirstPage ? Mono.just(List.of())
+                            : Flux.fromIterable(topics)
+                                    .flatMap(topic -> feedRepository.getNewArticlesByCountryAndTopic(countryId, topic, safeSessionCursor, fetchPerSource))
+                                    .collectList();
+
+                    return Mono.zip(phase1, newArticlesMono).flatMap(tuple -> {
+                        List<ScoredArticle> topicCandidates = tuple.getT1();
+                        List<ScoredArticle> newArticles = tuple.getT2();
+
                         Mono<List<ScoredArticle>> candidatesMono;
 
-                        if (!topicCandidates.isEmpty()) {
-                            // Phase 1 has results — use them
-                            candidatesMono = Mono.just(topicCandidates);
+                        if (!topicCandidates.isEmpty() || !newArticles.isEmpty()) {
+                            List<ScoredArticle> merged = new ArrayList<>(topicCandidates);
+                            merged.addAll(newArticles);
+                            candidatesMono = Mono.just(merged);
                         } else {
-                            // [3] PHASE 2 — country fallback
-                            candidatesMono = feedRepository
+                            // [3] PHASE 2 — country fallback + new articles
+                            Mono<List<ScoredArticle>> fallback = feedRepository
                                     .getArticleIdsByCountryWithScores(countryId, safeCursor, limit * 4)
                                     .collectList();
+                            Mono<List<ScoredArticle>> newFallback = isFirstPage ? Mono.just(List.of())
+                                    : feedRepository.getNewArticlesByCountry(countryId, safeSessionCursor, limit * 4)
+                                            .collectList();
+                            candidatesMono = Mono.zip(fallback, newFallback).map(fb -> {
+                                List<ScoredArticle> all = new ArrayList<>(fb.getT1());
+                                all.addAll(fb.getT2());
+                                return all;
+                            });
                         }
 
                         return candidatesMono.flatMap(candidates ->
-                                buildPage(userId, candidates, limit));
+                                buildPage(userId, candidates, limit, sessionCursorOut));
                     });
                 });
     }
 
-    private Mono<PageResult<ArticleCardDto>> buildPage(String userId, List<ScoredArticle> candidates, int limit) {
+    private Mono<PageResult<ArticleCardDto>> buildPage(String userId, List<ScoredArticle> candidates, int limit, long sessionCursorOut) {
         if (candidates.isEmpty()) {
             return Mono.just(new PageResult<>(List.of(), null));
         }
@@ -107,31 +130,57 @@ public class FeedService {
                                         .min()
                                         .getAsDouble();
 
-                        return new PageResult<>(page, nextCursor);
+                        return new PageResult<>(page, nextCursor, sessionCursorOut);
                     });
         });
     }
 
-    public Mono<PageResult<ArticleCardDto>> getByTopic(String userId, String topicId, Long cursor, int limit) {
+    public Mono<PageResult<ArticleCardDto>> getByTopic(String userId, String topicId, Long cursor, Long sessionCursor, int limit) {
         long rawCursor = (cursor == null || cursor == 0) ? System.currentTimeMillis() : cursor;
         double safeCursor = rawCursor > 20_000_000_000L ? rawCursor / 1000.0 : (double) rawCursor;
 
-        return feedRepository.getUserCountryId(userId).flatMap(countryId ->
-                feedRepository.getArticleIdsByCountryAndTopicWithScores(countryId, topicId, safeCursor, limit * 3)
-                        .collectList()
-                        .flatMap(candidates -> buildPage(userId, candidates, limit))
-        );
+        boolean isFirstPage = (sessionCursor == null || cursor == null || cursor == 0);
+        double safeSessionCursor = isFirstPage ? safeCursor
+                : (sessionCursor > 20_000_000_000L ? sessionCursor / 1000.0 : (double) sessionCursor);
+        long sessionCursorOut = (long) safeSessionCursor;
+
+        return feedRepository.getUserCountryId(userId).flatMap(countryId -> {
+            Mono<List<ScoredArticle>> older = feedRepository
+                    .getArticleIdsByCountryAndTopicWithScores(countryId, topicId, safeCursor, limit * 3)
+                    .collectList();
+            Mono<List<ScoredArticle>> newer = isFirstPage ? Mono.just(List.of())
+                    : feedRepository.getNewArticlesByCountryAndTopic(countryId, topicId, safeSessionCursor, limit * 3)
+                            .collectList();
+            return Mono.zip(older, newer).flatMap(t -> {
+                List<ScoredArticle> all = new ArrayList<>(t.getT1());
+                all.addAll(t.getT2());
+                return buildPage(userId, all, limit, sessionCursorOut);
+            });
+        });
     }
 
-    public Mono<PageResult<ArticleCardDto>> getLatest(String userId, Long cursor, int limit) {
+    public Mono<PageResult<ArticleCardDto>> getLatest(String userId, Long cursor, Long sessionCursor, int limit) {
         long rawCursor = (cursor == null || cursor == 0) ? System.currentTimeMillis() : cursor;
         double safeCursor = rawCursor > 20_000_000_000L ? rawCursor / 1000.0 : (double) rawCursor;
 
-        return feedRepository.getUserCountryId(userId).flatMap(countryId ->
-                feedRepository.getArticleIdsByCountryWithScores(countryId, safeCursor, limit * 3)
-                        .collectList()
-                        .flatMap(candidates -> buildPage(userId, candidates, limit))
-        );
+        boolean isFirstPage = (sessionCursor == null || cursor == null || cursor == 0);
+        double safeSessionCursor = isFirstPage ? safeCursor
+                : (sessionCursor > 20_000_000_000L ? sessionCursor / 1000.0 : (double) sessionCursor);
+        long sessionCursorOut = (long) safeSessionCursor;
+
+        return feedRepository.getUserCountryId(userId).flatMap(countryId -> {
+            Mono<List<ScoredArticle>> older = feedRepository
+                    .getArticleIdsByCountryWithScores(countryId, safeCursor, limit * 3)
+                    .collectList();
+            Mono<List<ScoredArticle>> newer = isFirstPage ? Mono.just(List.of())
+                    : feedRepository.getNewArticlesByCountry(countryId, safeSessionCursor, limit * 3)
+                            .collectList();
+            return Mono.zip(older, newer).flatMap(t -> {
+                List<ScoredArticle> all = new ArrayList<>(t.getT1());
+                all.addAll(t.getT2());
+                return buildPage(userId, all, limit, sessionCursorOut);
+            });
+        });
     }
 
     public Mono<Void> trackViews(String userId, List<String> articleIds) {

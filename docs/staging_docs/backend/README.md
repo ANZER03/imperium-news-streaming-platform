@@ -44,9 +44,10 @@ flowchart TD
         VEC_SEARCH["search(\n  collection=imperium_articles\n  vector=query_embedding\n  filter={country_id, root_topic_id, ...}\n  limit=N\n)"]
     end
 
-    CLIENT -->|"GET /feed?userId&cursor&limit"| FC
+    CLIENT -->|"GET /feed?userId&cursor&sessionCursor&limit"| FC
     FC -->|"[1] parallel"| PREFS
-    FC -->|"[2] Flux.flatMap per topic\n(parallel ZREVRANGEBYSCORE)"| FEED_CT
+    FC -->|"[2] Flux.flatMap per topic\n(parallel ZREVRANGEBYSCORE score < cursor)"| FEED_CT
+    FC -->|"[2b] if sessionCursor set:\nZREVRANGEBYSCORE score > sessionCursor"| FEED_CT
     FC -->|"[3] if Phase 1 empty"| FEED_C
     FC -->|"[4] filter seen"| VIEWED
     FC -->|"[5] parallel HGETALL per article_id"| CARD
@@ -68,53 +69,77 @@ flowchart TD
 
 ---
 
-## Feed Generation: Two-Phase Fan-out
+## Feed Generation: Two-Phase Fan-out with Session Cursor
 
 The feed engine runs in two phases per request. All Redis calls within a phase are parallelized using Project Reactor's `Flux.flatMap`.
+
+### Session Cursor — Real-time "Load More"
+
+Without a session cursor, new articles published after the first page load are invisible when scrolling down (they have scores above the original cursor window) and only appear on a full page refresh.
+
+The fix introduces a `sessionCursor` — fixed at the time of the first page load and passed back on every subsequent "load more" call. On each page request after the first, the feed engine fetches **two score windows in parallel**:
+
+| Window | Redis range | Purpose |
+|---|---|---|
+| Older articles | `score < pageCursor` | Continue scrolling through historical feed |
+| New articles | `score > sessionCursor` | Articles published since session started |
+
+Both sets are merged, deduplicated (highest score wins per ID), filtered for viewed articles, and sorted by score DESC — so the newest articles naturally float to the top of each page.
+
+**Client contract:**
+- First call: `GET /api/v1/feed?userId=X&limit=20` → response includes both `nextCursor` and `sessionCursor`
+- Subsequent calls: `GET /api/v1/feed?userId=X&cursor={nextCursor}&sessionCursor={sessionCursor}&limit=20`
+- `sessionCursor` stays fixed for the entire scroll session; only `cursor` advances.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
     participant API as FeedService
     participant R as Redis
-    participant PG as PostgreSQL
 
-    C->>API: GET /api/v1/feed?userId=X&cursor=T&limit=20
+    C->>API: GET /api/v1/feed?userId=X&cursor=T&sessionCursor=S&limit=20
 
     API->>R: [1] HGET user:X:prefs
     R-->>API: {country_id: 42, topic_ids: [5, 12, 31]}
 
     rect rgb(230, 245, 255)
-        Note over API,R: Phase 1 — Topic Fan-out (parallel per subscribed topic)
+        Note over API,R: Phase 1 — Older articles (parallel per topic)
         API->>R: ZREVRANGEBYSCORE feed:country:42:topic:5 (score < T)
         API->>R: ZREVRANGEBYSCORE feed:country:42:topic:12 (score < T)
         API->>R: ZREVRANGEBYSCORE feed:country:42:topic:31 (score < T)
-        R-->>API: article_id sets with scores
+        R-->>API: article_ids with scores
     end
 
-    alt Phase 1 returned < limit articles
+    rect rgb(230, 255, 240)
+        Note over API,R: Phase 1b — New articles since session start (parallel per topic)
+        API->>R: ZREVRANGEBYSCORE feed:country:42:topic:5 (score > S)
+        API->>R: ZREVRANGEBYSCORE feed:country:42:topic:12 (score > S)
+        API->>R: ZREVRANGEBYSCORE feed:country:42:topic:31 (score > S)
+        R-->>API: newly published article_ids with scores
+    end
+
+    alt Both Phase 1 sets are empty
         rect rgb(255, 240, 245)
-            Note over API,R: Phase 2 — Country Fallback
+            Note over API,R: Phase 2 — Country Fallback (older + newer)
             API->>R: ZREVRANGEBYSCORE feed:country:42 (score < T)
+            API->>R: ZREVRANGEBYSCORE feed:country:42 (score > S)
             R-->>API: article_ids with scores
         end
     end
 
-    API->>API: Deduplicate, merge (round-robin topic parity)
+    API->>API: Merge, deduplicate (highest score per ID)
     API->>R: SMEMBERS user:X:viewed
     R-->>API: already-seen article IDs
-    API->>API: Filter seen, sort by recency DESC, take limit
+    API->>API: Filter seen, sort by score DESC, take limit
 
     API->>R: Parallel HGETALL news:{id} for each article_id
     R-->>API: article card hashes
 
-    API->>API: Compute nextCursor = min(score) of current page
-    API-->>C: {articles: [...], nextCursor: T'}
+    API->>API: nextCursor = min(score) of current page
+    API-->>C: {data: [...], nextCursor: T', sessionCursor: S}
 ```
 
 **Cursor:** a Unix epoch in seconds. Millisecond cursors from older clients are normalized by the `rawCursor > 20_000_000_000L` check in [`FeedService.java`](../../../backend/news-app/src/main/java/solutions/imperium/news_api/domain/feed/FeedService.java).
-
-**Topic parity:** round-robin sampling ensures every subscribed topic contributes to the top of the feed before recency sort. Prevents one high-volume topic from crowding out others.
 
 ---
 
@@ -122,9 +147,9 @@ sequenceDiagram
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/v1/feed` | Personalized feed (two-phase fan-out) |
-| `GET` | `/api/v1/feed/topic` | Topic-filtered feed |
-| `GET` | `/api/v1/feed/latest` | Country-latest feed |
+| `GET` | `/api/v1/feed?userId&cursor&sessionCursor&limit` | Personalized feed (two-phase fan-out + real-time new articles) |
+| `GET` | `/api/v1/feed/topic?userId&topicId&cursor&sessionCursor&limit` | Topic-filtered feed |
+| `GET` | `/api/v1/feed/latest?userId&cursor&sessionCursor&limit` | Country-latest feed |
 | `POST` | `/api/v1/feed/views` | Track viewed article IDs |
 | `GET` | `/api/v1/articles/{articleId}` | Full article detail (Redis cache-aside → PG) |
 | `POST` | `/api/v1/users/onboard` | Onboard new user, generate UUID, store prefs |

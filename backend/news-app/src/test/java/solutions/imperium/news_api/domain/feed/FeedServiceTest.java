@@ -53,7 +53,7 @@ public class FeedServiceTest {
         when(feedRepository.getArticleMetadata("art2")).thenReturn(Mono.just(Map.of("title", "Title 2", "published_at", "1200")));
         when(feedRepository.getArticleMetadata("art3")).thenReturn(Mono.just(Map.of("title", "Title 3", "published_at", "1000")));
 
-        StepVerifier.create(feedService.generateFeed(userId, cursor, limit))
+        StepVerifier.create(feedService.generateFeed(userId, cursor, null, limit))
                 .expectNextMatches(page -> {
                     boolean correctSize = page.getData().size() == 2;
                     boolean filteredArt1 = page.getData().stream().noneMatch(a -> a.getId().equals("art1"));
@@ -85,7 +85,7 @@ public class FeedServiceTest {
         when(feedRepository.getArticleMetadata("c1")).thenReturn(Mono.just(Map.of("title", "Country 1", "published_at", "900")));
         when(feedRepository.getArticleMetadata("c2")).thenReturn(Mono.just(Map.of("title", "Country 2", "published_at", "800")));
 
-        StepVerifier.create(feedService.generateFeed(userId, 1000L, limit))
+        StepVerifier.create(feedService.generateFeed(userId, 1000L, null, limit))
                 .expectNextMatches(page -> {
                     boolean twoArticles = page.getData().size() == 2;
                     boolean fromCountry = page.getData().get(0).getId().equals("c1");
@@ -104,7 +104,7 @@ public class FeedServiceTest {
         when(feedRepository.getArticleIdsByCountryAndTopicWithScores(anyInt(), anyString(), anyDouble(), anyInt())).thenReturn(Flux.empty());
         when(feedRepository.getArticleIdsByCountryWithScores(anyInt(), anyDouble(), anyInt())).thenReturn(Flux.empty());
 
-        StepVerifier.create(feedService.generateFeed(userId, 1000L, 10))
+        StepVerifier.create(feedService.generateFeed(userId, 1000L, null, 10))
                 .expectNextMatches(page -> page.getData().isEmpty() && page.getNextCursor() == null)
                 .verifyComplete();
     }
@@ -121,7 +121,7 @@ public class FeedServiceTest {
         when(feedRepository.getArticleMetadata("b1")).thenReturn(Mono.just(Map.of("title", "Business 1", "published_at", "1800")));
         when(feedRepository.getArticleMetadata("b2")).thenReturn(Mono.just(Map.of("title", "Business 2", "published_at", "1700")));
 
-        StepVerifier.create(feedService.getByTopic(userId, topicId, 2000L, 5))
+        StepVerifier.create(feedService.getByTopic(userId, topicId, 2000L, null, 5))
                 .expectNextMatches(page ->
                         page.getData().size() == 2 &&
                         page.getData().get(0).getId().equals("b1") &&
@@ -140,7 +140,7 @@ public class FeedServiceTest {
         when(feedRepository.getArticleMetadata("l1")).thenReturn(Mono.just(Map.of("title", "Latest 1", "published_at", "2000")));
         when(feedRepository.getArticleMetadata("l2")).thenReturn(Mono.just(Map.of("title", "Latest 2", "published_at", "1900")));
 
-        StepVerifier.create(feedService.getLatest(userId, 3000L, 5))
+        StepVerifier.create(feedService.getLatest(userId, 3000L, null, 5))
                 .expectNextMatches(page ->
                         page.getData().size() == 2 &&
                         page.getData().get(0).getId().equals("l1") &&
@@ -156,7 +156,7 @@ public class FeedServiceTest {
         when(feedRepository.getArticleIdsByCountryAndTopicWithScores(anyInt(), anyString(), anyDouble(), anyInt()))
                 .thenReturn(Flux.empty());
 
-        StepVerifier.create(feedService.getByTopic(userId, "sports", 2000L, 10))
+        StepVerifier.create(feedService.getByTopic(userId, "sports", 2000L, null, 10))
                 .expectNextMatches(page -> page.getData().isEmpty() && page.getNextCursor() == null)
                 .verifyComplete();
     }
