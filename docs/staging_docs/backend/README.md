@@ -1,179 +1,187 @@
 # Backend Serving Stage: API & Personalization
 
-The Backend Serving Stage provides a high-performance, reactive API for mobile and web clients. It leverages the pre-computed projections in Redis and Qdrant to deliver personalized content with minimal latency.
+The Backend Serving Stage exposes a fully reactive Spring WebFlux API (port `8999`) that reads pre-computed projections from Redis and Qdrant to serve personalized feeds, article details, and semantic search to mobile/web clients.
 
-## Architecture Diagram
+**Data enters** via HTTP requests from clients. No Kafka consumption in this stage.  
+**Data leaves** as JSON HTTP responses. The only writes are to Redis (user prefs, viewed set, saved set).
 
-![Backend Serving Architecture](../assets/backend_arch.svg)
+← Previous stage: [Storage](../storage/README.md) — writes the Redis ZSETs and Qdrant points consumed here.
 
-## Architecture & Flow
+---
+
+## Architecture & Request Flow
 
 ```mermaid
-graph TD
-    subgraph "Clients"
-        MOB[Mobile App]
-        WEB[Web App]
+flowchart TD
+    CLIENT["Mobile / Web Client\nHTTP REST"]
+
+    subgraph API["Spring WebFlux API (:8999)"]
+        FC["FeedController\nGET /api/v1/feed\nGET /api/v1/feed/topic\nGET /api/v1/feed/latest\nPOST /api/v1/feed/views"]
+        AC["ArticleController\nGET /api/v1/articles/{id}\nPOST /api/v1/users/{id}/bookmarks/{articleId}\nDELETE /api/v1/users/{id}/bookmarks/{articleId}\nGET /api/v1/users/{id}/bookmarks"]
+        UC["UserController\nPOST /api/v1/users/onboard"]
+        TC["TopicController\nGET /api/v1/topics"]
+        CC["CountryController\nGET /api/v1/countries"]
+        SC["SearchController\nGET /api/v1/search"]
     end
 
-    subgraph "Backend API (Spring WebFlux)"
-        FC[Feed Controller]
-        AC[Article Controller]
-        UC[User Controller]
-        TC[Topic Controller]
+    subgraph REDIS["Redis"]
+        PREFS["HGET user:{id}:prefs\n→ {country_id, topic_ids[]}"]
+        FEED_CT["ZREVRANGEBYSCORE WITHSCORES\nfeed:country:{c}:topic:{t}\n← primary personalized query"]
+        FEED_C["ZREVRANGEBYSCORE WITHSCORES\nfeed:country:{c}\n← Phase 2 fallback"]
+        VIEWED["SMEMBERS user:{id}:viewed\n← filter seen articles"]
+        CARD["HGETALL news:{id}\n← feed card hydration"]
+        ART_CACHE["GET article:{id}\n← full article JSON, 24h TTL"]
+        SADD_VIEWED["SADD user:{id}:viewed {article_id}"]
+        SADD_SAVED["SADD / SREM user:{id}:saved"]
+        PREFS_W["HSET user:{id}:prefs"]
     end
 
-    subgraph "Hot Storage"
-        REDIS[(Redis)]
+    subgraph PG["PostgreSQL"]
+        ART_DETAIL["SELECT * FROM imperium_articles\nWHERE article_id = $1\n← cache-aside fallback"]
     end
 
-    subgraph "Cold Storage"
-        PG[(PostgreSQL)]
+    subgraph QDRANT["Qdrant"]
+        VEC_SEARCH["search(\n  collection=imperium_articles\n  vector=query_embedding\n  filter={country_id, root_topic_id, ...}\n  limit=N\n)"]
     end
 
-    subgraph "Vector Storage"
-        QDRANT[(Qdrant)]
-    end
+    CLIENT -->|"GET /feed?userId&cursor&limit"| FC
+    FC -->|"[1] parallel"| PREFS
+    FC -->|"[2] Flux.flatMap per topic\n(parallel ZREVRANGEBYSCORE)"| FEED_CT
+    FC -->|"[3] if Phase 1 empty"| FEED_C
+    FC -->|"[4] filter seen"| VIEWED
+    FC -->|"[5] parallel HGETALL per article_id"| CARD
+    FC -->|"[6] SADD viewed"| SADD_VIEWED
 
-    MOB & WEB -->|HTTP/REST| FC & AC & UC & TC
-    
-    UC -->|Save Prefs| REDIS
-    TC -->|List Topics| REDIS
-    TC -.->|Cache Miss| PG
-    
-    FC -->|Fan-out Query| REDIS
-    FC -->|Filter Viewed| REDIS
-    FC -->|Hydrate Cards| REDIS
-    
-    AC -->|Article Details| REDIS
-    AC -.->|Cache Miss| PG
-    
-    FC -.->|Semantic Search| QDRANT
+    CLIENT -->|"GET /articles/{id}"| AC
+    AC -->|"GET article:{id}"| ART_CACHE
+    ART_CACHE -.->|"cache miss"| ART_DETAIL
+
+    CLIENT -->|"POST /bookmarks / DELETE"| AC
+    AC -->|"SADD / SREM user:{id}:saved"| SADD_SAVED
+
+    CLIENT -->|"POST /onboard"| UC
+    UC -->|"HSET user:{id}:prefs"| PREFS_W
+
+    CLIENT -->|"GET /search?q=..."| SC
+    SC --> VEC_SEARCH
 ```
 
-## Core Functional Domains
+---
 
-### 1. User & Onboarding
-- **Anonymous Identity**: Users are assigned a UUID upon onboarding.
-- **Preferences**: Country and topic preferences are stored in Redis (`user:{userId}:prefs`).
-- **View Tracking**: Articles seen by the user are tracked in a Redis Set (`user:{userId}:viewed`) with a 12-day expiration to ensure feed freshness.
+## Feed Generation: Two-Phase Fan-out
 
-### 2. Personalized Feed Generation
-The feed engine uses a two-phase fan-out strategy to prioritize user interests:
-- **Phase 1: Topic Fan-out**: Simultaneously queries Redis Sorted Sets for all topics the user follows.
-- **Phase 2: Country Fallback**: If topic-specific content is exhausted, the engine falls back to the broader country feed (`feed:country:{id}`).
-- **Ranking**: Articles are interleaved and sorted by recency (`published_at`).
-- **Pagination**: Uses **Cursor-based pagination** (exclusive timestamp scores) to ensure stability even as new articles are ingested.
-
-### 3. Article Retrieval & Bookmarks
-- **Article Cards**: Fetched directly from Redis hashes for lightning-fast feed rendering.
-- **Full Details**: The full article body is fetched via a cache-aside pattern (Redis JSON cache -> PostgreSQL).
-- **Bookmarks**: Users can save articles to a persistent Redis Set (`user:{userId}:saved`).
-
-### 4. Semantic Search (Integration)
-- **Vector Search**: Backend is wired to Qdrant to support "Similar Articles" and semantic queries.
-- **Hybrid Filtering**: Combines vector similarity with metadata filters (e.g., "Show similar technology news from France").
-
-## Performance Principles
-- **Non-Blocking I/O**: The entire stack is built on Spring WebFlux and Project Reactor, ensuring high concurrency with minimal resource overhead.
-- **Parallel Execution**: Prefs loading, topic fan-out, and card hydration all happen in parallel using reactive operators.
-- **Social-Media Style Interleaving**: Ensures a diverse feed by round-robin sampling from multiple topic sets.
-
-## Ranking & Feed Generation Logic
-
-The Imperium ranking system is designed for high-performance, personalized news delivery using a two-phase fan-out approach. It prioritizes the user's explicit topic subscriptions before falling back to general country-wide feeds.
-
-### The Ranking Flow
+The feed engine runs in two phases per request. All Redis calls within a phase are parallelized using Project Reactor's `Flux.flatMap`.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant API as News Backend
+    participant API as FeedService
     participant R as Redis
     participant PG as PostgreSQL
 
-    C->>API: GET /api/v1/feed?userId=X&cursor=T
-    API->>R: [1] HGET user:X:prefs (topics, countryId)
-    R-->>API: (science, world), (country: 1)
-    
-    rect rgb(240, 248, 255)
-        Note over API, R: Phase 1: Topic Fan-out
-        API->>R: [2] Parallel ZREVRANGEBYSCORE feed:topic:science (T)
-        API->>R: [2] Parallel ZREVRANGEBYSCORE feed:topic:world (T)
-        R-->>API: Article IDs + Timestamps
+    C->>API: GET /api/v1/feed?userId=X&cursor=T&limit=20
+
+    API->>R: [1] HGET user:X:prefs
+    R-->>API: {country_id: 42, topic_ids: [5, 12, 31]}
+
+    rect rgb(230, 245, 255)
+        Note over API,R: Phase 1 — Topic Fan-out (parallel per subscribed topic)
+        API->>R: ZREVRANGEBYSCORE feed:country:42:topic:5 (score < T)
+        API->>R: ZREVRANGEBYSCORE feed:country:42:topic:12 (score < T)
+        API->>R: ZREVRANGEBYSCORE feed:country:42:topic:31 (score < T)
+        R-->>API: article_id sets with scores
     end
 
-    alt Phase 1 is empty
+    alt Phase 1 returned < limit articles
         rect rgb(255, 240, 245)
-            Note over API, R: Phase 2: Country Fallback
-            API->>R: [3] ZREVRANGEBYSCORE feed:country:1 (T)
-            R-->>API: Fallback Article IDs
+            Note over API,R: Phase 2 — Country Fallback
+            API->>R: ZREVRANGEBYSCORE feed:country:42 (score < T)
+            R-->>API: article_ids with scores
         end
     end
 
-    API->>API: [4] Deduplicate & Merge
-    API->>R: [5] SMEMBERS user:X:viewed
-    R-->>API: Viewed IDs
-    API->>API: [6] Filter Seen Articles
-    API->>API: [7] Sort by Recency (DESC)
-    
-    API->>R: [8] Parallel HGETALL news:{id} (Metadata)
-    R-->>API: Article Cards (title, image, source...)
-    
-    API->>API: [9] Take Limit & Calculate nextCursor
-    API-->>C: PageResult (List<ArticleCard>, nextCursor)
+    API->>API: Deduplicate, merge (round-robin topic parity)
+    API->>R: SMEMBERS user:X:viewed
+    R-->>API: already-seen article IDs
+    API->>API: Filter seen, sort by recency DESC, take limit
+
+    API->>R: Parallel HGETALL news:{id} for each article_id
+    R-->>API: article card hashes
+
+    API->>API: Compute nextCursor = min(score) of current page
+    API-->>C: {articles: [...], nextCursor: T'}
 ```
 
-### Key Ranking Principles
+**Cursor:** a Unix epoch in seconds. Millisecond cursors from older clients are normalized by the `rawCursor > 20_000_000_000L` check in [`FeedService.java`](../../../backend/news-app/src/main/java/solutions/imperium/news_api/domain/feed/FeedService.java).
 
-1.  **Recency is King**: The primary sort key is the `published_at` timestamp (mapped to Redis ZSET scores). This ensures users always see the freshest news first.
-2.  **Topic Parity**: When fetching from multiple topics, the system sampling ensures that every topic has a chance to contribute to the top of the feed before sorting (Round-robin sampling from Redis ZSETs).
-3.  **Stability via Cursors**: Instead of `offset/limit`, we use **Time-based Cursors**. The `nextCursor` is the timestamp of the last article in the current page. The next request asks for articles older than this timestamp, preventing duplicates if new articles are ingested while the user is scrolling.
-- **Social-Media Style Interleaving**: Ensures a diverse feed by round-robin sampling from multiple topic sets.
+**Topic parity:** round-robin sampling ensures every subscribed topic contributes to the top of the feed before recency sort. Prevents one high-volume topic from crowding out others.
 
-## Observability & Monitoring
+---
 
-The backend exposes several operational endpoints via **Spring Boot Actuator**:
-- **Health Probes**: `GET /actuator/health` provides real-time status of Redis, PostgreSQL, and Qdrant connectivity.
-- **Prometheus Metrics**: `GET /actuator/prometheus` exposes JVM performance, throughput, and latency metrics for scraping.
-- **API Documentation**: A collection of sample requests and expected responses is available in `api.http` for rapid developer onboarding.
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/feed` | Personalized feed (two-phase fan-out) |
+| `GET` | `/api/v1/feed/topic` | Topic-filtered feed |
+| `GET` | `/api/v1/feed/latest` | Country-latest feed |
+| `POST` | `/api/v1/feed/views` | Track viewed article IDs |
+| `GET` | `/api/v1/articles/{articleId}` | Full article detail (Redis cache-aside → PG) |
+| `POST` | `/api/v1/users/onboard` | Onboard new user, generate UUID, store prefs |
+| `POST` | `/api/v1/users/{userId}/bookmarks/{articleId}` | Add bookmark |
+| `DELETE` | `/api/v1/users/{userId}/bookmarks/{articleId}` | Remove bookmark |
+| `GET` | `/api/v1/users/{userId}/bookmarks` | List bookmarks |
+| `GET` | `/api/v1/topics` | List available topics |
+| `GET` | `/api/v1/countries` | List available countries |
+| `GET` | `/api/v1/search` | Semantic search via Qdrant |
+
+---
+
+## Key Source Files
+
+| File | Description |
+|---|---|
+| [`core/Constants.java`](../../../backend/news-app/src/main/java/solutions/imperium/news_api/core/Constants.java) | All Redis key pattern constants — single source of truth for the backend; must stay in sync with `redis_projection.py` |
+| [`domain/feed/FeedService.java`](../../../backend/news-app/src/main/java/solutions/imperium/news_api/domain/feed/FeedService.java) | Two-phase fan-out orchestration; cursor normalization; topic parity round-robin |
+| [`domain/feed/FeedRepository.java`](../../../backend/news-app/src/main/java/solutions/imperium/news_api/domain/feed/FeedRepository.java) | Reactive Redis queries: `ZREVRANGEBYSCORE`, `HGETALL`, `SMEMBERS` |
+| [`domain/article/ArticleService.java`](../../../backend/news-app/src/main/java/solutions/imperium/news_api/domain/article/ArticleService.java) | Cache-aside pattern: Redis `GET article:{id}` → on miss, query PostgreSQL → cache result |
+| [`domain/article/ArticlePostgresRepository.java`](../../../backend/news-app/src/main/java/solutions/imperium/news_api/domain/article/ArticlePostgresRepository.java) | Reactive R2DBC query on `imperium_articles` |
+| [`domain/user/UserService.java`](../../../backend/news-app/src/main/java/solutions/imperium/news_api/domain/user/UserService.java) | UUID generation; `HSET user:{id}:prefs` with `country_id` and `topic_ids[]` |
+| [`src/main/resources/application.yml`](../../../backend/news-app/src/main/resources/application.yml) | R2DBC, Redis, Qdrant connection config |
+| [`pom.xml`](../../../backend/news-app/pom.xml) | Dependencies: Spring Boot 4, Spring WebFlux, Spring AI 2.0, reactive Redis, R2DBC |
+
+---
+
+## Key Environment Variables
+
+| Variable | Purpose |
+|---|---|
+| `SERVER_PORT` | API listen port (default `8999`) |
+| `SPRING_REDIS_HOST` | Redis hostname |
+| `SPRING_REDIS_PORT` | Redis port (default `6379`) |
+| `SPRING_R2DBC_URL` | PostgreSQL R2DBC connection URL |
+| `SPRING_R2DBC_USERNAME` / `PASSWORD` | PostgreSQL credentials |
+| `QDRANT_HOST` | Qdrant hostname |
+| `QDRANT_PORT` | Qdrant HTTP port (default `6333`) |
+
+---
+
+## Observability
+
+Spring Boot Actuator endpoints available at `/actuator`:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /actuator/health` | Liveness/readiness + connectivity status for Redis, PostgreSQL, Qdrant |
+| `GET /actuator/prometheus` | JVM metrics, throughput, p99 latency — scraped by Prometheus |
+
+---
 
 ## Timestamp Normalization
 
-The backend implements a `FlexibleEpochDeserializer` to handle data heterogeneity from the upstream pipeline. It transparently converts:
-- Microseconds (μs) $\to$ Seconds
-- Milliseconds (ms) $\to$ Seconds
-- ISO-8601 Strings $\to$ Seconds
-This ensures that the **Time-based Cursors** used for pagination remain consistent across all devices and article sources.
+The backend handles heterogeneous timestamp formats from upstream via `FlexibleEpochDeserializer`:
+- Microseconds → seconds
+- Milliseconds → seconds
+- ISO-8601 string → seconds
 
-## Static Architecture Diagram (Python)
-
-The following Python code uses the `diagrams` library to generate a high-resolution architecture diagram for this stage.
-
-```python
-from diagrams import Diagram, Cluster, Edge
-from diagrams.onprem.database import PostgreSQL
-from diagrams.onprem.inmemory import Redis
-from diagrams.onprem.network import Internet
-from diagrams.onprem.client import Client
-from diagrams.programming.framework import Spring
-from diagrams.onprem.search import Solr 
-
-with Diagram("Backend Serving Stage Architecture", show=False, filename="backend_arch", direction="TB"):
-    user = Client("Mobile / Web App")
-    
-    with Cluster("API Layer"):
-        api = Spring("Spring Boot\n(Reactive WebFlux)")
-        
-    with Cluster("Data Sources"):
-        redis = Redis("Redis\n(Feeds, Cards, Prefs)")
-        qdrant = Solr("Qdrant\n(Semantic Search)")
-        pg = PostgreSQL("PostgreSQL\n(Article Details)")
-
-    user >> Edge(label="REST API") >> api
-    api >> Edge(label="Fan-out / Interleave") >> redis
-    api >> Edge(label="Vector Search") >> qdrant
-    api >> Edge(label="Cache-aside") >> pg
-```
-
-> [!NOTE]
-> To run this script, you need to install the `diagrams` library (`pip install diagrams`) and have **Graphviz** installed on your system.
+This keeps cursor-based pagination stable across all clients and article sources.

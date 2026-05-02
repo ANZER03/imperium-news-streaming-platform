@@ -32,11 +32,20 @@ The Imperium News Streaming Platform aims to modernize the existing database-cen
 - **Capabilities**: Paginated feeds, country-specific feeds, topic feeds, and semantic search.
 
 ## 4. Key Data Contracts
-- **CDC Envelope**: Debezium standard with `before`, `after`, and `op` fields.
-- **Canonical Article**: A cleaned, enriched, and classified representation of a news item.
-- **Projection State**: Replay-safe tracking of article status across different storage layers.
 
-## 5. Success Metrics
+- **CDC Envelope**: Debezium standard with `before`, `after`, `op`, `source`, and `ts_ms` fields. Serialized as Avro using the Confluent wire format (5-byte schema_id prefix). Schema definitions managed in Karapace Schema Registry.
+- **Canonical Article**: A cleaned, enriched, and classified representation of a news item. Defined as a Python dataclass in [`apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/canonical.py`](../../apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/canonical.py). The `classification_status` field (`enriched` → `classified` → `failed`) is the routing key that drives all downstream projector behavior.
+- **Projection State**: Replay-safe tracking of article `(country_id, root_topic_id)` across Redis projections. Stored in PostgreSQL `imperium_projection_state`, managed by [`projection_state.py`](../../apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/projection_state.py). Enables safe ZSET cleanup on reclassification without full table scans.
+
+## 5. External Dependencies
+
+| Dependency | Type | Rate Limit | Used By |
+|---|---|---|---|
+| NVIDIA `baai/bge-m3` API | External HTTP | 40 RPM | [`embedding_gateway.py`](../../apps/processing/news-pipeline/src/imperium_news_pipeline/phase3/embedding_gateway.py) |
+| PostgreSQL WAL (`pgoutput`) | Internal replication | — | Debezium connectors |
+| Karapace Schema Registry | Internal HTTP | — | Debezium (schema registration), Spark (schema fetch on consume) |
+
+## 6. Success Metrics
 - **Ingestion Latency**: Time from PG commit to Kafka availability < 1s.
 - **Processing Latency**: Time from Kafka raw to Redis/Qdrant availability < 30s.
 - **Serving Latency**: Redis feed retrieval < 50ms (p99).
