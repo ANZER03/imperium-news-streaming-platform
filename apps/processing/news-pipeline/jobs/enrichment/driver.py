@@ -128,12 +128,14 @@ def process_batch(batch_df: DataFrame, batch_id: int, config: Phase3RuntimeConfi
     success_df.write \
         .format("kafka") \
         .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
+        .option("kafka.max.request.size", "10485760") \
         .option("topic", config.kafka.canonical_topic) \
         .save()
 
     dlq_df.write \
         .format("kafka") \
         .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
+        .option("kafka.max.request.size", "10485760") \
         .option("topic", config.kafka.canonical_dlq_topic) \
         .save()
 
