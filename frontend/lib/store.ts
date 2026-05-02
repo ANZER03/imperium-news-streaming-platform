@@ -1,19 +1,21 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Article } from './types';
+import { bookmarkService } from './services/bookmark.service';
 
 interface AppState {
   userId: string | null;
   interests: string[];
   country: string | null;
+  countryId: number | null;
   isOnboarded: boolean;
   selectedArticle: Article | null;
   savedArticles: string[];
   activeView: 'feed' | 'saved' | 'search' | 'explore';
   activeTopic: string;
   searchQuery: string;
-  
-  completeOnboarding: (interests: string[], country: string, userId: string) => void;
+
+  completeOnboarding: (interests: string[], country: string, countryId: number, userId: string) => void;
   openArticle: (article: Article) => void;
   closeArticle: () => void;
   toggleSaved: (articleId: string) => void;
@@ -27,10 +29,11 @@ interface AppState {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       userId: null,
       interests: [],
       country: null,
+      countryId: null,
       isOnboarded: false,
       selectedArticle: null,
       savedArticles: [],
@@ -38,31 +41,52 @@ export const useAppStore = create<AppState>()(
       activeTopic: 'All',
       searchQuery: '',
 
-      completeOnboarding: (interests, country, userId) => set(() => ({ 
-        interests, 
-        country, 
+      completeOnboarding: (interests, country, countryId, userId) => set(() => ({
+        interests,
+        country,
+        countryId,
         isOnboarded: true,
-        userId
+        userId,
       })),
-      
+
       openArticle: (article) => set({ selectedArticle: article }),
-      
+
       closeArticle: () => set({ selectedArticle: null }),
 
-      toggleSaved: (articleId) => set((state) => {
-        const isSaved = state.savedArticles.includes(articleId);
-        return {
-          savedArticles: isSaved 
-            ? state.savedArticles.filter(id => id !== articleId)
-            : [...state.savedArticles, articleId]
-        };
-      }),
+      toggleSaved: (articleId) => {
+        const { userId, savedArticles } = get();
+        const isSaved = savedArticles.includes(articleId);
 
-      resetOnboarding: () => set({ 
-        isOnboarded: false, 
-        interests: [], 
+        // Optimistic update
+        set({
+          savedArticles: isSaved
+            ? savedArticles.filter(id => id !== articleId)
+            : [...savedArticles, articleId],
+        });
+
+        // Sync to backend (best-effort, revert on failure)
+        if (userId) {
+          const op = isSaved
+            ? bookmarkService.remove(userId, articleId)
+            : bookmarkService.add(userId, articleId);
+
+          op.catch(() => {
+            // Revert on failure
+            set((state) => ({
+              savedArticles: isSaved
+                ? [...state.savedArticles, articleId]
+                : state.savedArticles.filter(id => id !== articleId),
+            }));
+          });
+        }
+      },
+
+      resetOnboarding: () => set({
+        isOnboarded: false,
+        interests: [],
         country: null,
-        userId: null 
+        countryId: null,
+        userId: null,
       }),
 
       setView: (view) => set({ activeView: view, activeTopic: 'All', selectedArticle: null, searchQuery: '' }),
@@ -72,17 +96,18 @@ export const useAppStore = create<AppState>()(
       setSearchQuery: (query: string) => set({ searchQuery: query, activeView: 'search', selectedArticle: null }),
 
       setExploreTopic: (topic: string) => set({ activeTopic: topic, searchQuery: '', selectedArticle: null }),
-      
-      setExploreQuery: (query: string) => set({ searchQuery: query, activeTopic: 'All', selectedArticle: null })
+
+      setExploreQuery: (query: string) => set({ searchQuery: query, activeTopic: 'All', selectedArticle: null }),
     }),
     {
       name: 'imperium-storage',
-      partialize: (state) => ({ 
+      partialize: (state) => ({
         userId: state.userId,
         interests: state.interests,
         country: state.country,
+        countryId: state.countryId,
         isOnboarded: state.isOnboarded,
-        savedArticles: state.savedArticles // Persist everything except selectedArticle
+        savedArticles: state.savedArticles,
       }),
     }
   )

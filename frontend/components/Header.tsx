@@ -1,24 +1,28 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Search, Menu, ChevronLeft, ChevronRight, Bookmark, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAppStore } from '@/lib/store';
 import { AnimatePresence, motion } from 'motion/react';
+import { topicService } from '@/lib/services';
+import { Topic } from '@/lib/types';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
-const TOPICS = [
-  'For You', 'Latest', 'Trending', 'World', 'Business', 'Tech', 'Science', 'Sports', 'Entertainment', 'Health'
-];
+const SPECIAL_TOPICS = ['For You', 'Latest'];
 
 export function Header({ onMenuClick }: HeaderProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { activeTopic, activeView, setTopic, setView, interests } = useAppStore();
+  const { activeTopic, activeView, setTopic, setView } = useAppStore();
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [topics, setTopics] = useState<Topic[]>([]);
 
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = React.useState(false);
+  useEffect(() => {
+    topicService.getAll().then(setTopics).catch(() => {});
+  }, []);
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
@@ -136,43 +140,42 @@ export function Header({ onMenuClick }: HeaderProps) {
           className="flex-1 overflow-x-auto no-scrollbar scroll-smooth"
         >
           <div className="flex min-w-max items-center gap-6 md:gap-8 text-[15px] font-medium text-editorial-muted font-sans pb-0">
-            {TOPICS.map((topic) => {
-              const isSelected = activeView === 'feed' && (
-                (topic === 'For You' && activeTopic === 'All') || 
-                (activeTopic === topic)
-              );
+            {/* Special tabs: For You, Latest */}
+            {SPECIAL_TOPICS.map((label) => {
+              const key = label === 'For You' ? 'All' : label;
+              const isSelected = activeView === 'feed' && activeTopic === key;
               return (
-                <button 
-                  key={topic}
-                  onClick={() => {
-                    if (topic === 'For You') setTopic('All');
-                    else setTopic(topic);
-                  }}
+                <button
+                  key={label}
+                  onClick={() => setTopic(key)}
                   className={`py-3.5 transition font-sans ${
-                    isSelected 
-                      ? 'border-b-[3px] border-editorial-accent text-editorial-ink' 
+                    isSelected
+                      ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
                       : 'hover:text-editorial-ink'
                   }`}
                 >
-                  {topic}
+                  {label}
                 </button>
               );
             })}
-            
-            {/* Interests from onboarding */}
-            {interests.map(interest => (
-              <button 
-                key={interest}
-                onClick={() => setTopic(interest)}
-                className={`py-3.5 transition font-sans ${
-                  activeView === 'feed' && activeTopic === interest
-                    ? 'border-b-[3px] border-editorial-accent text-editorial-ink' 
-                    : 'hover:text-editorial-ink'
-                }`}
-              >
-                {interest}
-              </button>
-            ))}
+
+            {/* Topic tabs from API — same list as onboarding */}
+            {topics.map(({ topicId, displayName }) => {
+              const isSelected = activeView === 'feed' && activeTopic === topicId;
+              return (
+                <button
+                  key={topicId}
+                  onClick={() => setTopic(topicId)}
+                  className={`py-3.5 transition font-sans ${
+                    isSelected
+                      ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
+                      : 'hover:text-editorial-ink'
+                  }`}
+                >
+                  {displayName}
+                </button>
+              );
+            })}
           </div>
         </nav>
 

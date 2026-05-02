@@ -56,8 +56,8 @@ export function Onboarding() {
         
         const countryName = countries.find(c => c.countryId === selectedCountryId)?.countryName || '';
         const topicNames = selectedTopics.map(id => topics.find(t => t.topicId === id)?.displayName || id);
-        
-        completeOnboarding(topicNames, countryName, userId);
+
+        completeOnboarding(topicNames, countryName, selectedCountryId as number, userId);
       } catch (err) {
         console.error('Registration failed:', err);
         setError('Failed to create your profile. Please try again.');

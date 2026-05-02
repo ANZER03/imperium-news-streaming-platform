@@ -59,6 +59,17 @@ public class FeedRepository {
                 .map(tuple -> new ScoredArticle(String.valueOf(tuple.getValue()), tuple.getScore()));
     }
 
+    /**
+     * Fetch article IDs with scores from a country+topic ZSET (feed:country:{countryId}:topic:{topicId}).
+     */
+    public Flux<ScoredArticle> getArticleIdsByCountryAndTopicWithScores(int countryId, String topicId, double cursor, int limit) {
+        String key = String.format(Constants.KEY_FEED_COUNTRY_TOPIC, countryId, topicId);
+        Range<Double> range = Range.rightOpen(0.0, cursor);
+        return redisTemplate.opsForZSet()
+                .reverseRangeByScoreWithScores(key, range, RedisZSetCommands.Limit.limit().count(limit))
+                .map(tuple -> new ScoredArticle(String.valueOf(tuple.getValue()), tuple.getScore()));
+    }
+
     public Mono<List<String>> getAppearedArticles(String userId) {
         String key = String.format(Constants.KEY_USER_VIEWED, userId);
         return redisTemplate.opsForSet().members(key)

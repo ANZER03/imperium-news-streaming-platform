@@ -40,8 +40,8 @@ public class FeedServiceTest {
         when(feedRepository.getUserTopics(userId)).thenReturn(Mono.just(List.of("tech")));
         when(feedRepository.getUserCountryId(userId)).thenReturn(Mono.just(1));
 
-        // art1 score=1500, art2 score=1200, art3 score=1000
-        when(feedRepository.getArticleIdsByTopicWithScores(eq("tech"), anyDouble(), anyInt()))
+        // Phase 1 now uses country+topic ZSET
+        when(feedRepository.getArticleIdsByCountryAndTopicWithScores(eq(1), eq("tech"), anyDouble(), anyInt()))
                 .thenReturn(Flux.just(
                         new ScoredArticle("art1", 1500.0),
                         new ScoredArticle("art2", 1200.0),
@@ -57,8 +57,8 @@ public class FeedServiceTest {
                 .expectNextMatches(page -> {
                     boolean correctSize = page.getData().size() == 2;
                     boolean filteredArt1 = page.getData().stream().noneMatch(a -> a.getId().equals("art1"));
-                    boolean sortedDesc = page.getData().get(0).getId().equals("art2"); // higher score first
-                    boolean cursorSet = page.getNextCursor() == 1000L; // min score of page
+                    boolean sortedDesc = page.getData().get(0).getId().equals("art2");
+                    boolean cursorSet = page.getNextCursor() == 1000L;
                     return correctSize && filteredArt1 && sortedDesc && cursorSet;
                 })
                 .verifyComplete();
@@ -72,8 +72,8 @@ public class FeedServiceTest {
         when(feedRepository.getUserTopics(userId)).thenReturn(Mono.just(List.of("rare_topic")));
         when(feedRepository.getUserCountryId(userId)).thenReturn(Mono.just(1));
 
-        // Topic ZSET is empty → triggers country fallback
-        when(feedRepository.getArticleIdsByTopicWithScores(eq("rare_topic"), anyDouble(), anyInt()))
+        // Country+topic ZSET is empty → triggers country fallback
+        when(feedRepository.getArticleIdsByCountryAndTopicWithScores(eq(1), eq("rare_topic"), anyDouble(), anyInt()))
                 .thenReturn(Flux.empty());
 
         when(feedRepository.getArticleIdsByCountryWithScores(eq(1), anyDouble(), anyInt()))
@@ -101,10 +101,62 @@ public class FeedServiceTest {
 
         when(feedRepository.getUserTopics(userId)).thenReturn(Mono.just(List.of("topic_x")));
         when(feedRepository.getUserCountryId(userId)).thenReturn(Mono.just(1));
-        when(feedRepository.getArticleIdsByTopicWithScores(anyString(), anyDouble(), anyInt())).thenReturn(Flux.empty());
+        when(feedRepository.getArticleIdsByCountryAndTopicWithScores(anyInt(), anyString(), anyDouble(), anyInt())).thenReturn(Flux.empty());
         when(feedRepository.getArticleIdsByCountryWithScores(anyInt(), anyDouble(), anyInt())).thenReturn(Flux.empty());
 
         StepVerifier.create(feedService.generateFeed(userId, 1000L, 10))
+                .expectNextMatches(page -> page.getData().isEmpty() && page.getNextCursor() == null)
+                .verifyComplete();
+    }
+
+    @Test
+    public void testGetByTopic_ReturnsArticlesFromCountryTopicZSet() {
+        String userId = "user1";
+        String topicId = "business_economy";
+
+        when(feedRepository.getUserCountryId(userId)).thenReturn(Mono.just(2));
+        when(feedRepository.getArticleIdsByCountryAndTopicWithScores(eq(2), eq(topicId), anyDouble(), anyInt()))
+                .thenReturn(Flux.just(new ScoredArticle("b1", 1800.0), new ScoredArticle("b2", 1700.0)));
+        when(feedRepository.getAppearedArticles(userId)).thenReturn(Mono.just(List.of()));
+        when(feedRepository.getArticleMetadata("b1")).thenReturn(Mono.just(Map.of("title", "Business 1", "published_at", "1800")));
+        when(feedRepository.getArticleMetadata("b2")).thenReturn(Mono.just(Map.of("title", "Business 2", "published_at", "1700")));
+
+        StepVerifier.create(feedService.getByTopic(userId, topicId, 2000L, 5))
+                .expectNextMatches(page ->
+                        page.getData().size() == 2 &&
+                        page.getData().get(0).getId().equals("b1") &&
+                        page.getNextCursor() == 1700L)
+                .verifyComplete();
+    }
+
+    @Test
+    public void testGetLatest_ReturnsArticlesFromCountryZSet() {
+        String userId = "user2";
+
+        when(feedRepository.getUserCountryId(userId)).thenReturn(Mono.just(3));
+        when(feedRepository.getArticleIdsByCountryWithScores(eq(3), anyDouble(), anyInt()))
+                .thenReturn(Flux.just(new ScoredArticle("l1", 2000.0), new ScoredArticle("l2", 1900.0)));
+        when(feedRepository.getAppearedArticles(userId)).thenReturn(Mono.just(List.of()));
+        when(feedRepository.getArticleMetadata("l1")).thenReturn(Mono.just(Map.of("title", "Latest 1", "published_at", "2000")));
+        when(feedRepository.getArticleMetadata("l2")).thenReturn(Mono.just(Map.of("title", "Latest 2", "published_at", "1900")));
+
+        StepVerifier.create(feedService.getLatest(userId, 3000L, 5))
+                .expectNextMatches(page ->
+                        page.getData().size() == 2 &&
+                        page.getData().get(0).getId().equals("l1") &&
+                        page.getNextCursor() == 1900L)
+                .verifyComplete();
+    }
+
+    @Test
+    public void testGetByTopic_EmptyZSet_ReturnsNullCursor() {
+        String userId = "user3";
+
+        when(feedRepository.getUserCountryId(userId)).thenReturn(Mono.just(1));
+        when(feedRepository.getArticleIdsByCountryAndTopicWithScores(anyInt(), anyString(), anyDouble(), anyInt()))
+                .thenReturn(Flux.empty());
+
+        StepVerifier.create(feedService.getByTopic(userId, "sports", 2000L, 10))
                 .expectNextMatches(page -> page.getData().isEmpty() && page.getNextCursor() == null)
                 .verifyComplete();
     }

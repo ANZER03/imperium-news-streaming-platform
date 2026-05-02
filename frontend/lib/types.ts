@@ -2,11 +2,15 @@ export interface Article {
   id: string;
   title: string;
   excerpt: string;
-  topic: string;
+  topic: string;        // rootTopicLabel from backend
   imageUrl?: string;
-  publishedAt: string;
+  publishedAt: number;  // epoch-seconds
+  sourceName: string;
+  // Populated only after fetching full article detail
   content?: string;
-  reactions: number;
+  author?: string;
+  url?: string;
+  countryName?: string;
 }
 
 export interface Country {

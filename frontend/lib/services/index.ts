@@ -3,3 +3,4 @@ export * from './topic.service';
 export * from './user.service';
 export * from './feed.service';
 export * from './article.service';
+export * from './bookmark.service';
