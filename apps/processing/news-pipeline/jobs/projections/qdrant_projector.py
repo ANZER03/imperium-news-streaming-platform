@@ -96,14 +96,16 @@ def process_batch(messages: List[Message], client: QdrantClient, avro_deserializ
                     )
                 )
             except Exception as e:
-                logger.error(f"Failed to process message: {e}")
+                logger.error(f"Failed to process message article_id={data.get('article_id') if data else 'unknown'} error={type(e).__name__}: {e}")
 
     if points:
-        client.upsert(
+        distinct_ids = len({p.id for p in points})
+        result = client.upsert(
             collection_name=COLLECTION_NAME,
-            points=points
+            points=points,
+            wait=True,
         )
-        logger.info(f"Upserted {len(points)} vectors to Qdrant")
+        logger.info(f"Upserted {len(points)} vectors ({distinct_ids} distinct ids) to Qdrant status={result.status}")
 
 def main():
     bootstrap_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")

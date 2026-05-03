@@ -260,7 +260,7 @@ def process_batch(
         # non-nullable string fields in the Avro schema — coalesce null → ""
         expr("coalesce(value_json.title, '')").alias("title"),
         expr("coalesce(value_json.url, '')").alias("url"),
-        expr("coalesce(value_json.body_text, '')").alias("body_text"),
+        lit("").alias("body_text"),
         expr("coalesce(value_json.body_text_clean, '')").alias("body_text_clean"),
         expr("coalesce(value_json.excerpt, '')").alias("excerpt"),
         col("value_json.image_url").alias("image_url"),
@@ -298,6 +298,8 @@ def process_batch(
         .format("kafka") \
         .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
         .option("topic", config.kafka.classified_topic) \
+        .option("kafka.max.request.size", "2097152") \
+        .option("kafka.compression.type", "zstd") \
         .save()
 
     elapsed_ms = int((time.time() - t0) * 1000)

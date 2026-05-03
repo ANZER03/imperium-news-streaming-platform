@@ -90,7 +90,7 @@ def upsert_classified(cursor: psycopg.Cursor, records: List[Dict[str, Any]]):
         %(article_id)s, 'classified', %(classification_method)s, %(classification_model)s,
         %(root_topic_id)s, %(root_topic_label)s, %(primary_topic_id)s, %(primary_topic_label)s,
         %(topic_confidence)s, %(topic_candidates)s, %(embedding_vector)s, CURRENT_TIMESTAMP,
-        %(title)s, %(url)s, %(body_text)s, %(body_text_clean)s, %(excerpt)s, %(country_id)s
+        %(title)s, %(url)s, %(body_text_clean)s, %(body_text_clean)s, %(excerpt)s, %(country_id)s
     ) ON CONFLICT (article_id) DO UPDATE SET
         classification_status = 'classified',
         classification_method = EXCLUDED.classification_method,
@@ -155,17 +155,17 @@ def process_batch(messages: List[Message], conn: psycopg.Connection, avro_deseri
                     data['embedding_vector'] = None
                     
                 # Ensure all keys exist and apply safety truncation
-                for k in ["article_id", "classification_method", "classification_model", "root_topic_id", "root_topic_label", 
-                          "primary_topic_id", "primary_topic_label", "topic_confidence", "title", "url", "body_text", 
+                for k in ["article_id", "classification_method", "classification_model", "root_topic_id", "root_topic_label",
+                          "primary_topic_id", "primary_topic_label", "topic_confidence", "title", "url",
                           "body_text_clean", "excerpt", "country_id"]:
                     val = data.get(k)
                     if k in ["root_topic_label", "primary_topic_label", "classification_method", "classification_model"]:
                         val = truncate_string(val, 2000)
                     elif k in ["title", "excerpt"]:
                         val = truncate_string(val, 5000)
-                    elif k in ["body_text", "body_text_clean"]:
+                    elif k == "body_text_clean":
                         val = truncate_string(val, 50000)
-                        
+
                     data[k] = val
                 
                 classified_records.append(data)

@@ -172,7 +172,8 @@ kafka_exec kafka-topics --bootstrap-server "${KAFKA_BOOTSTRAP}" \
   --partitions 3 --replication-factor 1 \
   --config cleanup.policy=compact \
   --config retention.ms=604800000 \
-  --config min.compaction.lag.ms=60000 2>/dev/null
+  --config min.compaction.lag.ms=60000 \
+  --config max.message.bytes=2097152 2>/dev/null
 
 echo "  verifying topics..."
 kafka_exec kafka-topics --bootstrap-server "${KAFKA_BOOTSTRAP}" \
