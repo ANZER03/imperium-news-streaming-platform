@@ -12,6 +12,12 @@ logger = get_logger("PostgresProjector")
 CANONICAL_TOPIC = "imperium.canonical-articles"
 CLASSIFIED_TOPIC = "imperium.news.classified"
 
+def truncate_string(val: Any, max_len: int = 5000) -> Any:
+    """Safety truncation for string fields."""
+    if isinstance(val, str) and len(val) > max_len:
+        return val[:max_len]
+    return val
+
 def get_db_connection():
     dsn = os.environ.get("PHASE3_POSTGRES_DSN", "postgresql://postgres:postgres@postgres-source:5432/imperium-news-source")
     return psycopg.connect(dsn)
@@ -115,12 +121,21 @@ def process_batch(messages: List[Message], conn: psycopg.Connection, avro_deseri
             # Format missing_dimensions as JSONB
             data['missing_dimensions'] = Jsonb(data.get('missing_dimensions', []))
             
-            # Ensure all keys exist
+            # Ensure all keys exist and apply safety truncation
             for k in ["article_id", "source_news_id", "link_id", "authority_id", "country_id", "country_name",
                       "source_name", "source_domain", "rubric_id", "rubric_title", "language_id", "language_code",
                       "title", "url", "body_text", "body_text_clean", "excerpt", "image_url", "video_url", "reporter",
                       "source_date_text", "published_at", "crawled_at", "is_video", "dimension_status", "schema_version", "is_delete"]:
-                data.setdefault(k, None)
+                val = data.get(k)
+                # Apply truncation to text fields
+                if k in ["country_name", "source_name", "source_domain", "rubric_title", "reporter", "source_date_text"]:
+                    val = truncate_string(val, 2000) # Metadata fields
+                elif k in ["title", "excerpt"]:
+                    val = truncate_string(val, 5000)
+                elif k in ["body_text", "body_text_clean"]:
+                    val = truncate_string(val, 50000) # Content fields
+                
+                data[k] = val
                 
             canonical_records.append(data)
             
@@ -139,11 +154,19 @@ def process_batch(messages: List[Message], conn: psycopg.Connection, avro_deseri
                 if not vec:
                     data['embedding_vector'] = None
                     
-                # Ensure all keys exist
+                # Ensure all keys exist and apply safety truncation
                 for k in ["article_id", "classification_method", "classification_model", "root_topic_id", "root_topic_label", 
                           "primary_topic_id", "primary_topic_label", "topic_confidence", "title", "url", "body_text", 
                           "body_text_clean", "excerpt", "country_id"]:
-                    data.setdefault(k, None)
+                    val = data.get(k)
+                    if k in ["root_topic_label", "primary_topic_label", "classification_method", "classification_model"]:
+                        val = truncate_string(val, 2000)
+                    elif k in ["title", "excerpt"]:
+                        val = truncate_string(val, 5000)
+                    elif k in ["body_text", "body_text_clean"]:
+                        val = truncate_string(val, 50000)
+                        
+                    data[k] = val
                 
                 classified_records.append(data)
             except Exception as e:
@@ -165,7 +188,7 @@ def process_batch(messages: List[Message], conn: psycopg.Connection, avro_deseri
 def main():
     bootstrap_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
     schema_registry_url = os.environ.get("SCHEMA_REGISTRY_URL", "http://schema-registry:8081")
-    group_id = "imperium-postgres-projector-group"
+    group_id = "imperium-postgres-projector-group-v2"
     
     logger.info("Initializing Postgres Projector...")
     consumer = build_consumer(bootstrap_servers, group_id)

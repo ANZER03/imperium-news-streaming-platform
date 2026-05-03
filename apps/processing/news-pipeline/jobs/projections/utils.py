@@ -21,8 +21,9 @@ def build_consumer(bootstrap_servers: str, group_id: str, auto_offset_reset: str
         'group.id': group_id,
         'auto.offset.reset': auto_offset_reset,
         'enable.auto.commit': False,
-        'fetch.min.bytes': 1024 * 1024, # 1MB minimum fetch to encourage batching
-        'fetch.wait.max.ms': 500,       # Wait up to 500ms to fill the batch
+        'fetch.min.bytes': 1,           # return messages immediately, don't wait to fill
+        'fetch.wait.max.ms': 100,       # max 100ms wait per fetch
+        'max.partition.fetch.bytes': 10 * 1024 * 1024,  # 10MB per partition per fetch
     })
 
 def build_avro_deserializer(schema_registry_url: str) -> AvroDeserializer:
@@ -63,8 +64,7 @@ def consume_microbatches(
             # Process the batch
             try:
                 process_batch(valid_messages)
-                # Commit synchronously only after successful batch processing
-                consumer.commit(asynchronous=False)
+                consumer.commit(asynchronous=True)
                 logger.info(f"Processed and committed batch of {len(valid_messages)} messages.")
             except Exception as e:
                 logger.error(f"Failed to process batch: {e}", exc_info=True)

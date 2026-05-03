@@ -119,3 +119,179 @@ Use the container-internal address for admin operations to avoid port mapping co
 ```bash
 docker exec -i imperium-schema-registry curl -fsS http://schema-registry:8081/subjects
 ```
+
+---
+
+## Issue 5 — Spark Structured Streaming checkpoint persists in a named Docker volume
+
+**Symptom:**
+After flushing Redis and force-recreating the enrichment driver container, Spark logs:
+```
+Resuming at batch 115 with committed offsets {"imperium.news.public.table_news":{"0":571251}}
+```
+The driver does not replay from offset 0 despite `startingOffsets=earliest`.
+
+**Root cause:**
+The checkpoint directory (`/tmp/imperium/checkpoints/processing`) is mounted from a named Docker
+volume (`imperium-processing-checkpoints`). `--force-recreate` destroys the container but the
+volume survives. Spark finds the checkpoint on startup and ignores `startingOffsets` entirely —
+that option is only respected when **no checkpoint exists**.
+
+Clearing `/tmp` inside containers (spark-master, spark-worker-*) has no effect because the
+checkpoint lives in the driver container's volume, not on the workers.
+
+**Fix:**
+Clear the named volume directly using a throwaway alpine container:
+```bash
+docker run --rm -v imperium-processing-checkpoints:/data alpine sh -c "rm -rf /data/*"
+```
+Do this for all Spark volumes before restarting:
+- `imperium-processing-checkpoints`
+- `imperium-spark-events`
+- `imperium-spark-master-data`
+- `imperium-spark-worker-{1,2,3}-data`
+
+**Rule going forward:**
+`make processing-fresh-reset` now handles all of this automatically. Never restart a Spark
+Structured Streaming driver expecting a clean replay without first clearing the checkpoint volume.
+
+---
+
+## Issue 6 — Projector Docker image bakes code at build time (no bind mount)
+
+**Symptom:**
+Editing `redis_projector.py` on the host had no effect on the running container. The container
+reported `TTL_SECONDS: 1036800` (12 days) despite the file showing `7 * 24 * 60 * 60`.
+
+**Root cause:**
+The projector containers (`imperium-redis-projector`, `imperium-postgres-projector`,
+`imperium-qdrant-projector`) have **no volume mounts** — their code is baked into the Docker image
+at build time via `COPY`. Unlike the Spark driver containers (which bind-mount the source tree),
+projector code changes require an explicit `docker-compose build` before taking effect.
+
+**Fix:**
+Always rebuild before recreating a projector after a code change:
+```bash
+docker-compose --env-file .env --profile processing ... build imperium-redis-projector
+docker-compose --env-file .env --profile processing ... up -d --force-recreate --no-deps imperium-redis-projector
+```
+
+**Rule going forward:**
+Spark driver containers → code changes are live immediately (bind mount).
+Projector containers → must rebuild image first.
+
+---
+
+## Issue 7 — Kafka consumer group must be deleted AFTER the container stops
+
+**Symptom:**
+```
+GroupNotEmptyException: The group is not empty.
+```
+Running `kafka-consumer-groups --delete` immediately after `docker rm -f` failed because the
+Kafka broker still had the consumer registered (heartbeat timeout not yet elapsed).
+
+**Fix:**
+Poll until the delete succeeds:
+```bash
+until docker exec imperium-kafka-1 kafka-consumer-groups \
+  --bootstrap-server imperium-kafka-1:29092 \
+  --delete --group <group-id> 2>&1 | grep -qE "successful|does not exist"; do
+  sleep 2
+done
+```
+
+**Rule going forward:**
+`make processing-fresh-reset` handles this with the poll loop. When doing manual resets, always
+stop the container first and wait before deleting the group.
+
+---
+
+## Issue 8 — Versioned consumer group ID hidden in `.env`
+
+**Symptom:**
+Attempting to delete `imperium-redis-projector-group` and `imperium-redis-projector-group-v2`
+both failed with `GroupIdNotFoundException`. The actual active group was
+`imperium-redis-projector-group-v18` (set via `PHASE3_REDIS_PROJECTOR_GROUP_ID` in `.env`).
+
+**Root cause:**
+The `redis-projector-reset` Makefile target bumps the group ID version on every run and writes
+it to `.env`. The actual group ID in use diverges from the hardcoded default in the source code.
+
+**Fix:**
+Always check the real group ID before deleting:
+```bash
+docker exec imperium-kafka-1 kafka-consumer-groups \
+  --bootstrap-server imperium-kafka-1:29092 --list
+```
+
+**Rule going forward:**
+`processing-fresh-reset.sh` now lists all groups and deletes any matching the processing pattern
+(`imperium-(redis|postgres|qdrant)-projector|canonical|classification|enrichment|phase3`)
+regardless of version suffix.
+
+---
+
+## Issue 9 — ZSet topic feeds appear empty due to immediate score-based pruning
+
+**Symptom:**
+`feed:topic:sports` had 0 entries despite 62K classified messages being consumed with lag=0.
+Classified messages confirmed to have correct `root_topic_id` values (health, sports, etc.).
+
+**Root cause:**
+The projector adds article IDs to topic ZSets scored by `published_at` timestamp, then immediately
+calls `zremrangebyscore(zset, "-inf", cutoff_score)` in the same pipeline. Articles published more
+than 7 days ago have a score below the cutoff and are pruned in the same pipeline execution —
+they are added and removed atomically.
+
+128K out of 596K articles in Postgres had `published_at` older than 7 days, confirming this.
+`feed:global` (467K entries) vs topic feeds (13 entries total) confirmed the pruning was working
+correctly — topic feeds only contain articles classified AND published within the 7-day window.
+
+**Rule going forward:**
+Empty topic feeds after a fresh replay are expected if most articles are older than the TTL window.
+Topic feeds fill up naturally as the classification driver catches up to recent articles.
+Check `feed:global` count to confirm the projector is working — it should match recent articles in Postgres.
+
+---
+
+## Issue 10 — `VARCHAR(255)` truncation on real news data
+
+**Symptom:**
+```
+StringDataRightTruncation: value too long for type character varying(255)
+```
+Postgres projector crash-looped immediately after receiving canonical records.
+
+**Root cause:**
+The `imperium_news_articles` DDL used `VARCHAR(255)` for fields like `reporter`, `source_name`,
+`source_date_text`, `country_name`, etc. Real production news data regularly exceeds 255 characters
+in these fields (long reporter by-lines, verbose date strings, full source names).
+
+**Fix:**
+Changed all unconstrained `VARCHAR(255)` columns to `TEXT` in the schema. The `processing-fresh-reset`
+script now drops and recreates the table with the correct all-TEXT schema on every fresh reset.
+
+**Rule going forward:**
+Use `TEXT` for all free-form string fields. Only use `VARCHAR(n)` when there is a hard domain
+constraint on the length (e.g., `language_code VARCHAR(10)`).
+
+---
+
+## Issue 11 — `processed_at` Avro type mismatch: string vs long
+
+**Symptom:**
+Classification driver crashed with schema incompatibility on `processed_at` field.
+
+**Root cause:**
+`classified_article_v1.avsc` declared `processed_at` as `["null", "string"]`. Spark infers
+`processed_at` from the canonical Avro (epoch-millis `BIGINT`) as `LongType`, not `StringType`.
+Avro's `to_avro()` refused to serialize a long into a string field.
+
+**Fix:**
+Changed `classified_article_v1.avsc` line for `processed_at` to `["null", "long"]`.
+Purged the Schema Registry subject (`imperium.news.classified-value`) before restarting.
+
+**Rule going forward:**
+Any timestamp field carried through from the canonical Avro will be `long` (epoch millis/micros).
+Never declare it as `string` in a downstream schema.

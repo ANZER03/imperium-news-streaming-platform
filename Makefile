@@ -7,7 +7,7 @@ PROCESSING_SERVICES := imperium-dimension-driver imperium-canonical-enrichment-d
 BACKEND_SERVICES := kafka kafka-broker-2 schema-registry postgres-source redis qdrant imperium-redis-projector imperium-postgres-projector imperium-qdrant-projector redis-ui
 BACKEND_PROFILES := --profile backbone --profile source --profile serving --profile processing
 
-.PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test validate-reference-cdc validate-metadata-cdc validate-news-cdc source-db-refresh cdc-clean cdc-up cdc-verify cdc-reset-and-verify processing-config processing-down processing-clean processing-clean-full processing-up processing-reset-and-run processing-logs processing-validate clean-all-from-source redis-projector-reset backend-up backend-down backend-logs
+.PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test validate-reference-cdc validate-metadata-cdc validate-news-cdc source-db-refresh cdc-clean cdc-up cdc-verify cdc-reset-and-verify processing-config processing-down processing-clean processing-clean-full processing-up processing-reset-and-run processing-logs processing-validate processing-fresh-reset clean-all-from-source redis-projector-reset backend-up backend-down backend-logs
 
 infra-config:
 	ENV_FILE=$(ENV_FILE) $(COMPOSE) --env-file $(ENV_FILE) config
@@ -29,6 +29,9 @@ processing-up:
 
 processing-reset-and-run:
 	ENV_FILE=$(ENV_FILE) COMPOSE="$(COMPOSE)" bash scripts/processing-reset-and-run.sh
+
+processing-fresh-reset:
+	ENV_FILE=$(ENV_FILE) COMPOSE="$(COMPOSE)" bash scripts/processing-fresh-reset.sh
 
 processing-logs:
 	ENV_FILE=$(ENV_FILE) COMPOSE="$(COMPOSE)" PROCESSING_SERVICES="$(PROCESSING_SERVICES)" bash scripts/processing-logs.sh
