@@ -548,6 +548,7 @@ services:
       PHASE3_CLASSIFICATION_TRIGGER_PROCESSING_TIME: 10 seconds
       PHASE3_CLASSIFICATION_EMBEDDING_BATCH_SIZE: 100
       PHASE3_CLASSIFICATION_NVIDIA_RPM_BUDGET: 24
+      PHASE3_CLASSIFIED_DLQ_TOPIC: imperium.news.classified.dlq
       PHASE3_CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
       SPARK_EVENTLOG_DIR: file:/tmp/spark-events
     ports:

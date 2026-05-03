@@ -174,6 +174,11 @@ kafka_exec kafka-topics --bootstrap-server "${KAFKA_BOOTSTRAP}" \
   --config retention.ms=604800000 \
   --config min.compaction.lag.ms=60000 \
   --config max.message.bytes=2097152 2>/dev/null
+kafka_exec kafka-topics --bootstrap-server "${KAFKA_BOOTSTRAP}" \
+  --create --if-not-exists --topic imperium.news.classified.dlq \
+  --partitions 1 --replication-factor 1 \
+  --config cleanup.policy=delete \
+  --config retention.ms=604800000 2>/dev/null
 
 echo "  verifying topics..."
 kafka_exec kafka-topics --bootstrap-server "${KAFKA_BOOTSTRAP}" \

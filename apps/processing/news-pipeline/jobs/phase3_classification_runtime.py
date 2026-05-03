@@ -23,7 +23,7 @@ from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql.functions import (
-    broadcast, col, collect_list, concat, current_timestamp,
+    array, broadcast, col, collect_list, concat, current_timestamp,
     date_format, expr, lit, row_number, struct,
 )
 from pyspark.sql.types import (
@@ -171,12 +171,14 @@ def process_batch(
         logger.error(f"batch={batch_id} embedding_empty — aborting batch")
         return
 
+    failed_ids: set[str] = set()
     if result.failures:
         logger.warning(
             f"batch={batch_id} embedding_failures={len(result.failures)}"
         )
         for fail in result.failures[:10]:
             logger.warning(f"  item_id={fail.item_id} reason={fail.reason}")
+        failed_ids = {f.item_id for f in result.failures}
 
     logger.info(f"batch={batch_id} embeddings_received={embed_count} skipped={skipped}")
 
@@ -302,11 +304,78 @@ def process_batch(
         .option("kafka.compression.type", "zstd") \
         .save()
 
+    dlq_count = 0
+    if failed_ids:
+        dlq_enriched = enriched_df.filter(col("article_id").isin(list(failed_ids)))
+        dlq_event = struct(
+            col("value_json.article_id").alias("article_id"),
+            col("value_json.source_news_id").alias("source_news_id"),
+            col("value_json.link_id").alias("link_id"),
+            col("value_json.authority_id").alias("authority_id"),
+            col("value_json.country_id").alias("country_id"),
+            col("value_json.country_name").alias("country_name"),
+            col("value_json.source_name").alias("source_name"),
+            col("value_json.source_domain").alias("source_domain"),
+            col("value_json.rubric_id").alias("rubric_id"),
+            col("value_json.rubric_title").alias("rubric_title"),
+            col("value_json.language_id").alias("language_id"),
+            col("value_json.language_code").alias("language_code"),
+            lit("dlq").alias("classification_status"),
+            lit(None).cast("string").alias("classification_method"),
+            lit(None).cast("string").alias("classification_model"),
+            lit(None).cast("string").alias("root_topic_id"),
+            lit(None).cast("string").alias("root_topic_label"),
+            lit(None).cast("string").alias("primary_topic_id"),
+            lit(None).cast("string").alias("primary_topic_label"),
+            lit(None).cast("double").alias("topic_confidence"),
+            array().cast(ArrayType(StructType([
+                StructField("topic_id",         StringType(), True),
+                StructField("topic_label",       StringType(), True),
+                StructField("root_topic_id",     StringType(), True),
+                StructField("root_topic_label",  StringType(), True),
+                StructField("similarity",        StringType(), True),
+            ]))).alias("topic_candidates"),
+            expr("coalesce(value_json.title, '')").alias("title"),
+            expr("coalesce(value_json.url, '')").alias("url"),
+            lit("").alias("body_text"),
+            expr("coalesce(value_json.body_text_clean, '')").alias("body_text_clean"),
+            expr("coalesce(value_json.excerpt, '')").alias("excerpt"),
+            col("value_json.image_url").alias("image_url"),
+            col("value_json.video_url").alias("video_url"),
+            col("value_json.reporter").alias("reporter"),
+            col("value_json.source_date_text").alias("source_date_text"),
+            col("value_json.published_at").alias("published_at"),
+            col("value_json.crawled_at").alias("crawled_at"),
+            col("value_json.is_video").alias("is_video"),
+            col("value_json.dimension_status").alias("dimension_status"),
+            expr("coalesce(value_json.missing_dimensions, array())").alias("missing_dimensions"),
+            col("value_json.schema_version").alias("schema_version"),
+            col("value_json.processed_at").alias("processed_at"),
+            col("value_json.is_delete").alias("is_delete"),
+            classified_at.alias("classified_at"),
+            expr("array()").cast(ArrayType(FloatType())).alias("embedding_vector"),
+        )
+        dlq_df = dlq_enriched.select(
+            col("key").cast("string").alias("key"),
+            concat(magic_lit, to_avro(dlq_event, classified_schema_json)).alias("value"),
+        )
+        dlq_count = dlq_df.count()
+        logger.warning(
+            f"batch={batch_id} dlq_writing={dlq_count} topic={config.kafka.classified_dlq_topic}"
+        )
+        dlq_df.write \
+            .format("kafka") \
+            .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
+            .option("topic", config.kafka.classified_dlq_topic) \
+            .option("kafka.max.request.size", "2097152") \
+            .option("kafka.compression.type", "zstd") \
+            .save()
+
     elapsed_ms = int((time.time() - t0) * 1000)
     logger.info(
         f"batch={batch_id} done "
         f"enriched={count} embedded={embed_count} skipped={skipped} "
-        f"written={write_count} elapsed_ms={elapsed_ms}"
+        f"written={write_count} dlq={dlq_count} elapsed_ms={elapsed_ms}"
     )
     sys.stdout.flush()
 
