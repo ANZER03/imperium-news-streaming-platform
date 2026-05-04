@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.avro.functions import from_avro
+from pyspark.sql.functions import col, expr, to_json
 
 from imperium_news_pipeline.phase3.canonical import canonical_article_from_event
 from imperium_news_pipeline.phase3.redis_projection import RedisFeedProjector
@@ -28,6 +30,13 @@ def process_batch(rows: DataFrame, batch_id: int, projector: RedisFeedProjector)
 def main() -> None:
     env = os.environ
     config = Phase3RuntimeConfig.from_env()
+
+    _canonical_schema_path = (
+        Path(__file__).resolve().parent.parent
+        / "resources" / "schema" / "canonical_article_v1.avsc"
+    )
+    canonical_schema_json = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("PHASE3_CANONICAL_SCHEMA_PATH", str(_canonical_schema_path))).read_text()
+
     spark = SparkSession.builder.appName("imperium-redis-driver").getOrCreate()
     projector = RedisFeedProjector(build_redis_client(config.redis.url))
     raw_reader = (
@@ -40,7 +49,10 @@ def main() -> None:
     if max_offsets:
         raw_reader = raw_reader.option("maxOffsetsPerTrigger", max_offsets)
     raw = raw_reader.load()
-    stream = raw.select(col("key").cast("string").alias("key"), col("value").cast("string").alias("value"))
+    stream = raw.select(
+        col("key").cast("string").alias("key"),
+        to_json(from_avro(expr("substring(value, 6)"), canonical_schema_json)).cast("string").alias("value"),
+    )
     writer = stream.writeStream.foreachBatch(lambda rows, batch_id: process_batch(rows, batch_id, projector)).option(
         "checkpointLocation",
         config.checkpoints.for_job("imperium-redis-driver"),

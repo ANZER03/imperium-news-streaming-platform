@@ -4,6 +4,28 @@ Use the root `Makefile` targets to reset only the processing-owned state after
 CDC, preserve the expensive curated dimensions and taxonomy assets, and restart
 the live replay in a fixed order.
 
+## Live Topic Config Changes (without full reset)
+
+Use these commands to alter a running topic's config in-place without recreating it or restarting anything. The `processing-fresh-reset.sh` script sets these values on new topic creation; this section covers applying them to an already-running cluster.
+
+### `imperium.news.classified` — raise max message size to 2 MB
+
+```bash
+kafka-configs --bootstrap-server kafka:29092 --entity-type topics \
+  --entity-name imperium.news.classified --alter \
+  --add-config max.message.bytes=2097152
+```
+
+Verify:
+```bash
+kafka-configs --bootstrap-server kafka:29092 --entity-type topics \
+  --entity-name imperium.news.classified --describe
+```
+
+> **When to run:** after a broker restart (broker env vars take effect on restart but existing topic-level overrides are preserved in ZooKeeper/KRaft metadata — you only need this if the topic was originally created without `max.message.bytes` set, e.g. before this runbook was updated).
+
+---
+
 For a true from-source rebuild of both CDC and processing state, use
 [`full-cdc-rebootstrap-runbook.md`](./full-cdc-rebootstrap-runbook.md).
 

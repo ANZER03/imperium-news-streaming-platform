@@ -1,11 +1,13 @@
 import os
 import sys
+from pathlib import Path
 from pyspark import StorageLevel
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (
-    col, coalesce, to_json, struct, when, lit, expr, 
+    col, coalesce, concat, struct, when, lit, expr,
     current_timestamp, regexp_replace, trim, lower
 )
+from pyspark.sql.avro.functions import to_avro
 
 # Ensure local helpers are importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -13,7 +15,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from imperium_news_pipeline.phase3.runtime_config import Phase3RuntimeConfig
 from imperium_news_pipeline.phase3.spark_cdc import read_debezium_avro_stream
 from imperium_news_pipeline.phase3.streaming import apply_trigger_processing_time
+from imperium_news_pipeline.phase3.schema_registry import register_schema, confluent_magic
 from helpers import load_small_dimensions, fetch_large_dimensions
+
+_CANONICAL_SCHEMA_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "resources" / "schema" / "canonical_article_v1.avsc"
+)
 
 NEWS_TOPIC = "imperium.news.public.table_news"
 NEWS_FIELDS = {
@@ -25,7 +33,7 @@ NEWS_FIELDS = {
     )
 }
 
-def process_batch(batch_df: DataFrame, batch_id: int, config: Phase3RuntimeConfig, spark: SparkSession):
+def process_batch(batch_df: DataFrame, batch_id: int, config: Phase3RuntimeConfig, spark: SparkSession, canonical_schema_json: str, canonical_magic: bytes):
     # 1. Prepare raw payload (No action here)
     raw_df = batch_df.withColumn("payload", coalesce(col("value.after"), col("value.before"))) \
                      .withColumn("is_cdc_delete", col("value.op") == "d") \
@@ -104,7 +112,7 @@ def process_batch(batch_df: DataFrame, batch_id: int, config: Phase3RuntimeConfi
         coalesce(col("crawl_date"), col("added_in")).alias("crawled_at"),
         col("isvideo").cast("boolean").alias("is_video"),
         col("dimension_status"),
-        col("missing_dimensions"),
+        expr("coalesce(missing_dimensions, array())").alias("missing_dimensions"),
         lit(1).alias("schema_version"),
         current_timestamp().alias("processed_at"),
         col("is_delete")
@@ -112,7 +120,7 @@ def process_batch(batch_df: DataFrame, batch_id: int, config: Phase3RuntimeConfi
     
     final_df = cleaned_df.select(
         col("id").cast("string").alias("key"),
-        to_json(canonical_event).alias("value"),
+        concat(lit(canonical_magic), to_avro(canonical_event, canonical_schema_json)).alias("value"),
         col("route")
     )
 
@@ -146,10 +154,19 @@ def process_batch(batch_df: DataFrame, batch_id: int, config: Phase3RuntimeConfi
 def main():
     env = os.environ
     config = Phase3RuntimeConfig.from_env(env)
-    
+
+    schema_path = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("PHASE3_CANONICAL_SCHEMA_PATH", str(_CANONICAL_SCHEMA_PATH)))
+    canonical_schema_json = schema_path.read_text()
+    canonical_schema_id = register_schema(
+        config.kafka.schema_registry_url,
+        f"{config.kafka.canonical_topic}-value",
+        canonical_schema_json,
+    )
+    canonical_magic = confluent_magic(canonical_schema_id)
+
     # Configure Spark Session for high throughput
     spark = SparkSession.builder \
-        .appName("imperium-canonical-enrichment-v2") \
+        .appName("imperium-canonical-enrichment") \
         .config("spark.sql.shuffle.partitions", "8") \
         .config("spark.streaming.stopGracefullyOnShutdown", "true") \
         .getOrCreate()
@@ -165,10 +182,10 @@ def main():
     )
     
     # Use a fresh checkpoint for the optimized run
-    checkpoint_path = f"{config.checkpoints.root}/enrichment-v2"
+    checkpoint_path = config.checkpoints.for_job("enrichment")
     
     writer = stream.writeStream \
-        .foreachBatch(lambda df, batch_id: process_batch(df, batch_id, config, spark)) \
+        .foreachBatch(lambda df, batch_id: process_batch(df, batch_id, config, spark, canonical_schema_json, canonical_magic)) \
         .option("checkpointLocation", checkpoint_path)
         
     writer = apply_trigger_processing_time(writer, config.stream_trigger_processing_time(env, "canonical"))

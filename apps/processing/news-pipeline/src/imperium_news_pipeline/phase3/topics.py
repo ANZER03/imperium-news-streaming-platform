@@ -9,7 +9,7 @@ import unicodedata
 from typing import Protocol, Sequence
 
 
-DEFAULT_TAXONOMY_VERSION = "phase3-v1"
+DEFAULT_TAXONOMY_VERSION = "medtop-v2"
 DEFAULT_EMBEDDING_MODEL = "baai/bge-m3"
 
 
@@ -30,6 +30,20 @@ class TopicTranslation:
 
 
 @dataclass(frozen=True)
+class TopicSignals:
+    strong: tuple[str, ...] = ()
+    medium: tuple[str, ...] = ()
+    weak: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TopicDimensions:
+    event: tuple[str, ...] = ()
+    impact: tuple[str, ...] = ()
+    actors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Topic:
     topic_id: str
     topic_key: str
@@ -42,6 +56,10 @@ class Topic:
     taxonomy_version: str = DEFAULT_TAXONOMY_VERSION
     parent_topic_id: str | None = None
     is_active: bool = True
+    # Rich taxonomy fields from medtop JSON
+    embedding_seeds: tuple[str, ...] = ()
+    signals: TopicSignals = field(default_factory=TopicSignals)
+    dimensions: TopicDimensions = field(default_factory=TopicDimensions)
 
     @property
     def is_root(self) -> bool:
@@ -131,14 +149,31 @@ class TopicEmbeddingInputBuilder:
             if root_topic.description:
                 context.append(f"Root description: {root_topic.description}")
 
+        # Deduplicate signals and dimensions in priority order so a term that
+        # already appears in a higher-confidence bucket is not repeated below.
+        # embedding_seeds are kept as-is (curated phrases, not single keywords).
+        seen: set[str] = set()
+        strong  = _dedup(topic.signals.strong,    seen)
+        medium  = _dedup(topic.signals.medium,    seen)
+        weak    = _dedup(topic.signals.weak,      seen)
+        events  = _dedup(topic.dimensions.event,  seen)
+        impacts = _dedup(topic.dimensions.impact, seen)
+        actors  = _dedup(topic.dimensions.actors, seen)
+
         parts = [
             f"Topic: {topic.display_name}",
             f"Description: {topic.description}",
-            _join_items("Tags", topic.tags),
-            _join_items("Sub-topics", topic.sub_topics),
-            _join_items("Model hint", (topic.model_hint,)),
+            # Curated seed phrases — highest semantic signal
+            _join_items("Embedding seeds", topic.embedding_seeds, sep="; "),
+            # Keyword signals by confidence tier (deduplicated)
+            _join_items("Strong signals", strong),
+            _join_items("Medium signals", medium),
+            _join_items("Weak signals",   weak),
+            # Semantic dimensions (deduplicated against signals)
+            _join_items("Key events",    events),
+            _join_items("Impact areas",  impacts),
+            _join_items("Key actors",    actors),
             *context,
-            _translations_text(topic.translations),
         ]
         input_text = "\n".join(part for part in parts if part)
         input_hash = sha256(input_text.encode("utf-8")).hexdigest()
@@ -200,16 +235,30 @@ def load_medtop_topics(taxonomy_version: str = DEFAULT_TAXONOMY_VERSION) -> tupl
     data = json.loads(path.read_text(encoding="utf-8"))
     topics = []
     for item in data.get("categories", []):
+        raw_signals = item.get("signals", {})
+        raw_dims = item.get("dimensions", {})
+        strong = tuple(raw_signals.get("strong", ()))
+        medium = tuple(raw_signals.get("medium", ()))
+        weak = tuple(raw_signals.get("weak", ()))
+        # Flatten strong+medium as legacy tags for backwards-compat queries
+        tags = strong + medium
         topic = Topic(
             topic_id=item["id"],
             topic_key=item["id"],
             display_name=item["name"],
             description=item.get("description", ""),
-            tags=tuple(item.get("tags", ())),
+            tags=tags,
             sub_topics=tuple(item.get("sub_categories", ())),
             translations=(),
-            model_hint="",
+            model_hint=item.get("version", ""),
             taxonomy_version=taxonomy_version,
+            embedding_seeds=tuple(item.get("embedding_seeds", ())),
+            signals=TopicSignals(strong=strong, medium=medium, weak=weak),
+            dimensions=TopicDimensions(
+                event=tuple(raw_dims.get("event", ())),
+                impact=tuple(raw_dims.get("impact", ())),
+                actors=tuple(raw_dims.get("actors", ())),
+            ),
         )
         topics.append(topic)
     return tuple(topics)
@@ -235,11 +284,21 @@ def topic_record_json(topic: Topic) -> str:
     return json.dumps(topic_to_record(topic), sort_keys=True, ensure_ascii=False)
 
 
-def _join_items(label: str, values: tuple[str, ...]) -> str:
+def _dedup(values: tuple[str, ...], seen: set[str]) -> tuple[str, ...]:
+    result = []
+    for v in values:
+        key = v.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            result.append(v.strip())
+    return tuple(result)
+
+
+def _join_items(label: str, values: tuple[str, ...], sep: str = ", ") -> str:
     clean_values = [value.strip() for value in values if value.strip()]
     if not clean_values:
         return ""
-    return f"{label}: {', '.join(clean_values)}"
+    return f"{label}: {sep.join(clean_values)}"
 
 
 def _translations_text(translations: tuple[TopicTranslation, ...]) -> str:

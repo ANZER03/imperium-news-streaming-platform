@@ -11,7 +11,49 @@ logger = get_logger("RedisProjector")
 
 CANONICAL_TOPIC = "imperium.canonical-articles"
 CLASSIFIED_TOPIC = "imperium.news.classified"
-TTL_SECONDS = 12 * 24 * 60 * 60 # 12 days
+TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days from crawled_at
+TTL_MIN_SECONDS = 60             # floor: keep at least 1 min even for old articles
+
+
+def _crawled_at_to_unix(val: Any) -> float:
+    """Convert crawled_at (microseconds int, milliseconds int, or ISO string) to unix seconds."""
+    if val is None:
+        return 0.0
+    if isinstance(val, (int, float)):
+        v = float(val)
+        if v <= 0:
+            return 0.0
+        if v > 1e15:          # microseconds (16+ digits)
+            return v / 1_000_000.0
+        if v > 1e12:          # milliseconds (13 digits)
+            return v / 1_000.0
+        return v              # already seconds
+    if isinstance(val, str):
+        s = val.strip()
+        if not s or s.lower() == "null":
+            return 0.0
+        try:
+            return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            try:
+                return _crawled_at_to_unix(float(s))
+            except ValueError:
+                return 0.0
+    return 0.0
+
+
+def ttl_from_crawled_at(crawled_at: Any) -> int:
+    """Remaining TTL in seconds = 7 days - elapsed since crawled_at. Floor: TTL_MIN_SECONDS."""
+    try:
+        crawled_ts = _crawled_at_to_unix(crawled_at)
+        now = time.time()
+        if crawled_ts <= 0 or crawled_ts > now + 86400:
+            return TTL_SECONDS
+        elapsed = now - crawled_ts
+        remaining = int(TTL_SECONDS - elapsed)
+        return max(remaining, TTL_MIN_SECONDS)
+    except Exception:
+        return TTL_SECONDS
 
 def get_redis_client():
     url = os.environ.get("PHASE3_REDIS_URL", "redis://redis:6379/0")
@@ -110,7 +152,7 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
 
         if topic == CANONICAL_TOPIC:
             try:
-                data = decode_json(msg)
+                data = avro_deserializer(msg.value(), None)
                 if not data:
                     skipped_count += 1
                     continue
@@ -146,10 +188,12 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
                     "is_video":      "1" if data.get("is_video") else "0",
                 }
 
+                ttl = ttl_from_crawled_at(data.get("crawled_at"))
+
                 # Delete the key first to clear any stale wrong-type entry, then re-write
                 pipeline.delete(hash_key)
                 pipeline.hset(hash_key, mapping=fields)
-                pipeline.expire(hash_key, TTL_SECONDS)
+                pipeline.expire(hash_key, ttl)
 
                 # Feeds
                 score = parse_iso_or_ts(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at")))
@@ -195,8 +239,9 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
                     "root_topic_label": _safe_str(root_topic_label),
                     "topic_confidence": _safe_str(topic_confidence),
                 }
+                ttl = ttl_from_crawled_at(data.get("crawled_at"))
                 pipeline.hset(hash_key, mapping=fields)
-                pipeline.expire(hash_key, TTL_SECONDS)
+                pipeline.expire(hash_key, ttl)
 
                 if root_topic_id:
                     score = parse_iso_or_ts(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at"), data.get("classified_at")))
@@ -254,7 +299,7 @@ def main():
             consumer=consumer,
             topics=[CANONICAL_TOPIC, CLASSIFIED_TOPIC],
             process_batch=batch_processor,
-            batch_size=5000,
+            batch_size=20000,
             timeout_ms=1.0,
             logger=logger
         )

@@ -23,14 +23,14 @@ from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql.functions import (
-    broadcast, col, collect_list, concat, current_timestamp,
-    date_format, expr, from_json, lit, row_number, struct,
+    array, broadcast, col, collect_list, concat, current_timestamp,
+    date_format, expr, lit, row_number, struct,
 )
 from pyspark.sql.types import (
-    ArrayType, BooleanType, DoubleType, FloatType,
-    IntegerType, LongType, StringType, StructField, StructType,
+    ArrayType, DoubleType, FloatType,
+    StringType, StructField, StructType,
 )
-from pyspark.sql.avro.functions import to_avro
+from pyspark.sql.avro.functions import from_avro, to_avro
 
 from imperium_news_pipeline.phase3.runtime_config import Phase3RuntimeConfig
 from imperium_news_pipeline.phase3.embedding_gateway import EmbeddingRequestItem
@@ -59,39 +59,10 @@ _SCHEMA_PATH = (
     / "resources" / "schema" / "classified_article_v1.avsc"
 )
 
-# Spark schema for the incoming JSON messages from the canonical topic
-_CANONICAL_SCHEMA = StructType([
-    StructField("article_id",          StringType(),          True),
-    StructField("source_news_id",      LongType(),            True),
-    StructField("link_id",             LongType(),            True),
-    StructField("authority_id",        LongType(),            True),
-    StructField("country_id",          IntegerType(),         True),
-    StructField("country_name",        StringType(),          True),
-    StructField("source_name",         StringType(),          True),
-    StructField("source_domain",       StringType(),          True),
-    StructField("rubric_id",           IntegerType(),         True),
-    StructField("rubric_title",        StringType(),          True),
-    StructField("language_id",         IntegerType(),         True),
-    StructField("language_code",       StringType(),          True),
-    StructField("classification_status", StringType(),        True),
-    StructField("title",               StringType(),          True),
-    StructField("url",                 StringType(),          True),
-    StructField("body_text",           StringType(),          True),
-    StructField("body_text_clean",     StringType(),          True),
-    StructField("excerpt",             StringType(),          True),
-    StructField("image_url",           StringType(),          True),
-    StructField("video_url",           StringType(),          True),
-    StructField("reporter",            StringType(),          True),
-    StructField("source_date_text",    StringType(),          True),
-    StructField("published_at",        LongType(),            True),
-    StructField("crawled_at",          LongType(),            True),
-    StructField("is_video",            BooleanType(),         True),
-    StructField("dimension_status",    StringType(),          True),
-    StructField("missing_dimensions",  ArrayType(StringType()), True),
-    StructField("schema_version",      IntegerType(),         True),
-    StructField("processed_at",        StringType(),          True),
-    StructField("is_delete",           BooleanType(),         True),
-])
+_CANONICAL_SCHEMA_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "resources" / "schema" / "canonical_article_v1.avsc"
+)
 
 # Cosine similarity using Spark SQL aggregate functions
 _COSINE_SIMILARITY_EXPR = """
@@ -200,12 +171,14 @@ def process_batch(
         logger.error(f"batch={batch_id} embedding_empty — aborting batch")
         return
 
+    failed_ids: set[str] = set()
     if result.failures:
         logger.warning(
             f"batch={batch_id} embedding_failures={len(result.failures)}"
         )
         for fail in result.failures[:10]:
             logger.warning(f"  item_id={fail.item_id} reason={fail.reason}")
+        failed_ids = {f.item_id for f in result.failures}
 
     logger.info(f"batch={batch_id} embeddings_received={embed_count} skipped={skipped}")
 
@@ -289,7 +262,7 @@ def process_batch(
         # non-nullable string fields in the Avro schema — coalesce null → ""
         expr("coalesce(value_json.title, '')").alias("title"),
         expr("coalesce(value_json.url, '')").alias("url"),
-        expr("coalesce(value_json.body_text, '')").alias("body_text"),
+        lit("").alias("body_text"),
         expr("coalesce(value_json.body_text_clean, '')").alias("body_text_clean"),
         expr("coalesce(value_json.excerpt, '')").alias("excerpt"),
         col("value_json.image_url").alias("image_url"),
@@ -327,13 +300,82 @@ def process_batch(
         .format("kafka") \
         .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
         .option("topic", config.kafka.classified_topic) \
+        .option("kafka.max.request.size", "2097152") \
+        .option("kafka.compression.type", "zstd") \
         .save()
+
+    dlq_count = 0
+    if failed_ids:
+        dlq_enriched = enriched_df.filter(col("article_id").isin(list(failed_ids)))
+        dlq_event = struct(
+            col("value_json.article_id").alias("article_id"),
+            col("value_json.source_news_id").alias("source_news_id"),
+            col("value_json.link_id").alias("link_id"),
+            col("value_json.authority_id").alias("authority_id"),
+            col("value_json.country_id").alias("country_id"),
+            col("value_json.country_name").alias("country_name"),
+            col("value_json.source_name").alias("source_name"),
+            col("value_json.source_domain").alias("source_domain"),
+            col("value_json.rubric_id").alias("rubric_id"),
+            col("value_json.rubric_title").alias("rubric_title"),
+            col("value_json.language_id").alias("language_id"),
+            col("value_json.language_code").alias("language_code"),
+            lit("dlq").alias("classification_status"),
+            lit(None).cast("string").alias("classification_method"),
+            lit(None).cast("string").alias("classification_model"),
+            lit(None).cast("string").alias("root_topic_id"),
+            lit(None).cast("string").alias("root_topic_label"),
+            lit(None).cast("string").alias("primary_topic_id"),
+            lit(None).cast("string").alias("primary_topic_label"),
+            lit(None).cast("double").alias("topic_confidence"),
+            array().cast(ArrayType(StructType([
+                StructField("topic_id",         StringType(), True),
+                StructField("topic_label",       StringType(), True),
+                StructField("root_topic_id",     StringType(), True),
+                StructField("root_topic_label",  StringType(), True),
+                StructField("similarity",        StringType(), True),
+            ]))).alias("topic_candidates"),
+            expr("coalesce(value_json.title, '')").alias("title"),
+            expr("coalesce(value_json.url, '')").alias("url"),
+            lit("").alias("body_text"),
+            expr("coalesce(value_json.body_text_clean, '')").alias("body_text_clean"),
+            expr("coalesce(value_json.excerpt, '')").alias("excerpt"),
+            col("value_json.image_url").alias("image_url"),
+            col("value_json.video_url").alias("video_url"),
+            col("value_json.reporter").alias("reporter"),
+            col("value_json.source_date_text").alias("source_date_text"),
+            col("value_json.published_at").alias("published_at"),
+            col("value_json.crawled_at").alias("crawled_at"),
+            col("value_json.is_video").alias("is_video"),
+            col("value_json.dimension_status").alias("dimension_status"),
+            expr("coalesce(value_json.missing_dimensions, array())").alias("missing_dimensions"),
+            col("value_json.schema_version").alias("schema_version"),
+            col("value_json.processed_at").alias("processed_at"),
+            col("value_json.is_delete").alias("is_delete"),
+            classified_at.alias("classified_at"),
+            expr("array()").cast(ArrayType(FloatType())).alias("embedding_vector"),
+        )
+        dlq_df = dlq_enriched.select(
+            col("key").cast("string").alias("key"),
+            concat(magic_lit, to_avro(dlq_event, classified_schema_json)).alias("value"),
+        )
+        dlq_count = dlq_df.count()
+        logger.warning(
+            f"batch={batch_id} dlq_writing={dlq_count} topic={config.kafka.classified_dlq_topic}"
+        )
+        dlq_df.write \
+            .format("kafka") \
+            .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
+            .option("topic", config.kafka.classified_dlq_topic) \
+            .option("kafka.max.request.size", "2097152") \
+            .option("kafka.compression.type", "zstd") \
+            .save()
 
     elapsed_ms = int((time.time() - t0) * 1000)
     logger.info(
         f"batch={batch_id} done "
         f"enriched={count} embedded={embed_count} skipped={skipped} "
-        f"written={write_count} elapsed_ms={elapsed_ms}"
+        f"written={write_count} dlq={dlq_count} elapsed_ms={elapsed_ms}"
     )
     sys.stdout.flush()
 
@@ -354,6 +396,9 @@ def main() -> None:
     classified_schema_json = schema_path.read_text()
     logger.info(f"Loaded Avro schema from {schema_path}")
 
+    canonical_schema_path = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("PHASE3_CANONICAL_SCHEMA_PATH", str(_CANONICAL_SCHEMA_PATH)))
+    canonical_schema_json = canonical_schema_path.read_text()
+
     # Register schema with Schema Registry — idempotent, fails fast on error
     classified_subject = f"{config.kafka.classified_topic}-value"
     logger.info(f"Registering schema subject '{classified_subject}' ...")
@@ -367,7 +412,7 @@ def main() -> None:
 
     spark = (
         SparkSession.builder
-        .appName("imperium-classification-driver-v3")
+        .appName("imperium-classification-driver")
         .config("spark.sql.shuffle.partitions", "8")
         .config("spark.streaming.stopGracefullyOnShutdown", "true")
         .getOrCreate()
@@ -394,10 +439,10 @@ def main() -> None:
     raw = raw_reader.load()
     stream = raw.select(
         col("key").cast("string").alias("key"),
-        from_json(col("value").cast("string"), _CANONICAL_SCHEMA).alias("value_json"),
+        from_avro(expr("substring(value, 6)"), canonical_schema_json).alias("value_json"),
     )
 
-    checkpoint_path = f"{config.checkpoints.root}/classification-v3"
+    checkpoint_path = config.checkpoints.for_job("classification")
 
     writer = stream.writeStream.foreachBatch(
         lambda rows, batch_id: process_batch(

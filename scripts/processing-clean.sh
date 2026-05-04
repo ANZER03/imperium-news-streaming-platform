@@ -141,9 +141,25 @@ topics=(
   phase3.canonical-articles.dlq
   imperium.canonical-articles
   imperium.canonical-articles.dlq
+  imperium.news.classified
 )
 for topic in "${topics[@]}"; do
   kafka_exec kafka-topics --bootstrap-server "${KAFKA_BOOTSTRAP}" --delete --if-exists --topic "${topic}" >/dev/null 2>&1 || true
+done
+
+# Delete Schema Registry subjects so re-registration after a schema fix is never blocked by a 409.
+# Soft-delete first, then permanent purge. Both commands are idempotent (404 on missing subject is ok).
+schema_registry_subjects=(
+  imperium.canonical-articles-value
+  imperium.news.classified-value
+)
+SCHEMA_REGISTRY_CONTAINER="${SCHEMA_REGISTRY_CONTAINER:-imperium-schema-registry}"
+SCHEMA_REGISTRY_INTERNAL="${SCHEMA_REGISTRY_INTERNAL_URL:-http://schema-registry:8081}"
+for subject in "${schema_registry_subjects[@]}"; do
+  docker exec -i "${SCHEMA_REGISTRY_CONTAINER}" \
+    curl -fsS -X DELETE "${SCHEMA_REGISTRY_INTERNAL}/subjects/${subject}" >/dev/null 2>&1 || true
+  docker exec -i "${SCHEMA_REGISTRY_CONTAINER}" \
+    curl -fsS -X DELETE "${SCHEMA_REGISTRY_INTERNAL}/subjects/${subject}?permanent=true" >/dev/null 2>&1 || true
 done
 
 if [[ "${MODE}" != "--refactor-reset" ]]; then
