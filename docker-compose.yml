@@ -788,6 +788,25 @@ services:
       - source-db:/var/lib/postgresql/data
       - ./infrastructure/postgres/initdb:/docker-entrypoint-initdb.d:ro
 
+  clone-news:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: infrastructure/docker/clone-news/Dockerfile
+    container_name: imperium-clone-news
+    profiles:
+      - source
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - clone-news-state:/app/infra/source-db-clone/.state
+    environment:
+      SOURCE_PG_CONTAINER: ${SOURCE_PG_CONTAINER:-imperium-news-source-db}
+    restart: unless-stopped
+    depends_on:
+      postgres-source:
+        condition: service_healthy
+
 networks:
   imperium-net:
     name: imperium-net
@@ -823,3 +842,5 @@ volumes:
   source-db:
     external: true
     name: source-db
+  clone-news-state:
+    name: imperium-clone-news-state
