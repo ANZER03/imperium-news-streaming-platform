@@ -129,19 +129,19 @@ All wiring is read by [`runtime_config.py`](../../../apps/processing/news-pipeli
 |---|---|---|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:49092` | Kafka broker address |
 | `SCHEMA_REGISTRY_URL` | `http://localhost:8081` | Karapace endpoint |
-| `PHASE3_POSTGRES_DSN` | `postgresql://postgres:postgres@localhost:35432/imperium-news-source` | PostgreSQL connection |
-| `PHASE3_REDIS_URL` | `redis://localhost:46379/0` | Redis connection |
-| `PHASE3_QDRANT_URL` | `http://localhost:46333` | Qdrant HTTP endpoint |
-| `PHASE3_QDRANT_COLLECTION` | `imperium_articles` | Qdrant collection name |
-| `PHASE3_QDRANT_VECTOR_SIZE` | `1024` | Must match embedding model output dimension |
+| `POSTGRES_DSN` | `postgresql://postgres:postgres@localhost:35432/imperium-news-source` | PostgreSQL connection |
+| `REDIS_URL` | `redis://localhost:46379/0` | Redis connection |
+| `QDRANT_URL` | `http://localhost:46333` | Qdrant HTTP endpoint |
+| `QDRANT_COLLECTION` | `imperium_articles` | Qdrant collection name |
+| `QDRANT_VECTOR_SIZE` | `1024` | Must match embedding model output dimension |
 | `NVIDIA_API_BASE_URL` | — | NVIDIA embedding API base URL |
 | `NVIDIA_API_KEY` | — | NVIDIA API authentication key |
 | `NVIDIA_EMBEDDING_MODEL` | `baai/bge-m3` | Embedding model name |
-| `PHASE3_EMBEDDING_BATCH_SIZE` | `8191` | Max items per embedding API call |
-| `PHASE3_EMBEDDING_RPM` | `40` | Rate limit (requests per minute) |
-| `PHASE3_WINDOW_DAYS` | `5` | MVP window; articles older than N days are filtered out |
+| `EMBEDDING_BATCH_SIZE` | `8191` | Max items per embedding API call |
+| `EMBEDDING_RPM` | `40` | Rate limit (requests per minute) |
+| `WINDOW_DAYS` | `5` | MVP window; articles older than N days are filtered out |
 
-Per-job overrides use the pattern `PHASE3_{JOB_NAME_UPPER}_{KEY_SUFFIX}`.
+Per-job overrides use the pattern `{JOB_NAME_UPPER}_{KEY_SUFFIX}`.
 
 ---
 

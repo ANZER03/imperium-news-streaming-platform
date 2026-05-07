@@ -15,14 +15,14 @@ SOURCE_PG_USER="${SOURCE_PG_USER:-postgres}"
 SOURCE_PG_PASSWORD="${SOURCE_PG_PASSWORD:-postgres}"
 SOURCE_PG_EXTERNAL_PORT="${SOURCE_PG_EXTERNAL_PORT:-35432}"
 
-"${DOCKER_COMPOSE[@]}" --profile source up -d postgres-source
+"${DOCKER_COMPOSE[@]}" --profile source up -d news-source-db
 
-until "${DOCKER_COMPOSE[@]}" exec -T postgres-source pg_isready -U "$SOURCE_PG_USER" -d postgres >/dev/null 2>&1; do
+until "${DOCKER_COMPOSE[@]}" exec -T news-source-db pg_isready -U "$SOURCE_PG_USER" -d postgres >/dev/null 2>&1; do
   sleep 1
 done
 
-if ! "${DOCKER_COMPOSE[@]}" exec -T postgres-source psql -U "$SOURCE_PG_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$SOURCE_PG_DATABASE'" | grep -q 1; then
-  "${DOCKER_COMPOSE[@]}" exec -T postgres-source createdb -U "$SOURCE_PG_USER" "$SOURCE_PG_DATABASE"
+if ! "${DOCKER_COMPOSE[@]}" exec -T news-source-db psql -U "$SOURCE_PG_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$SOURCE_PG_DATABASE'" | grep -q 1; then
+  "${DOCKER_COMPOSE[@]}" exec -T news-source-db createdb -U "$SOURCE_PG_USER" "$SOURCE_PG_DATABASE"
 fi
 
 for sql_file in \
@@ -36,5 +36,5 @@ for sql_file in \
   "$ROOT_DIR/infrastructure/postgres/initdb/07_phase3_curated_dimensions.sql" \
   "$ROOT_DIR/infrastructure/postgres/initdb/08_phase3_projection_state.sql"
 do
-  "${DOCKER_COMPOSE[@]}" exec -T postgres-source psql -U "$SOURCE_PG_USER" -d "$SOURCE_PG_DATABASE" -v ON_ERROR_STOP=1 -f - < "$sql_file"
+  "${DOCKER_COMPOSE[@]}" exec -T news-source-db psql -U "$SOURCE_PG_USER" -d "$SOURCE_PG_DATABASE" -v ON_ERROR_STOP=1 -f - < "$sql_file"
 done

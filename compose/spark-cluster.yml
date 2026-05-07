@@ -1,0 +1,121 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - imperium-net
+
+services:
+  spark-master:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/spark/Dockerfile
+    image: imperium-spark:3.5.3
+    container_name: imperium-spark-master
+    hostname: spark-master
+    profiles:
+      - processing-infra
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master --port 7077 --webui-port 8080
+    ports:
+      - "${SPARK_MASTER_UI_EXTERNAL_PORT:-48080}:8080"
+      - "${SPARK_MASTER_EXTERNAL_PORT:-47077}:7077"
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080 > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline:ro
+      - spark-master-data:/opt/spark/work-dir
+
+  spark-worker:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/spark/Dockerfile
+    image: imperium-spark:3.5.3
+    container_name: imperium-spark-worker-1
+    hostname: spark-worker
+    profiles:
+      - processing-infra
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    ports:
+      - "${SPARK_WORKER_UI_EXTERNAL_PORT:-48091}:8081"
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_WEBUI_PORT: 8081
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-4}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-6g}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081 > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline:ro
+      - spark-worker-1-data:/opt/spark/work-dir
+
+  spark-worker-2:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/spark/Dockerfile
+    image: imperium-spark:3.5.3
+    container_name: imperium-spark-worker-2
+    hostname: spark-worker-2
+    profiles:
+      - processing-infra
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    ports:
+      - "${SPARK_WORKER2_UI_EXTERNAL_PORT:-48092}:8081"
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_WEBUI_PORT: 8081
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-4}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-6g}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081 > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline:ro
+      - spark-worker-2-data:/opt/spark/work-dir
+
+  spark-worker-3:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/spark/Dockerfile
+    image: imperium-spark:3.5.3
+    container_name: imperium-spark-worker-3
+    hostname: spark-worker-3
+    profiles:
+      - processing-infra
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    ports:
+      - "${SPARK_WORKER3_UI_EXTERNAL_PORT:-48093}:8081"
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_WEBUI_PORT: 8081
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-4}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-6g}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081 > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline:ro
+      - spark-worker-3-data:/opt/spark/work-dir
+

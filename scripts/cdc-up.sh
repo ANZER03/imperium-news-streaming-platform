@@ -17,7 +17,7 @@ compose --profile source --profile backbone up -d \
   kafka \
   kafka-broker-2 \
   schema-registry \
-  postgres-source \
+  news-source-db \
   kafka-connect >/dev/null
 wait_for_connect_api
 

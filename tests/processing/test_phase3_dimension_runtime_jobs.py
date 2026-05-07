@@ -78,13 +78,13 @@ class DimensionRuntimeJobsTests(unittest.TestCase):
 
     def test_selected_dimension_topics_rejects_cross_driver_topic(self) -> None:
         env = {f"{job_env_prefix('reference')}_TOPICS": "imperium.metadata.public.table_links"}
-        with self.assertRaisesRegex(ValueError, "unsupported PHASE3_REFERENCE_TOPICS entries for reference"):
+        with self.assertRaisesRegex(ValueError, "unsupported REFERENCE_TOPICS entries for reference"):
             selected_dimension_topics("reference", env)
 
     def test_dimension_db_batch_size_prefers_job_specific_env(self) -> None:
         env = {
-            "PHASE3_DIMENSION_DB_BATCH_SIZE": "5000",
-            "PHASE3_AUTHORITY_DB_BATCH_SIZE": "1234",
+            "DIMENSION_DB_BATCH_SIZE": "5000",
+            "AUTHORITY_DB_BATCH_SIZE": "1234",
         }
         self.assertEqual(dimension_db_batch_size(env, "authority"), 1234)
         self.assertEqual(dimension_db_batch_size(env, "links"), 5000)

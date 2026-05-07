@@ -70,7 +70,7 @@ class Phase3RuntimeConfigTests(unittest.TestCase):
         config = Phase3RuntimeConfig.from_env(
             {
                 "NVIDIA_API_KEY": "secret-key",
-                "PHASE3_CHECKPOINT_ROOT": "/checkpoints/phase3",
+                "CHECKPOINT_ROOT": "/checkpoints/phase3",
             }
         )
 
@@ -83,8 +83,8 @@ class Phase3RuntimeConfigTests(unittest.TestCase):
         self.assertFalse(hasattr(config.nvidia, "api_key"))
 
     def test_rejects_invalid_runtime_values(self) -> None:
-        with self.assertRaisesRegex(ValueError, "PHASE3_WINDOW_DAYS must be positive"):
-            Phase3RuntimeConfig.from_env({"PHASE3_WINDOW_DAYS": "0"})
+        with self.assertRaisesRegex(ValueError, "WINDOW_DAYS must be positive"):
+            Phase3RuntimeConfig.from_env({"WINDOW_DAYS": "0"})
 
 
 class RuntimeTopicBootstrapTests(unittest.TestCase):

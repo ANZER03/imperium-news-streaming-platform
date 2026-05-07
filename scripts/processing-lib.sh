@@ -14,7 +14,7 @@ PROCESSING_CHECKPOINT_ROOT="${PROCESSING_CHECKPOINT_ROOT:-/tmp/imperium/checkpoi
 DIMENSION_CHECKPOINT_ROOT="${DIMENSION_CHECKPOINT_ROOT:-/tmp/imperium/checkpoints/dimensions}"
 POSTGRES_DB="${POSTGRES_DB:-imperium-news-source}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
-POSTGRES_DSN="${POSTGRES_DSN:-postgresql://${POSTGRES_USER}:postgres@postgres-source:5432/${POSTGRES_DB}}"
+POSTGRES_DSN="${POSTGRES_DSN:-postgresql://${POSTGRES_USER}:postgres@news-source-db:5432/${POSTGRES_DB}}"
 
 compose() {
   "${COMPOSE_BIN}" --env-file "${ENV_FILE_PATH}" "$@"

@@ -56,7 +56,7 @@ def ttl_from_crawled_at(crawled_at: Any) -> int:
         return TTL_SECONDS
 
 def get_redis_client():
-    url = os.environ.get("PHASE3_REDIS_URL", "redis://redis:6379/0")
+    url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
     return redis.Redis.from_url(url, decode_responses=True)
 
 def parse_iso_or_ts(val: Any) -> float:
@@ -275,7 +275,7 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
 def main():
     bootstrap_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
     schema_registry_url = os.environ.get("SCHEMA_REGISTRY_URL", "http://schema-registry:8081")
-    group_id = os.environ.get("PHASE3_KAFKA_GROUP_ID", "imperium-redis-projector-group")
+    group_id = os.environ.get("KAFKA_GROUP_ID", "imperium-redis-projector-group")
     
     logger.info("Initializing Redis Projector...")
     consumer = build_consumer(bootstrap_servers, group_id)

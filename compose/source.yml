@@ -1,0 +1,48 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - imperium-net
+
+services:
+
+  news-source-db:
+    <<: *service-defaults
+    image: postgres:13
+    container_name: imperium-news-source-db
+    hostname: news-source-db
+    profiles:
+      - source
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=10"]
+    ports:
+      - "${SOURCE_PG_EXTERNAL_PORT:-35432}:5432"
+    environment:
+      POSTGRES_DB: ${SOURCE_PG_DATABASE:-imperium-news-source}
+      POSTGRES_USER: ${SOURCE_PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${SOURCE_PG_PASSWORD:-postgres}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SOURCE_PG_USER:-postgres} -d ${SOURCE_PG_DATABASE:-imperium-news-source}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - source-db:/var/lib/postgresql/data
+      - ../infrastructure/postgres/initdb:/docker-entrypoint-initdb.d:ro
+
+  clone-news:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/clone-news/Dockerfile
+    container_name: imperium-clone-news
+    profiles:
+      - migration
+    volumes:
+      - ..:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - clone-news-state:/app/infra/source-db-clone/.state
+    environment:
+      SOURCE_PG_CONTAINER: ${SOURCE_PG_CONTAINER:-imperium-news-source-db}
+    depends_on:
+      news-source-db:
+        condition: service_healthy

@@ -155,7 +155,7 @@ def main():
     env = os.environ
     config = Phase3RuntimeConfig.from_env(env)
 
-    schema_path = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("PHASE3_CANONICAL_SCHEMA_PATH", str(_CANONICAL_SCHEMA_PATH)))
+    schema_path = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("CANONICAL_SCHEMA_PATH", str(_CANONICAL_SCHEMA_PATH)))
     canonical_schema_json = schema_path.read_text()
     canonical_schema_id = register_schema(
         config.kafka.schema_registry_url,

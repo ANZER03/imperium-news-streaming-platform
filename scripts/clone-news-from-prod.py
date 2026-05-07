@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Clone a slice of table_news from prod into the local postgres-source.
+Clone a slice of table_news from prod into the local news-source-db.
 
 Usage:
     python scripts/clone-news-from-prod.py --from-id <id> --size <rows>

@@ -10,11 +10,11 @@ from utils import build_consumer, build_avro_deserializer, consume_microbatches,
 logger = get_logger("QdrantProjector")
 
 CLASSIFIED_TOPIC = "imperium.news.classified"
-COLLECTION_NAME = os.environ.get("PHASE3_QDRANT_COLLECTION", "imperium_articles")
+COLLECTION_NAME = os.environ.get("QDRANT_COLLECTION", "imperium_articles")
 VECTOR_SIZE = 768 # Matched to the embedding model dimension
 
 def get_qdrant_client():
-    url = os.environ.get("PHASE3_QDRANT_URL", "http://qdrant:6333")
+    url = os.environ.get("QDRANT_URL", "http://qdrant:6333")
     return QdrantClient(url=url)
 
 def setup_collection(client: QdrantClient):

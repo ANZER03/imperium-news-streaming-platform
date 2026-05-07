@@ -68,17 +68,17 @@ redis-projector-reset:
 	@echo "==> Stopping redis projector..."
 	$(COMPOSE) --profile processing stop imperium-redis-projector
 	@echo "==> Deleting Kafka consumer group..."
-	@GROUP=$$(grep PHASE3_REDIS_PROJECTOR_GROUP_ID $(ENV_FILE) | cut -d= -f2); \
+	@GROUP=$$(grep REDIS_PROJECTOR_GROUP_ID $(ENV_FILE) | cut -d= -f2); \
 	docker exec imperium-kafka-1 kafka-consumer-groups \
 	  --bootstrap-server kafka:29092 \
 	  --group "$$GROUP" --delete 2>/dev/null || true; \
 	echo "  Deleted group: $$GROUP"
 	@echo "==> Bumping group ID in $(ENV_FILE)..."
-	@CURRENT=$$(grep PHASE3_REDIS_PROJECTOR_GROUP_ID $(ENV_FILE) | cut -d= -f2); \
+	@CURRENT=$$(grep REDIS_PROJECTOR_GROUP_ID $(ENV_FILE) | cut -d= -f2); \
 	BASE=$$(echo "$$CURRENT" | sed 's/-v[0-9]*$$//'); \
 	VER=$$(echo "$$CURRENT" | grep -oE '[0-9]+$$'); \
 	NEW="$$BASE-v$$((VER + 1))"; \
-	sed -i "s/PHASE3_REDIS_PROJECTOR_GROUP_ID=.*/PHASE3_REDIS_PROJECTOR_GROUP_ID=$$NEW/" $(ENV_FILE); \
+	sed -i "s/REDIS_PROJECTOR_GROUP_ID=.*/REDIS_PROJECTOR_GROUP_ID=$$NEW/" $(ENV_FILE); \
 	echo "  $$CURRENT --> $$NEW"
 	@echo "==> Flushing Redis..."
 	docker exec imperium-redis redis-cli FLUSHALL

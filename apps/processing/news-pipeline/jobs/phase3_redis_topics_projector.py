@@ -61,7 +61,7 @@ def main() -> None:
         Path(__file__).resolve().parent.parent
         / "resources" / "schema" / "classified_article_v1.avsc"
     )
-    classified_schema_json = Path(os.getenv("CLASSIFIED_SCHEMA_PATH") or os.getenv("PHASE3_CLASSIFIED_SCHEMA_PATH", str(_classified_schema_path))).read_text()
+    classified_schema_json = Path(os.getenv("CLASSIFIED_SCHEMA_PATH") or os.getenv("CLASSIFIED_SCHEMA_PATH", str(_classified_schema_path))).read_text()
 
     spark = SparkSession.builder.appName("imperium-redis-topics-driver").getOrCreate()
     projector = RedisFeedProjector(build_redis_client(config.redis.url))

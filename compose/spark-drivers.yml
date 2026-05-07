@@ -1,0 +1,255 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - imperium-net
+
+x-phase3-driver-defaults: &phase3-driver-defaults
+  <<: *service-defaults
+  image: imperium-spark:3.5.3
+  user: root
+  profiles:
+    - processing
+  env_file:
+    - ${ENV_FILE:-../.env}
+  depends_on:
+    spark-master:
+      condition: service_healthy
+    spark-worker:
+      condition: service_healthy
+    kafka:
+      condition: service_healthy
+    kafka-broker-2:
+      condition: service_healthy
+    schema-registry:
+      condition: service_healthy
+    news-source-db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    qdrant:
+      condition: service_started
+  environment:
+    PYTHONPATH: /opt/imperium/news-pipeline/src
+    KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+    SCHEMA_REGISTRY_URL: http://schema-registry:8081
+    POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+    ARTICLE_TABLE: imperium_articles
+    TOPIC_TAXONOMY_TABLE: imperium_topic_taxonomy
+    TOPIC_EMBEDDINGS_TABLE: imperium_topic_embeddings
+    PROJECTION_STATE_TABLE: imperium_projection_state
+    DIMENSION_TABLE_PREFIX: imperium_dim_
+    REDIS_URL: redis://redis:6379/0
+    QDRANT_URL: http://qdrant:6333
+    CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
+    STARTING_OFFSETS: earliest
+    NVIDIA_EMBEDDING_BATCH_SIZE: 8191
+    NVIDIA_EMBEDDING_RATE_LIMIT_RPM: 40
+
+  volumes:
+    - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline
+
+    - phase3-checkpoints:/tmp/imperium/checkpoints
+
+services:
+  imperium-topic-embedding-driver:
+    <<: *phase3-driver-defaults
+    container_name: imperium-topic-embedding-driver
+    hostname: imperium-topic-embedding-driver
+    restart: "no"
+    depends_on:
+      news-source-db:
+        condition: service_healthy
+      llama-cpp:
+        condition: service_healthy
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+      TOPIC_TAXONOMY_TABLE: imperium_topic_taxonomy
+      TOPIC_EMBEDDINGS_TABLE: imperium_topic_embeddings
+      LLAMA_CPP_BASE_URL: http://llama-cpp:8080
+      NVIDIA_EMBEDDING_MODEL: embeddinggemma-300M-Q8_0.gguf
+      TAXONOMY_VERSION: medtop-v2
+      EMBEDDING_BATCH_SIZE: "13"
+    command: >
+      bash -lc '
+      python3 /opt/imperium/news-pipeline/jobs/phase3_topic_embedding_refresh.py
+      '
+
+  imperium-dimension-reference-driver:
+    <<: *phase3-driver-defaults
+    container_name: imperium-dimension-reference-driver
+    hostname: imperium-dimension-reference-driver
+    ports:
+      - "44041:4040"
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      CHECKPOINT_ROOT: /tmp/imperium/checkpoints/dimensions
+      STARTING_OFFSETS: earliest
+      REFERENCE_TRIGGER_PROCESSING_TIME: 5 seconds
+      REFERENCE_MAX_OFFSETS_PER_TRIGGER: 10000
+      DIMENSION_DB_BATCH_SIZE: 50000
+
+    command: >
+      bash -lc '
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.executor.cores=1
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      /opt/imperium/news-pipeline/jobs/dimensions/reference.py
+      '
+
+  imperium-dimension-authority-driver:
+    <<: *phase3-driver-defaults
+    container_name: imperium-dimension-authority-driver
+    hostname: imperium-dimension-authority-driver
+    ports:
+      - "44042:4040"
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      CHECKPOINT_ROOT: /tmp/imperium/checkpoints/dimensions
+      STARTING_OFFSETS: earliest
+      AUTHORITY_TRIGGER_PROCESSING_TIME: 5 seconds
+      AUTHORITY_MAX_OFFSETS_PER_TRIGGER: 200000
+      DIMENSION_DB_BATCH_SIZE: 50000
+
+    command: >
+      bash -lc '
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.executor.cores=1
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      /opt/imperium/news-pipeline/jobs/dimensions/authority.py
+      '
+
+  imperium-dimension-links-driver:
+    <<: *phase3-driver-defaults
+    container_name: imperium-dimension-links-driver
+    hostname: imperium-dimension-links-driver
+    ports:
+      - "44043:4040"
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      CHECKPOINT_ROOT: /tmp/imperium/checkpoints/dimensions
+      STARTING_OFFSETS: earliest
+      LINKS_TRIGGER_PROCESSING_TIME: 5 seconds
+      LINKS_MAX_OFFSETS_PER_TRIGGER: 200000
+      DIMENSION_DB_BATCH_SIZE: 50000
+
+    command: >
+      bash -lc '
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.executor.cores=1
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      /opt/imperium/news-pipeline/jobs/dimensions/links.py
+      '
+
+  imperium-canonical-enrichment-driver:
+    <<: *phase3-driver-defaults
+    restart: "no"
+    container_name: imperium-canonical-enrichment-driver
+    hostname: imperium-canonical-enrichment-driver
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src:/opt/imperium/news-pipeline/jobs/enrichment
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+      ARTICLE_TABLE: imperium_articles
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      CANONICAL_STARTING_OFFSETS: earliest
+      CANONICAL_MAX_OFFSETS_PER_TRIGGER: 5000
+      CANONICAL_TRIGGER_PROCESSING_TIME: 3 seconds
+      CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
+
+    ports:
+      - "${CANONICAL_UI_EXTERNAL_PORT:-48100}:4040"
+      - "${CANONICAL_DRIVER_EXTERNAL_PORT:-47100}:31000"
+      - "${CANONICAL_BLOCKMANAGER_EXTERNAL_PORT:-47200}:32000"
+    command: >
+      bash -lc '
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.executor.cores=1
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
+      --conf spark.driver.bindAddress=0.0.0.0
+      --conf spark.driver.port=31000
+      --conf spark.blockManager.port=32000
+      --conf spark.ui.port=4040
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src:/opt/imperium/news-pipeline/jobs/enrichment
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src:/opt/imperium/news-pipeline/jobs/enrichment
+      /opt/imperium/news-pipeline/jobs/enrichment/driver.py
+      '
+
+  imperium-classification-driver:
+    <<: *phase3-driver-defaults
+    restart: "no"
+    container_name: imperium-classification-driver
+    hostname: imperium-classification-driver
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+      ARTICLE_TABLE: imperium_articles
+      TOPIC_TAXONOMY_TABLE: imperium_topic_taxonomy
+      TOPIC_EMBEDDINGS_TABLE: imperium_topic_embeddings
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      CLASSIFICATION_STARTING_OFFSETS: earliest
+      CLASSIFICATION_MAX_OFFSETS_PER_TRIGGER: 700
+      CLASSIFICATION_TRIGGER_PROCESSING_TIME: 10 seconds
+      CLASSIFICATION_EMBEDDING_BATCH_SIZE: 100
+      CLASSIFICATION_NVIDIA_RPM_BUDGET: 24
+      CLASSIFIED_DLQ_TOPIC: imperium.news.classified.dlq
+      CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
+
+    ports:
+      - "${CLASSIFICATION_UI_EXTERNAL_PORT:-48101}:4040"
+      - "${CLASSIFICATION_DRIVER_EXTERNAL_PORT:-47101}:31001"
+      - "${CLASSIFICATION_BLOCKMANAGER_EXTERNAL_PORT:-47201}:32001"
+    command: >
+      bash -lc '
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.executor.cores=1
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
+      --conf spark.driver.bindAddress=0.0.0.0
+      --conf spark.driver.port=31001
+      --conf spark.blockManager.port=32001
+      --conf spark.ui.port=4040
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      /opt/imperium/news-pipeline/jobs/phase3_classification_runtime.py
+      '

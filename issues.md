@@ -295,3 +295,35 @@ Purged the Schema Registry subject (`imperium.news.classified-value`) before res
 **Rule going forward:**
 Any timestamp field carried through from the canonical Avro will be `long` (epoch millis/micros).
 Never declare it as `string` in a downstream schema.
+
+---
+
+## Issue 12 — Qdrant: duplicate field `max_segment_size` on startup
+
+**Files affected:**
+- `compose/serving.yml`
+
+**Symptom:**
+```
+Error: duplicate field `max_segment_size` for key `storage.optimizers`
+```
+Qdrant failed to start after a `docker-compose up`.
+
+**Root cause:**
+The env var `QDRANT__STORAGE__OPTIMIZERS__MAX_SEGMENT_SIZE` used the old field name. Newer Qdrant
+versions renamed this field to `max_segment_size_kb`. When both the env var (old name) and the
+internal default config (new name) were present, Qdrant's config deserializer saw both as the same
+field and raised a duplicate error.
+
+Additionally, setting the value to `"0"` (previously used to disable the limit) is no longer valid
+in Qdrant 1.x — it must be 1 or larger, or omitted entirely to let Qdrant auto-select.
+
+**Fix:**
+Removed `QDRANT__STORAGE__OPTIMIZERS__MAX_SEGMENT_SIZE` from `compose/serving.yml` entirely.
+Omitting it lets Qdrant auto-select the segment size based on available CPUs, which is the correct
+default behavior.
+
+**Rule going forward:**
+When upgrading Qdrant, check for renamed config fields. The env var naming convention maps directly
+to the config file keys (`QDRANT__SECTION__FIELD` → `section.field`). If a field is renamed in the
+config, the corresponding env var name must be updated to match.

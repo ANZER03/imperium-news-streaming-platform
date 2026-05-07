@@ -390,13 +390,13 @@ def main() -> None:
     config = Phase3RuntimeConfig.from_env()
 
     # Load and validate the Avro schema
-    schema_path = Path(os.getenv("PHASE3_CLASSIFIED_SCHEMA_PATH", str(_SCHEMA_PATH)))
+    schema_path = Path(os.getenv("CLASSIFIED_SCHEMA_PATH", str(_SCHEMA_PATH)))
     if not schema_path.exists():
         raise FileNotFoundError(f"Avro schema not found: {schema_path}")
     classified_schema_json = schema_path.read_text()
     logger.info(f"Loaded Avro schema from {schema_path}")
 
-    canonical_schema_path = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("PHASE3_CANONICAL_SCHEMA_PATH", str(_CANONICAL_SCHEMA_PATH)))
+    canonical_schema_path = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("CANONICAL_SCHEMA_PATH", str(_CANONICAL_SCHEMA_PATH)))
     canonical_schema_json = canonical_schema_path.read_text()
 
     # Register schema with Schema Registry — idempotent, fails fast on error

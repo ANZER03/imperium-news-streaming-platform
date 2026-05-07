@@ -1,0 +1,52 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - imperium-net
+
+services:
+  kafka-ui:
+    <<: *service-defaults
+    image: ${KAFKA_UI_IMAGE}
+    container_name: imperium-kafka-ui
+    hostname: kafka-ui
+    profiles:
+      - ui
+    ports:
+      - "${KAFKA_UI_EXTERNAL_PORT:-48089}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: imperium
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092,kafka-broker-2:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+      DYNAMIC_CONFIG_ENABLED: "true"
+      SERVER_PORT: 8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/api/clusters || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  redis-ui:
+    <<: *service-defaults
+    image: redis/redisinsight:2.64.0
+    container_name: imperium-redis-ui
+    hostname: redis-ui
+    profiles:
+      - ui
+    ports:
+      - "${REDIS_UI_EXTERNAL_PORT:-48090}:5540"
+    environment:
+      RIPROXY_DISABLE_AUTH: "true"
+    volumes:
+      - redisinsight-data:/data
+
+  pg-ui:
+    <<: *service-defaults
+    image: adminer:4.8.1
+    container_name: imperium-pg-ui
+    hostname: pg-ui
+    profiles:
+      - ui
+    ports:
+      - "${PG_UI_EXTERNAL_PORT:-48084}:8080"
