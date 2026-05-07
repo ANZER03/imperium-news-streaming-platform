@@ -32,15 +32,14 @@ services:
   clone-news:
     <<: *service-defaults
     build:
-      context: ..
-      dockerfile: infrastructure/docker/clone-news/Dockerfile
+      context: ../infrastructure/docker/clone-news
     container_name: imperium-clone-news
     profiles:
       - migration
     volumes:
       - ..:/app
       - /var/run/docker.sock:/var/run/docker.sock
-      - clone-news-state:/app/infra/source-db-clone/.state
+      - clone-news-state:/app/scripts/clone/.state
     environment:
       SOURCE_PG_CONTAINER: ${SOURCE_PG_CONTAINER:-imperium-news-source-db}
     depends_on:

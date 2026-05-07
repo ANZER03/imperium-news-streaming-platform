@@ -22,6 +22,8 @@
     "tombstones.on.delete": "false",
     "heartbeat.interval.ms": "10000",
     "schema.history.internal.kafka.bootstrap.servers": "${KAFKA_BOOTSTRAP_SERVERS}",
-    "schema.history.internal.kafka.topic": "${NEWS_CDC_SCHEMA_HISTORY_TOPIC}"
+    "schema.history.internal.kafka.topic": "${NEWS_CDC_SCHEMA_HISTORY_TOPIC}",
+    "producer.override.max.request.size": "2097152",
+    "producer.override.max.block.ms": "60000"
   }
 }

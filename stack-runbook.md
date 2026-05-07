@@ -22,8 +22,9 @@ Step-by-step guide to bring the full stack up and down in the correct order.
 | `serving` | `redis`, `qdrant`, `llama-cpp` | — |
 | `processing-infra` | `spark-master`, `spark-worker-1/2/3` | — |
 | `processing` | all Spark drivers | `backbone`, `serving`, `processing-infra` already running |
+| `projectors` | `imperium-redis-projector`, `imperium-postgres-projector`, `imperium-qdrant-projector` | `backbone`, `serving`, `source` already running |
 | `ui` | `kafka-ui`, `redis-ui`, `pg-ui` | `backbone`, `serving` already running |
-| `migration` | `clone-news` | `source` already running |
+| `migration` | `clone-news` (scheduler that pulls 2k rows/5min from prod) | `source` already running |
 
 > **Note:** `depends_on` across profiles is not validated by Compose at parse time. Always bring profiles up in the order below to respect runtime dependencies.
 
@@ -122,7 +123,59 @@ docker logs -f imperium-classification-driver
 
 ---
 
-### 6. UI (optional)
+### 6. Projectors (Redis / Postgres / Qdrant)
+
+Projectors consume the Kafka `imperium.canonical-articles` and `imperium.news.classified` topics and write to their respective stores. They must be started with all upstream profiles in scope so cross-profile dependencies resolve:
+
+```bash
+docker-compose --profile backbone --profile source --profile serving --profile processing --profile processing-infra up -d --no-deps \
+  imperium-redis-projector \
+  imperium-postgres-projector \
+  imperium-qdrant-projector
+```
+
+Verify each is healthy:
+```bash
+docker logs imperium-redis-projector    --tail 5   # expect "Subscribed to [...] entering micro-batch loop"
+docker logs imperium-postgres-projector --tail 5   # expect "Connected to PostgreSQL successfully"
+docker logs imperium-qdrant-projector   --tail 5   # expect "Upserted N vectors to Qdrant"
+```
+
+> **Important:** projector code is baked into the image (no bind mount). After any code or env-var change, rebuild before recreating:
+> ```bash
+> docker-compose ... up -d --build --no-deps imperium-postgres-projector
+> ```
+> See Issues 6 and 14 in `issues.md`.
+
+---
+
+### 7. Clone scheduler (optional, for development)
+
+Continuously pulls 2 000 rows of `table_news` from prod every 5 minutes into the local source DB. Requires `.env.prod` with prod credentials.
+
+Pre-seed the starting ID into the named volume (only needed the first time, or to skip ahead):
+
+```bash
+docker volume create imperium-news-streaming-platform_clone-news-state 2>/dev/null || true
+docker run --rm \
+  -v imperium-news-streaming-platform_clone-news-state:/state \
+  alpine sh -c 'echo "{\"last_id\": <ID>}" > /state/clone-news-last-id.json'
+```
+
+Start the scheduler:
+
+```bash
+docker-compose --profile backbone --profile source --profile migration up -d --no-deps clone-news
+```
+
+Follow progress:
+```bash
+docker logs -f imperium-clone-news
+```
+
+---
+
+### 8. UI (optional)
 
 Must be started together with `backbone` and `serving` so cross-profile `depends_on` resolves:
 
@@ -143,7 +196,16 @@ docker-compose --profile backbone --profile serving --profile ui up -d
 ### Tear down all profiles at once
 
 ```bash
-docker-compose --profile source --profile backbone --profile serving --profile processing-infra --profile ui down
+docker-compose \
+  --profile source \
+  --profile backbone \
+  --profile serving \
+  --profile processing-infra \
+  --profile processing \
+  --profile projectors \
+  --profile migration \
+  --profile ui \
+  down
 ```
 
 > This removes containers and networks but **preserves all named volumes** (Kafka data, Spark checkpoints, Qdrant data, Redis data). Add `-v` only if you want a full clean reset.
@@ -183,6 +245,9 @@ docker-compose --profile backbone --profile serving --profile source --profile p
 | `service "X" depends on undefined service "Y"` | Always include all required profiles in the `up` command |
 | Spark driver exits with `Permission denied` on `.py` file | Blank line inside `bash -lc '...'` YAML block — the `.py` path was being run as a separate shell command instead of passed to `spark-submit`. Fixed in `compose/spark-drivers.yml`. |
 | Qdrant `duplicate field max_segment_size` | Renamed env var to `MAX_SEGMENT_SIZE_KB` then removed it — see Issue 12 in `issues.md` |
+| News CDC connector FAILED with `RecordTooLargeException` | Connector config needs `producer.override.max.request.size=2097152` — see Issue 13 in `issues.md` |
+| Postgres projector loops on `Temporary failure in name resolution` | Image is stale (still uses `PHASE3_POSTGRES_DSN`). Rebuild with `--build` — see Issue 14 |
+| Clone-news rebuild sends 400 MB of context | Build context now scoped to `infrastructure/docker/clone-news/` — see Issue 15 |
 
 ---
 
