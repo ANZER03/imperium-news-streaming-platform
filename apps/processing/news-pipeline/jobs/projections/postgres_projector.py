@@ -19,7 +19,7 @@ def truncate_string(val: Any, max_len: int = 5000) -> Any:
     return val
 
 def get_db_connection():
-    dsn = os.environ.get("PHASE3_POSTGRES_DSN", "postgresql://postgres:postgres@postgres-source:5432/imperium-news-source")
+    dsn = os.environ.get("POSTGRES_DSN", "postgresql://postgres:postgres@postgres-source:5432/imperium-news-source")
     return psycopg.connect(dsn)
 
 def upsert_canonical(cursor: psycopg.Cursor, records: List[Dict[str, Any]]):

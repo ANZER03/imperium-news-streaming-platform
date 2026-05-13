@@ -35,7 +35,7 @@ def main() -> None:
         Path(__file__).resolve().parent.parent
         / "resources" / "schema" / "canonical_article_v1.avsc"
     )
-    canonical_schema_json = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("PHASE3_CANONICAL_SCHEMA_PATH", str(_canonical_schema_path))).read_text()
+    canonical_schema_json = Path(os.getenv("CANONICAL_SCHEMA_PATH") or os.getenv("CANONICAL_SCHEMA_PATH", str(_canonical_schema_path))).read_text()
 
     spark = SparkSession.builder.appName("imperium-redis-driver").getOrCreate()
     projector = RedisFeedProjector(build_redis_client(config.redis.url))

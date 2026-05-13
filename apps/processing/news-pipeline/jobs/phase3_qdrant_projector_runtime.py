@@ -80,9 +80,9 @@ def process_batch(rows: DataFrame, batch_id: int, projector: QdrantArticleProjec
 
 
 def _embedding_chunk_size() -> int:
-    value = int(os.getenv("PHASE3_QDRANT_EMBEDDING_CHUNK_SIZE", "128"))
+    value = int(os.getenv("QDRANT_EMBEDDING_CHUNK_SIZE", "128"))
     if value <= 0:
-        raise ValueError("PHASE3_QDRANT_EMBEDDING_CHUNK_SIZE must be positive")
+        raise ValueError("QDRANT_EMBEDDING_CHUNK_SIZE must be positive")
     return value
 
 
@@ -99,7 +99,7 @@ def main() -> None:
         Path(__file__).resolve().parent.parent
         / "resources" / "schema" / "classified_article_v1.avsc"
     )
-    classified_schema_path = Path(os.getenv("CLASSIFIED_SCHEMA_PATH") or os.getenv("PHASE3_CLASSIFIED_SCHEMA_PATH", str(_classified_schema_path)))
+    classified_schema_path = Path(os.getenv("CLASSIFIED_SCHEMA_PATH") or os.getenv("CLASSIFIED_SCHEMA_PATH", str(_classified_schema_path)))
     classified_schema_json = classified_schema_path.read_text()
 
     spark = SparkSession.builder.appName("imperium-qdrant-driver").getOrCreate()

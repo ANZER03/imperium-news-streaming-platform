@@ -83,32 +83,32 @@ class Phase3RuntimeConfig:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Phase3RuntimeConfig:
         values = os.environ if env is None else env
-        window_days = _positive_int(values, "PHASE3_WINDOW_DAYS", 5)
+        window_days = _positive_int(values, "WINDOW_DAYS", 5)
         return cls(
             kafka=KafkaRuntimeConfig(
                 bootstrap_servers=_get(values, "KAFKA_BOOTSTRAP_SERVERS", "localhost:49092"),
                 schema_registry_url=_get(values, "SCHEMA_REGISTRY_URL", "http://localhost:48081"),
-                canonical_topic=_get(values, "PHASE3_CANONICAL_TOPIC", "imperium.canonical-articles"),
-                canonical_dlq_topic=_get(values, "PHASE3_CANONICAL_DLQ_TOPIC", "imperium.canonical-articles.dlq"),
-                canonical_retry_topic=_get(values, "PHASE3_CANONICAL_RETRY_TOPIC", "imperium.canonical-articles.retry"),
-                classified_topic=_get(values, "PHASE3_CLASSIFIED_TOPIC", "imperium.news.classified"),
-                classified_dlq_topic=_get(values, "PHASE3_CLASSIFIED_DLQ_TOPIC", "imperium.news.classified.dlq"),
-                source_topic_prefix=_get(values, "PHASE3_SOURCE_TOPIC_PREFIX", DEFAULT_SOURCE_TOPIC_PREFIX),
+                canonical_topic=_get(values, "CANONICAL_TOPIC", "imperium.canonical-articles"),
+                canonical_dlq_topic=_get(values, "CANONICAL_DLQ_TOPIC", "imperium.canonical-articles.dlq"),
+                canonical_retry_topic=_get(values, "CANONICAL_RETRY_TOPIC", "imperium.canonical-articles.retry"),
+                classified_topic=_get(values, "CLASSIFIED_TOPIC", "imperium.news.classified"),
+                classified_dlq_topic=_get(values, "CLASSIFIED_DLQ_TOPIC", "imperium.news.classified.dlq"),
+                source_topic_prefix=_get(values, "SOURCE_TOPIC_PREFIX", DEFAULT_SOURCE_TOPIC_PREFIX),
             ),
             postgres=PostgresRuntimeConfig(
-                dsn=_get(values, "PHASE3_POSTGRES_DSN", "postgresql://postgres:postgres@localhost:35432/imperium-news-source"),
-                article_table=_get(values, "PHASE3_ARTICLE_TABLE", "imperium_articles"),
-                topic_taxonomy_table=_get(values, "PHASE3_TOPIC_TAXONOMY_TABLE", "imperium_topic_taxonomy"),
-                topic_embeddings_table=_get(values, "PHASE3_TOPIC_EMBEDDINGS_TABLE", "imperium_topic_embeddings"),
-                projection_state_table=_get(values, "PHASE3_PROJECTION_STATE_TABLE", "imperium_projection_state"),
-                dimension_table_prefix=_get(values, "PHASE3_DIMENSION_TABLE_PREFIX", "imperium_dim_"),
+                dsn=_get(values, "POSTGRES_DSN", "postgresql://postgres:postgres@localhost:35432/imperium-news-source"),
+                article_table=_get(values, "ARTICLE_TABLE", "imperium_articles"),
+                topic_taxonomy_table=_get(values, "TOPIC_TAXONOMY_TABLE", "imperium_topic_taxonomy"),
+                topic_embeddings_table=_get(values, "TOPIC_EMBEDDINGS_TABLE", "imperium_topic_embeddings"),
+                projection_state_table=_get(values, "PROJECTION_STATE_TABLE", "imperium_projection_state"),
+                dimension_table_prefix=_get(values, "DIMENSION_TABLE_PREFIX", "imperium_dim_"),
             ),
-            redis=RedisRuntimeConfig(url=_get(values, "PHASE3_REDIS_URL", "redis://localhost:46379/0")),
+            redis=RedisRuntimeConfig(url=_get(values, "REDIS_URL", "redis://localhost:46379/0")),
             qdrant=QdrantRuntimeConfig(
-                url=_get(values, "PHASE3_QDRANT_URL", "http://localhost:46333"),
-                collection_name=_get(values, "PHASE3_QDRANT_COLLECTION", "imperium_articles"),
-                vector_size=_positive_int(values, "PHASE3_QDRANT_VECTOR_SIZE", 1024),
-                distance=_get(values, "PHASE3_QDRANT_DISTANCE", "Cosine"),
+                url=_get(values, "QDRANT_URL", "http://localhost:46333"),
+                collection_name=_get(values, "QDRANT_COLLECTION", "imperium_articles"),
+                vector_size=_positive_int(values, "QDRANT_VECTOR_SIZE", 1024),
+                distance=_get(values, "QDRANT_DISTANCE", "Cosine"),
             ),
             nvidia=NvidiaRuntimeConfig(
                 api_key_present=bool(values.get("NVIDIA_API_KEY", "").strip()),
@@ -121,7 +121,7 @@ class Phase3RuntimeConfig:
                 timeout_seconds=_positive_float(values, "NVIDIA_EMBEDDING_TIMEOUT_SECONDS", 30.0),
                 split_on_failure=_bool(values, "NVIDIA_EMBEDDING_SPLIT_ON_FAILURE", True),
             ),
-            checkpoints=CheckpointConfig(root=_get(values, "PHASE3_CHECKPOINT_ROOT", "/tmp/imperium/checkpoints/processing")),
+            checkpoints=CheckpointConfig(root=_get(values, "CHECKPOINT_ROOT", "/tmp/imperium/checkpoints/processing")),
             window_days=window_days,
         )
 
@@ -197,12 +197,12 @@ def _job_env_prefix(job_name: str) -> str:
     normalized = job_name.strip().upper().replace("-", "_")
     if not normalized:
         raise ValueError("job_name is required")
-    return f"PHASE3_{normalized}"
+    return f"{normalized}"
 
 
 def _get_job_setting(env: Mapping[str, str], job_name: str, key_suffix: str, default: str) -> str:
     job_key = f"{_job_env_prefix(job_name)}_{key_suffix}"
-    fallback_key = f"PHASE3_{key_suffix}"
+    fallback_key = f"{key_suffix}"
     return _get(env, job_key, env.get(fallback_key, default))
 
 
@@ -212,7 +212,7 @@ def _get_job_setting_optional(env: Mapping[str, str], job_name: str, key_suffix:
     if value is not None:
         value = value.strip()
         return value or None
-    fallback_key = f"PHASE3_{key_suffix}"
+    fallback_key = f"{key_suffix}"
     fallback = env.get(fallback_key)
     if fallback is None:
         return None

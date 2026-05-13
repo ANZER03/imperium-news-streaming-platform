@@ -78,12 +78,12 @@ def selected_dimension_topics(job_key: str, env: Mapping[str, str] | None = None
 
 
 def job_env_prefix(job_key: str) -> str:
-    return f"PHASE3_{build_dimension_job(job_key).key.upper()}"
+    return f"{build_dimension_job(job_key).key.upper()}"
 
 
 def dimension_db_batch_size(env: Mapping[str, str], job_key: str) -> int:
     job_value = env.get(f"{job_env_prefix(job_key)}_DB_BATCH_SIZE", "").strip()
-    value = int(job_value or env.get("PHASE3_DIMENSION_DB_BATCH_SIZE", "1000"))
+    value = int(job_value or env.get("DIMENSION_DB_BATCH_SIZE", "1000"))
     if value <= 0:
         raise ValueError("dimension DB batch size must be positive")
     return value

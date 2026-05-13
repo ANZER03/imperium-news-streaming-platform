@@ -295,3 +295,135 @@ Purged the Schema Registry subject (`imperium.news.classified-value`) before res
 **Rule going forward:**
 Any timestamp field carried through from the canonical Avro will be `long` (epoch millis/micros).
 Never declare it as `string` in a downstream schema.
+
+---
+
+## Issue 12 — Qdrant: duplicate field `max_segment_size` on startup
+
+**Files affected:**
+- `compose/serving.yml`
+
+**Symptom:**
+```
+Error: duplicate field `max_segment_size` for key `storage.optimizers`
+```
+Qdrant failed to start after a `docker-compose up`.
+
+**Root cause:**
+The env var `QDRANT__STORAGE__OPTIMIZERS__MAX_SEGMENT_SIZE` used the old field name. Newer Qdrant
+versions renamed this field to `max_segment_size_kb`. When both the env var (old name) and the
+internal default config (new name) were present, Qdrant's config deserializer saw both as the same
+field and raised a duplicate error.
+
+Additionally, setting the value to `"0"` (previously used to disable the limit) is no longer valid
+in Qdrant 1.x — it must be 1 or larger, or omitted entirely to let Qdrant auto-select.
+
+**Fix:**
+Removed `QDRANT__STORAGE__OPTIMIZERS__MAX_SEGMENT_SIZE` from `compose/serving.yml` entirely.
+Omitting it lets Qdrant auto-select the segment size based on available CPUs, which is the correct
+default behavior.
+
+**Rule going forward:**
+When upgrading Qdrant, check for renamed config fields. The env var naming convention maps directly
+to the config file keys (`QDRANT__SECTION__FIELD` → `section.field`). If a field is renamed in the
+config, the corresponding env var name must be updated to match.
+
+---
+
+## Issue 13 — CDC news connector fails with `RecordTooLargeException` on large articles
+
+**Files affected:**
+- `apps/ingestion/connector-bootstrap/news/news-connector.json`
+
+**Symptom:**
+```
+ConnectException: Unrecoverable exception from producer send callback
+Caused by: RecordTooLargeException: The message is 1113754 bytes when serialized
+which is larger than 1048576, which is the value of the max.request.size configuration.
+```
+The `imperium-news-cdc` connector task went `FAILED`. New articles cloned from prod stopped
+arriving in Kafka.
+
+**Root cause:**
+Some production `table_news` rows have very large `more_source_html` or body fields. When
+Debezium serializes them as Avro, the resulting Kafka message exceeds the Kafka producer's
+default `max.request.size` of 1 MB (1,048,576 bytes). The connector has no producer override
+configured, so it uses the default limit.
+
+**Fix:**
+Added producer overrides to the connector config via REST API (live) and in the template
+(permanent):
+```json
+"producer.override.max.request.size": "2097152",
+"producer.override.max.block.ms": "60000"
+```
+Then restarted the failed task:
+```bash
+curl -X POST http://localhost:48083/connectors/imperium-news-cdc/tasks/0/restart
+```
+
+**Rule going forward:**
+Any CDC connector sourcing tables with unbounded text columns (`more_source_html`, body, HTML)
+must set `producer.override.max.request.size` to at least `2097152` (2 MB). The Kafka topic
+`max.message.bytes` should match (already set to `2097152` on `imperium.news.classified`).
+
+---
+
+## Issue 14 — Postgres projector connects to `postgres-source` (stale image with old env var)
+
+**Files affected:**
+- `apps/processing/news-pipeline/jobs/projections/postgres_projector.py`
+- `compose/projectors.yml`
+
+**Symptom:**
+```
+WARNING PostgresProjector: Waiting for Postgres... ([Errno -3] Temporary failure in name resolution)
+```
+The postgres projector looped indefinitely on startup despite `news-source-db` being reachable
+from the same network. `docker exec` into the container could connect fine.
+
+**Root cause:**
+The projector image was stale — built before the `PHASE3_` prefix removal. The code read
+`os.environ.get("PHASE3_POSTGRES_DSN", "postgresql://...@postgres-source:5432/...")`. The compose
+env sets `POSTGRES_DSN` (without prefix), so the code fell back to the hardcoded default DSN
+pointing at `postgres-source` — the old hostname that no longer exists.
+
+**Fix:**
+Rebuilt the projector image to pick up the updated `postgres_projector.py` which reads
+`POSTGRES_DSN` (no prefix):
+```bash
+docker-compose ... up -d --build --no-deps imperium-postgres-projector
+```
+
+**Rule going forward:**
+Projector code changes are **not** live-reloaded — they are baked into the image at build time
+(see Issue 6). Any env var rename or code change requires an explicit `--build`. After the
+`PHASE3_` prefix removal, all projector and driver images must be rebuilt before they pick up the
+new variable names.
+
+---
+
+## Issue 15 — Docker build context too large for clone-news container (~400 MB)
+
+**Files affected:**
+- `compose/source.yml`
+- `infrastructure/docker/clone-news/Dockerfile`
+
+**Symptom:**
+`docker-compose up --build` for the `clone-news` service sent the entire project root (~400 MB)
+to the Docker daemon before starting the build, causing very slow rebuilds.
+
+**Root cause:**
+The compose build context was set to `..` (project root) and no `.dockerignore` existed. The
+Dockerfile only copies a single docker CLI binary — it does not `COPY` any project files — but
+Docker still transfers the full context before evaluating what is needed.
+
+**Fix:**
+1. Changed `context: ..` to `context: ../infrastructure/docker/clone-news` in `compose/source.yml`
+   so the build context is just the 3-file Dockerfile directory (~333 bytes).
+2. Added `infrastructure/docker/clone-news/.dockerignore` with `**` as a safety net.
+
+**Rule going forward:**
+Set `context:` to the smallest directory that contains everything the Dockerfile `COPY`s.
+For images that only install binaries from other images (multi-stage `COPY --from`), the context
+should be just the Dockerfile directory — it needs no source files at all.

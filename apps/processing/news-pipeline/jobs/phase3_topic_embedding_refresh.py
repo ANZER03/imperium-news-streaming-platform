@@ -152,12 +152,12 @@ def _embed_with_llamacpp(
 
 def main() -> None:
     dsn = os.environ.get(
-        "PHASE3_POSTGRES_DSN",
+        "POSTGRES_DSN",
         "postgresql://postgres:postgres@localhost:35432/imperium-news-source",
     )
     llama_base_url  = os.environ.get("LLAMA_CPP_BASE_URL", "http://llama-cpp:8080")
     embedding_model = os.environ.get("NVIDIA_EMBEDDING_MODEL", "embeddinggemma-300M-Q8_0.gguf")
-    taxonomy_version = os.environ.get("PHASE3_TAXONOMY_VERSION", "medtop-v2")
+    taxonomy_version = os.environ.get("TAXONOMY_VERSION", "medtop-v2")
     batch_size = int(os.environ.get("EMBEDDING_BATCH_SIZE", "13"))
 
     print("imperium-topic-embedding-refresh starting")

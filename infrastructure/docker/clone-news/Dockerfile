@@ -6,4 +6,4 @@ COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 
 WORKDIR /app
 
-CMD ["python", "scripts/clone-news-scheduler.py"]
+CMD ["python", "scripts/clone/scheduler.py"]

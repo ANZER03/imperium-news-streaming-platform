@@ -351,7 +351,7 @@ Quick accuracy test — embeds 20 multilingual headlines and classifies them aga
 
 ```bash
 docker exec \
-  -e PHASE3_POSTGRES_DSN="postgresql://postgres:postgres@imperium-news-source-db:5432/imperium-news-source" \
+  -e POSTGRES_DSN="postgresql://postgres:postgres@imperium-news-source-db:5432/imperium-news-source" \
   -e LLAMA_CPP_BASE_URL="http://llama-cpp:8080" \
   -e NVIDIA_EMBEDDING_MODEL="embeddinggemma-300M-Q8_0.gguf" \
   -e PYTHONPATH="/opt/imperium/news-pipeline/src" \

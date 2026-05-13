@@ -49,7 +49,7 @@ def build_dimension_stream(spark: SparkSession, bootstrap_servers: str, topic: s
         spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", bootstrap_servers)
         .option("subscribe", topic)
-        .option("startingOffsets", os.getenv("PHASE3_STARTING_OFFSETS", "latest"))
+        .option("startingOffsets", os.getenv("STARTING_OFFSETS", "latest"))
         .load()
     )
     return raw.select(from_json(col("value").cast("string"), CDC_ENVELOPE_SCHEMA).alias("value")).select("value.*")
@@ -63,8 +63,8 @@ def process_dimension_micro_batch(rows: DataFrame, batch_id: int, dimension_type
 
 def main() -> None:
     spark = SparkSession.builder.appName("phase3-dimension-materializer").getOrCreate()
-    bootstrap_servers = os.environ["PHASE3_KAFKA_BOOTSTRAP_SERVERS"]
-    materializer = _missing_runtime_adapter("PHASE3_DIMENSION_MATERIALIZER")
+    bootstrap_servers = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
+    materializer = _missing_runtime_adapter("DIMENSION_MATERIALIZER")
 
     queries = []
     for dimension_type, topic in _dimension_topics_from_env().items():
@@ -78,7 +78,7 @@ def main() -> None:
                     materializer,
                 )
             )
-            .option("checkpointLocation", f"{os.environ['PHASE3_DIMENSION_CHECKPOINT_ROOT']}/{dimension_type}")
+            .option("checkpointLocation", f"{os.environ['DIMENSION_CHECKPOINT_ROOT']}/{dimension_type}")
             .start()
         )
         queries.append(query)
@@ -89,12 +89,12 @@ def main() -> None:
 
 def _dimension_topics_from_env() -> dict[str, str]:
     return {
-        "links": os.environ["PHASE3_LINKS_SOURCE_TOPIC"],
-        "authorities": os.environ["PHASE3_AUTHORITIES_SOURCE_TOPIC"],
-        "seditions": os.environ["PHASE3_SEDITIONS_SOURCE_TOPIC"],
-        "countries": os.environ["PHASE3_COUNTRIES_SOURCE_TOPIC"],
-        "rubrics": os.environ["PHASE3_RUBRICS_SOURCE_TOPIC"],
-        "languages": os.environ["PHASE3_LANGUAGES_SOURCE_TOPIC"],
+        "links": os.environ["LINKS_SOURCE_TOPIC"],
+        "authorities": os.environ["AUTHORITIES_SOURCE_TOPIC"],
+        "seditions": os.environ["SEDITIONS_SOURCE_TOPIC"],
+        "countries": os.environ["COUNTRIES_SOURCE_TOPIC"],
+        "rubrics": os.environ["RUBRICS_SOURCE_TOPIC"],
+        "languages": os.environ["LANGUAGES_SOURCE_TOPIC"],
     }
 
 

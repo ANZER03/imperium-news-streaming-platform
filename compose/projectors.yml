@@ -1,0 +1,49 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - imperium-net
+
+services:
+  imperium-redis-projector:
+    <<: *service-defaults
+    build:
+      context: ../apps/processing/news-pipeline/jobs/projections
+    container_name: imperium-redis-projector
+    hostname: imperium-redis-projector
+    profiles:
+      - projectors
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_GROUP_ID: ${REDIS_PROJECTOR_GROUP_ID:-imperium-redis-projector-group-v2}
+    command: ["python", "redis_projector.py"]
+
+  imperium-postgres-projector:
+    <<: *service-defaults
+    build:
+      context: ../apps/processing/news-pipeline/jobs/projections
+    container_name: imperium-postgres-projector
+    hostname: imperium-postgres-projector
+    profiles:
+      - projectors
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+    command: ["python", "postgres_projector.py"]
+
+  imperium-qdrant-projector:
+    <<: *service-defaults
+    build:
+      context: ../apps/processing/news-pipeline/jobs/projections
+    container_name: imperium-qdrant-projector
+    hostname: imperium-qdrant-projector
+    profiles:
+      - projectors
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: imperium_articles
+    command: ["python", "qdrant_projector.py"]

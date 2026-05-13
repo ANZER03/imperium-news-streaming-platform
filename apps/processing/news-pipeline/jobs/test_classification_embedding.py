@@ -12,7 +12,7 @@ import urllib.request
 import psycopg
 
 DSN = os.environ.get(
-    "PHASE3_POSTGRES_DSN",
+    "POSTGRES_DSN",
     "postgresql://postgres:postgres@localhost:35432/imperium-news-source",
 )
 LLAMA_URL = os.environ.get("LLAMA_CPP_BASE_URL", "http://llama-cpp:8080")
