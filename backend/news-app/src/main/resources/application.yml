@@ -45,3 +45,12 @@ management:
   endpoint:
     health:
       show-details: always
+
+feed:
+  inject-page-max: 5
+  inject-per-topic: 3
+  scroll-per-topic: 12
+  seek-max-iterations: 4
+  max-topics-per-request: 64
+  scroll-batch-multiplier: 1.5
+  weight-scale: 0.0

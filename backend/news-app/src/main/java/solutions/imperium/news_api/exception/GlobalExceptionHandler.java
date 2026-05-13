@@ -12,4 +12,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleArticleNotFound(CustomExceptions.ArticleNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
+
+    @ExceptionHandler(CustomExceptions.FeedRequestInProgressException.class)
+    public ResponseEntity<String> handleFeedRequestInProgress(CustomExceptions.FeedRequestInProgressException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
 }

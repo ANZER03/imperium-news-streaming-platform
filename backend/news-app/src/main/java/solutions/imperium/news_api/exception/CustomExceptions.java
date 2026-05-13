@@ -6,4 +6,10 @@ public class CustomExceptions {
             super("Article not found: " + articleId);
         }
     }
+
+    public static class FeedRequestInProgressException extends RuntimeException {
+        public FeedRequestInProgressException(String sessionId) {
+            super("Feed request already in progress for session: " + sessionId);
+        }
+    }
 }

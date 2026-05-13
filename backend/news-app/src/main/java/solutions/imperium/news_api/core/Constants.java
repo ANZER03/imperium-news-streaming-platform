@@ -3,6 +3,9 @@ package solutions.imperium.news_api.core;
 public class Constants {
     public static final String KEY_USER_PREFS = "user:%s:prefs"; // %s is userId
     public static final String KEY_USER_VIEWED = "user:%s:viewed";
+    public static final String KEY_USER_VIEWED_BLOOM = "bf:user:%s:viewed";
+    public static final String KEY_FEED_SESSION = "session:%s:%s";
+    public static final String KEY_FEED_SESSION_LOCK = "lock:%s:%s";
     public static final String KEY_FEED_TOPIC = "feed:topic:%s";
     public static final String KEY_NEWS_HASH = "news:%s";
     public static final String KEY_TOPICS_LIST = "topics:list"; // cached topic taxonomy
