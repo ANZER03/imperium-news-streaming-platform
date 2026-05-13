@@ -1,4 +1,5 @@
 import os
+import zlib
 import time
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Tuple
@@ -58,6 +59,12 @@ def ttl_from_crawled_at(crawled_at: Any) -> int:
 def get_redis_client():
     url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
     return redis.Redis.from_url(url, decode_responses=True)
+
+def _score_with_tiebreak(base_score: float, article_id: str) -> float:
+    """Add a deterministic microsecond offset (1-999) derived from article_id to break score ties."""
+    micro = (zlib.crc32(article_id.encode()) % 999) + 1
+    return base_score + micro / 1_000_000.0
+
 
 def parse_iso_or_ts(val: Any) -> float:
     """Returns unix timestamp from integer or ISO string."""
@@ -196,7 +203,10 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
                 pipeline.expire(hash_key, ttl)
 
                 # Feeds
-                score = parse_iso_or_ts(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at")))
+                score = _score_with_tiebreak(
+                    parse_iso_or_ts(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at"))),
+                    article_id_str
+                )
 
                 global_feed = "feed:global"
                 pipeline.zadd(global_feed, {article_id_str: score})
@@ -244,7 +254,10 @@ def process_batch(messages: List[Message], r: redis.Redis, avro_deserializer):
                 pipeline.expire(hash_key, ttl)
 
                 if root_topic_id:
-                    score = parse_iso_or_ts(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at"), data.get("classified_at")))
+                    score = _score_with_tiebreak(
+                        parse_iso_or_ts(get_first_valid_timestamp(data.get("published_at"), data.get("crawled_at"), data.get("processed_at"), data.get("classified_at"))),
+                        article_id_str
+                    )
                     effective_country_id = int(raw_country_id) if raw_country_id is not None else 0
 
                     topic_feed = f"feed:topic:{root_topic_id}"

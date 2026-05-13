@@ -119,7 +119,7 @@ smoke-test:
 
 redis-projector-reset:
 	@echo "==> Stopping redis projector..."
-	$(COMPOSE) --profile processing stop imperium-redis-projector
+	$(COMPOSE) --profile projectors stop imperium-redis-projector
 	@echo "==> Deleting Kafka consumer group..."
 	@GROUP=$$(grep REDIS_PROJECTOR_GROUP_ID $(ENV_FILE) | cut -d= -f2); \
 	docker exec imperium-kafka-1 kafka-consumer-groups \
@@ -136,7 +136,7 @@ redis-projector-reset:
 	@echo "==> Flushing Redis..."
 	docker exec imperium-redis redis-cli FLUSHALL
 	@echo "==> Building redis projector image..."
-	$(COMPOSE) --profile processing build imperium-redis-projector
+	$(COMPOSE) --profile projectors build imperium-redis-projector
 	@echo "==> Starting redis projector with new group..."
-	$(COMPOSE) --env-file $(ENV_FILE) --profile processing up -d imperium-redis-projector
+	$(COMPOSE) --env-file $(ENV_FILE) --profile projectors up -d imperium-redis-projector
 	@echo "==> Done. Follow logs with: docker logs -f imperium-redis-projector"
