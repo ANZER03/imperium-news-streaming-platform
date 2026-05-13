@@ -36,7 +36,7 @@ export const feedService = {
     userId: string,
     cursor?: number,
     sessionCursor?: number,
-    limit = 20
+    limit = 40
   ): Promise<{ data: Article[]; nextCursor: number | null; sessionCursor: number | null }> => {
     const params = new URLSearchParams({ userId, limit: String(limit) });
     if (cursor !== undefined) params.set('cursor', String(cursor));
@@ -51,7 +51,7 @@ export const feedService = {
     topicId: string,
     cursor?: number,
     sessionCursor?: number,
-    limit = 20
+    limit = 40
   ): Promise<{ data: Article[]; nextCursor: number | null; sessionCursor: number | null }> => {
     const params = new URLSearchParams({ userId, topicId, limit: String(limit) });
     if (cursor !== undefined) params.set('cursor', String(cursor));
@@ -65,7 +65,7 @@ export const feedService = {
     userId: string,
     cursor?: number,
     sessionCursor?: number,
-    limit = 20
+    limit = 40
   ): Promise<{ data: Article[]; nextCursor: number | null; sessionCursor: number | null }> => {
     const params = new URLSearchParams({ userId, limit: String(limit) });
     if (cursor !== undefined) params.set('cursor', String(cursor));

@@ -1,14 +1,14 @@
 server:
-  port: 8999
+  port: ${SERVER_PORT:8999}
 spring:
   application:
     name: news-app
   
   # R2DBC Reactive PostgreSQL
   r2dbc:
-    url: r2dbc:postgresql://localhost:35432/imperium-news-source
-    username: postgres
-    password: postgres
+    url: ${SPRING_R2DBC_URL:r2dbc:postgresql://localhost:35432/imperium-news-source}
+    username: ${SPRING_R2DBC_USERNAME:postgres}
+    password: ${SPRING_R2DBC_PASSWORD:postgres}
     pool:
       initial-size: 5
       max-size: 20
@@ -16,19 +16,19 @@ spring:
   # Reactive Redis
   data:
     redis:
-      host: localhost
-      port: 46379
-      password: 
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:46379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
       timeout: 2000ms
 
   # Spring AI / Qdrant
   ai:
     vectorstore:
       qdrant:
-        host: localhost
-        port: 46334 # gRPC port for Qdrant
-        api-key: 
-        collection-name: imperium_articles
+        host: ${SPRING_AI_VECTORSTORE_QDRANT_HOST:localhost}
+        port: ${SPRING_AI_VECTORSTORE_QDRANT_PORT:46334} # gRPC port for Qdrant
+        api-key: ${SPRING_AI_VECTORSTORE_QDRANT_API_KEY:}
+        collection-name: ${SPRING_AI_VECTORSTORE_QDRANT_COLLECTION_NAME:imperium_articles}
 
   # Exclude Spring AI Auto-configurations
   autoconfigure:

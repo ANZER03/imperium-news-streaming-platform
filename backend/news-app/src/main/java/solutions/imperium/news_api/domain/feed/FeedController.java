@@ -23,7 +23,7 @@ public class FeedController {
             @RequestParam(required = false) String sessionId,
             @RequestParam(required = false) Long cursor,
             @RequestParam(required = false) Long sessionCursor,
-            @RequestParam(defaultValue = "20") int limit) {
+            @RequestParam(defaultValue = "40") int limit) {
         return feedService.generateFeed(userId, sessionId, cursor, sessionCursor, limit);
     }
 
@@ -35,7 +35,7 @@ public class FeedController {
             @RequestParam(required = false) String sessionId,
             @RequestParam(required = false) Long cursor,
             @RequestParam(required = false) Long sessionCursor,
-            @RequestParam(defaultValue = "20") int limit) {
+            @RequestParam(defaultValue = "40") int limit) {
         return feedService.getByTopic(userId, topicId, sessionId, cursor, sessionCursor, limit);
     }
 
@@ -46,7 +46,7 @@ public class FeedController {
             @RequestParam(required = false) String sessionId,
             @RequestParam(required = false) Long cursor,
             @RequestParam(required = false) Long sessionCursor,
-            @RequestParam(defaultValue = "20") int limit) {
+            @RequestParam(defaultValue = "40") int limit) {
         return feedService.getLatest(userId, sessionId, cursor, sessionCursor, limit);
     }
 

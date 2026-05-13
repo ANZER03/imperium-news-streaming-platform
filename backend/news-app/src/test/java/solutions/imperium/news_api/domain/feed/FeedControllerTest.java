@@ -19,6 +19,8 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -110,5 +112,18 @@ class FeedControllerTest {
                 .expectStatus().isEqualTo(409)
                 .expectBody(String.class)
                 .isEqualTo("Feed request already in progress for session: sess-1");
+    }
+
+    @Test
+    void testGetFeedUsesDefaultLimitOfForty() {
+        when(feedService.generateFeed(eq("user123"), any(), any(), any(), eq(40)))
+                .thenReturn(Mono.just(new PageResult<>(List.of(), null)));
+
+        webTestClient.get()
+                .uri("/api/v1/feed?userId=user123")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(feedService).generateFeed(eq("user123"), any(), any(), any(), eq(40));
     }
 }

@@ -661,6 +661,23 @@ spring:
 java -jar target/news-app-0.0.1-SNAPSHOT.jar
 ```
 
+### Docker
+
+From the repo root, build and run the backend plus its required services in one command:
+
+```bash
+make backend-app-up
+```
+
+This command now manages only the backend container. Start shared dependencies separately if you need them, then call the API at `http://localhost:8999`.
+
+Useful follow-ups:
+
+```bash
+make backend-app-logs
+make backend-app-down
+```
+
 **Quick smoke test:**
 ```bash
 # 1. Get countries

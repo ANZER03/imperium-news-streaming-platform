@@ -7,6 +7,7 @@ include:
   - compose/spark-drivers.yml
   - compose/projectors.yml
   - compose/serving.yml
+  - compose/backend.yml
   - compose/ui.yml
 
 networks:

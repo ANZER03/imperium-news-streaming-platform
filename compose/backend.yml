@@ -1,0 +1,31 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - imperium-net
+
+services:
+  news-app:
+    <<: *service-defaults
+    build:
+      context: ../backend/news-app
+      dockerfile: Dockerfile
+    container_name: imperium-news-app
+    hostname: news-app
+    profiles:
+      - backend-app
+    ports:
+      - "8999:8999"
+    environment:
+      SERVER_PORT: 8999
+      SPRING_R2DBC_URL: r2dbc:postgresql://news-source-db:5432/imperium-news-source
+      SPRING_R2DBC_USERNAME: postgres
+      SPRING_R2DBC_PASSWORD: postgres
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_AI_VECTORSTORE_QDRANT_HOST: qdrant
+      SPRING_AI_VECTORSTORE_QDRANT_PORT: 6334
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8999/actuator/health | grep '\"status\":\"UP\"' > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
