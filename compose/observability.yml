@@ -1,0 +1,113 @@
+x-service-defaults: &service-defaults
+  restart: "no"
+  networks:
+    - imperium-net
+
+services:
+  clickhouse:
+    <<: *service-defaults
+    image: clickhouse/clickhouse-server:latest
+    container_name: imperium-obs-clickhouse
+    hostname: clickhouse
+    profiles:
+      - observability
+    ports:
+      - "${OBS_CLICKHOUSE_HTTP_PORT:-48123}:8123"
+      - "${OBS_CLICKHOUSE_NATIVE_PORT:-49000}:9000"
+    environment:
+      CLICKHOUSE_USER: ${OBS_CLICKHOUSE_USER:-admin}
+      CLICKHOUSE_PASSWORD: ${OBS_CLICKHOUSE_PASSWORD:-clickstack123}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - observability-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  hyperdx-mongo:
+    <<: *service-defaults
+    image: mongo:5.0.32-focal
+    container_name: imperium-obs-hyperdx-mongo
+    hostname: hyperdx-mongo
+    profiles:
+      - observability
+    volumes:
+      - observability-hyperdx-mongo-data:/data/db
+
+  hyperdx:
+    <<: *service-defaults
+    image: docker.hyperdx.io/hyperdx/hyperdx:latest
+    container_name: imperium-obs-hyperdx
+    hostname: hyperdx
+    profiles:
+      - observability
+    ports:
+      - "${OBS_HYPERDX_PORT:-48091}:8080"
+    environment:
+      MONGO_URI: "mongodb://hyperdx-mongo:27017/hyperdx"
+      FRONTEND_URL: "http://localhost:${OBS_HYPERDX_PORT:-48091}"
+      HYPERDX_API_KEY: ${OBS_HYPERDX_API_KEY:-imperium-local-dev}
+      DEFAULT_CONNECTIONS: '[{"name":"Imperium ClickHouse","host":"http://clickhouse:8123","username":"${OBS_CLICKHOUSE_USER:-admin}","password":"${OBS_CLICKHOUSE_PASSWORD:-clickstack123}"}]'
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      hyperdx-mongo:
+        condition: service_started
+
+  otel-collector:
+    <<: *service-defaults
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: imperium-obs-otel-collector
+    hostname: otel-collector
+    profiles:
+      - observability
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      CLICKHOUSE_USER: ${OBS_CLICKHOUSE_USER:-admin}
+      CLICKHOUSE_PASSWORD: ${OBS_CLICKHOUSE_PASSWORD:-clickstack123}
+    volumes:
+      - ${PWD}/obser/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "${OBS_OTEL_HEALTH_PORT:-48133}:13133"
+      - "${OBS_OTEL_GRPC_PORT:-4327}:4317"
+      - "${OBS_OTEL_HTTP_PORT:-4318}:4318"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:13133 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  grafana:
+    <<: *service-defaults
+    image: grafana/grafana-oss:latest
+    container_name: imperium-obs-grafana
+    hostname: grafana
+    profiles:
+      - observability
+    ports:
+      - "${OBS_GRAFANA_PORT:-48092}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: grafana123
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_LOG_LEVEL: warn
+    volumes:
+      - observability-grafana-data:/var/lib/grafana
+      - ${PWD}/obser/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ${PWD}/obser/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10

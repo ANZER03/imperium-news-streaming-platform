@@ -1,0 +1,40 @@
+apiVersion: 1
+
+datasources:
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    uid: clickhouse-obs
+    isDefault: true
+    editable: true
+    jsonData:
+      host: clickhouse
+      port: 9000
+      protocol: native
+      username: admin
+      defaultDatabase: default
+      tlsSkipVerify: true
+      logs:
+        defaultDatabase: default
+        defaultTable: otel_logs
+        otelEnabled: true
+        otelVersion: latest
+        timeColumn: Timestamp
+        levelColumn: SeverityText
+        messageColumn: Body
+      traces:
+        defaultDatabase: default
+        defaultTable: otel_traces
+        otelEnabled: true
+        otelVersion: latest
+        traceIdColumn: TraceId
+        spanIdColumn: SpanId
+        operationNameColumn: SpanName
+        parentSpanIdColumn: ParentSpanId
+        serviceNameColumn: ServiceName
+        durationColumn: Duration
+        durationUnit: nanoseconds
+        startTimeColumn: Timestamp
+        tagsColumn: SpanAttributes
+        serviceTagsColumn: ResourceAttributes
+    secureJsonData:
+      password: clickstack123

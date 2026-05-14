@@ -24,6 +24,17 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_AI_VECTORSTORE_QDRANT_HOST: qdrant
       SPRING_AI_VECTORSTORE_QDRANT_PORT: 6334
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: news-app
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=imperium-local,service.namespace=backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
+    volumes:
+      - ${PWD}/obser/otel/otel-javaagent.jar:/otel/otel-javaagent.jar:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8999/actuator/health | grep '\"status\":\"UP\"' > /dev/null"]
       interval: 10s
