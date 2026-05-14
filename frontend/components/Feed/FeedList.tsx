@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { feedService, bookmarkService } from '@/lib/services';
+import type { FeedPage } from '@/lib/services/feed.service';
 import { Article } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { NewsCard } from './NewsCard';
@@ -16,22 +17,21 @@ export function FeedList() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<number | null | undefined>(undefined);
-  const [sessionCursor, setSessionCursor] = useState<number | null | undefined>(undefined);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const observerTarget = useRef<HTMLDivElement>(null);
   const activeKey = useRef('');
 
-  const fetchFeed = useCallback(async (cursor?: number, sessCursor?: number) => {
+  const fetchFeed = useCallback(async (sid?: string): Promise<FeedPage | null> => {
     if (!userId) return null;
     try {
       if (activeTopic === 'All') {
-        return await feedService.getFeed(userId, cursor, sessCursor);
+        return await feedService.getFeed(userId, sid);
       }
       if (activeTopic === 'Latest') {
-        return await feedService.getLatest(userId, cursor, sessCursor);
+        return await feedService.getLatest(userId, sid);
       }
-      return await feedService.getByTopic(userId, resolveTopicId(activeTopic), cursor, sessCursor);
+      return await feedService.getByTopic(userId, resolveTopicId(activeTopic), sid);
     } catch (err) {
       console.error('Feed fetch failed', err);
       return null;
@@ -70,16 +70,14 @@ export function FeedList() {
 
     setLoading(true);
     setArticles([]);
-    setNextCursor(undefined);
-    setSessionCursor(undefined);
+    setSessionId(undefined);
     setHasMore(true);
 
-    fetchFeed(undefined, undefined).then(res => {
+    fetchFeed(undefined).then(res => {
       if (!res || activeKey.current !== key) return;
       setArticles(res.data);
-      setNextCursor(res.nextCursor);
-      setSessionCursor(res.sessionCursor);
-      setHasMore(res.nextCursor !== null);
+      setSessionId(res.sessionId);
+      setHasMore(res.hasMore);
     }).finally(() => {
       if (activeKey.current === key) setLoading(false);
     });
@@ -87,35 +85,33 @@ export function FeedList() {
   }, [userId, activeView, activeTopic]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || nextCursor === undefined || nextCursor === null) return;
+    if (loadingMore || !hasMore || !sessionId) return;
     if (activeView !== 'feed') return;
     setLoadingMore(true);
-    const res = await fetchFeed(nextCursor, sessionCursor ?? undefined);
+    const res = await fetchFeed(sessionId);
     if (res) {
       setArticles(prev => {
         const existingIds = new Set(prev.map(a => a.id));
         const fresh = res.data.filter(a => !existingIds.has(a.id));
         return [...prev, ...fresh];
       });
-      setNextCursor(res.nextCursor);
-      setHasMore(res.nextCursor !== null);
+      setSessionId(res.sessionId);
+      setHasMore(res.hasMore);
     }
     setLoadingMore(false);
-  }, [loadingMore, hasMore, nextCursor, sessionCursor, activeView, fetchFeed]);
+  }, [loadingMore, hasMore, sessionId, activeView, fetchFeed]);
 
   const handleRefresh = useCallback(() => {
     if (!userId || activeView !== 'feed') return;
     setLoading(true);
     setArticles([]);
-    setNextCursor(undefined);
-    setSessionCursor(undefined);
+    setSessionId(undefined);
     setHasMore(true);
-    fetchFeed(undefined, undefined).then(res => {
+    fetchFeed(undefined).then(res => {
       if (!res) return;
       setArticles(res.data);
-      setNextCursor(res.nextCursor);
-      setSessionCursor(res.sessionCursor);
-      setHasMore(res.nextCursor !== null);
+      setSessionId(res.sessionId);
+      setHasMore(res.hasMore);
     }).finally(() => setLoading(false));
   }, [userId, activeView, fetchFeed]);
 

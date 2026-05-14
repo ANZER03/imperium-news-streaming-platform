@@ -54,3 +54,20 @@ feed:
   max-topics-per-request: 64
   scroll-batch-multiplier: 1.5
   weight-scale: 0.0
+  v2:
+    page-size-default: 40
+    page-size-min: 5
+    page-size-max: 50
+    inject-page-max: 5
+    inject-per-topic: 3
+    scroll-per-topic: 25
+    seek-max-iterations: 3
+    max-topics-per-request: 64
+    weight-scale: 0.0
+    session-ttl-hours: 12
+    session-idle-threshold-hours: 4
+    lock-ttl-ms: 1500
+    hydration-concurrency: 32
+    seen:
+      ttl-days: 14
+      prune-on-write: true

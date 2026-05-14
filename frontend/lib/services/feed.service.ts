@@ -2,10 +2,15 @@ import { fetchApi } from '../api-client';
 import { Article } from '../types';
 import { normalizeImageUrl } from '../utils/image';
 
-interface FeedResponse {
+interface FeedV2Response {
   data: BackendArticleCard[];
-  nextCursor: number | null;
-  sessionCursor: number | null;
+  sessionId: string;
+  sessionAnchor: number | null;
+  nextScrollCursor: number | null;
+  source: 'primary' | 'fallback' | 'mixed';
+  hasMore: boolean;
+  newSinceLastSession: number | null;
+  warnings: string[] | null;
 }
 
 // Field names match the Java @JsonProperty annotations (snake_case in HTTP response)
@@ -17,6 +22,15 @@ interface BackendArticleCard {
   source_name: string;
   published_at: number;
   root_topic_label: string;
+}
+
+export interface FeedPage {
+  data: Article[];
+  sessionId: string;
+  hasMore: boolean;
+  source: 'primary' | 'fallback' | 'mixed';
+  newSinceLastSession: number;
+  warnings: string[];
 }
 
 function mapCard(card: BackendArticleCard): Article {
@@ -31,47 +45,40 @@ function mapCard(card: BackendArticleCard): Article {
   };
 }
 
+function toPage(res: FeedV2Response): FeedPage {
+  return {
+    data: res.data.map(mapCard),
+    sessionId: res.sessionId,
+    hasMore: res.hasMore,
+    source: res.source,
+    newSinceLastSession: res.newSinceLastSession ?? 0,
+    warnings: res.warnings ?? [],
+  };
+}
+
+function buildParams(userId: string, sessionId: string | undefined, limit: number, extras?: Record<string, string>) {
+  const params = new URLSearchParams({ userId, limit: String(limit) });
+  if (sessionId) params.set('sessionId', sessionId);
+  if (extras) for (const [k, v] of Object.entries(extras)) params.set(k, v);
+  return params;
+}
+
 export const feedService = {
-  getFeed: async (
-    userId: string,
-    cursor?: number,
-    sessionCursor?: number,
-    limit = 40
-  ): Promise<{ data: Article[]; nextCursor: number | null; sessionCursor: number | null }> => {
-    const params = new URLSearchParams({ userId, limit: String(limit) });
-    if (cursor !== undefined) params.set('cursor', String(cursor));
-    if (sessionCursor !== undefined) params.set('sessionCursor', String(sessionCursor));
-
-    const res = await fetchApi<FeedResponse>(`/api/v1/feed?${params}`);
-    return { data: res.data.map(mapCard), nextCursor: res.nextCursor, sessionCursor: res.sessionCursor };
+  getFeed: async (userId: string, sessionId?: string, limit = 40): Promise<FeedPage> => {
+    const params = buildParams(userId, sessionId, limit);
+    const res = await fetchApi<FeedV2Response>(`/api/v2/feed?${params}`);
+    return toPage(res);
   },
 
-  getByTopic: async (
-    userId: string,
-    topicId: string,
-    cursor?: number,
-    sessionCursor?: number,
-    limit = 40
-  ): Promise<{ data: Article[]; nextCursor: number | null; sessionCursor: number | null }> => {
-    const params = new URLSearchParams({ userId, topicId, limit: String(limit) });
-    if (cursor !== undefined) params.set('cursor', String(cursor));
-    if (sessionCursor !== undefined) params.set('sessionCursor', String(sessionCursor));
-
-    const res = await fetchApi<FeedResponse>(`/api/v1/feed/topic?${params}`);
-    return { data: res.data.map(mapCard), nextCursor: res.nextCursor, sessionCursor: res.sessionCursor };
+  getByTopic: async (userId: string, topicId: string, sessionId?: string, limit = 40): Promise<FeedPage> => {
+    const params = buildParams(userId, sessionId, limit, { topicId });
+    const res = await fetchApi<FeedV2Response>(`/api/v2/feed/topic?${params}`);
+    return toPage(res);
   },
 
-  getLatest: async (
-    userId: string,
-    cursor?: number,
-    sessionCursor?: number,
-    limit = 40
-  ): Promise<{ data: Article[]; nextCursor: number | null; sessionCursor: number | null }> => {
-    const params = new URLSearchParams({ userId, limit: String(limit) });
-    if (cursor !== undefined) params.set('cursor', String(cursor));
-    if (sessionCursor !== undefined) params.set('sessionCursor', String(sessionCursor));
-
-    const res = await fetchApi<FeedResponse>(`/api/v1/feed/latest?${params}`);
-    return { data: res.data.map(mapCard), nextCursor: res.nextCursor, sessionCursor: res.sessionCursor };
+  getLatest: async (userId: string, sessionId?: string, limit = 40): Promise<FeedPage> => {
+    const params = buildParams(userId, sessionId, limit);
+    const res = await fetchApi<FeedV2Response>(`/api/v2/feed/latest?${params}`);
+    return toPage(res);
   },
 };
