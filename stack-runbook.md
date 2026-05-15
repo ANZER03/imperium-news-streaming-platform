@@ -191,6 +191,71 @@ docker-compose --profile backbone --profile serving --profile ui up -d
 
 ---
 
+## Feed v2 Local Verification
+
+Use this after the `serving` profile is up and Redis is running with the Stack image.
+
+### 1. Run the live Redis Stack aggregation test
+
+```bash
+cd backend/news-app
+./mvnw -Dtest=FeedRepositoryRedisStackIntegrationTest test
+```
+
+Expected result:
+- the test passes against the local Redis Stack instance
+- if Redis is not reachable, the test is skipped by its reachability guard
+
+### 2. Start the news API locally
+
+```bash
+cd backend/news-app
+./mvnw spring-boot:run
+```
+
+The API should be reachable at `http://localhost:8999`.
+
+### 3. Seed a temporary personalized user
+
+```bash
+docker exec imperium-redis redis-cli HSET 'user:e2e-v2-user:prefs' topics '["business_economy"]' country_id '7' topic_prefs_version '1'
+```
+
+This creates a minimal personalized feed scope on top of existing live feed data.
+
+### 4. Exercise the real feed endpoints
+
+```bash
+curl -s 'http://localhost:8999/api/v1/feed?userId=e2e-v2-user&limit=5'
+curl -s 'http://localhost:8999/api/v1/feed/topic?userId=e2e-v2-user&topicId=business_economy&limit=5'
+curl -s 'http://localhost:8999/api/v1/feed/latest?userId=e2e-v2-user&limit=5'
+```
+
+Expected result:
+- all three endpoints return `200`
+- responses include `sessionId`, `sessionAnchor`, `nextScrollCursor`, `source`, `hasMore`, and `newSinceLastSession`
+- `/api/v1/feed` returns `source="primary"` when personalized topic feed data exists
+
+### 5. Verify pagination reuses the same session
+
+Run the first request and capture `sessionId`, then call `/api/v1/feed` again with that `sessionId`.
+
+Expected result:
+- the same `sessionId` is reused
+- the second page advances `nextScrollCursor`
+- served article IDs do not overlap across the two pages
+
+### 6. Clean up temporary keys
+
+```bash
+docker exec imperium-redis redis-cli DEL 'user:e2e-v2-user:prefs' 'bf:user:e2e-v2-user:viewed'
+docker exec imperium-redis sh -lc "redis-cli --scan --pattern 'session:e2e-v2-user:*' | xargs -r redis-cli DEL"
+```
+
+Use a different test user if you want to preserve an earlier session for inspection.
+
+---
+
 ## Bringing the Stack Down
 
 ### Tear down all profiles at once

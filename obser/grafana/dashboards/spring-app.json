@@ -1,0 +1,138 @@
+{
+  "uid": "spring-app",
+  "title": "Spring Application",
+  "tags": ["spring", "http", "traces"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "title": "Total Requests",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT count() as value FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND Timestamp >= now() - INTERVAL 3 HOUR", "format": "table" }]
+    },
+    {
+      "id": 2, "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "title": "Error Rate %",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":1},{"color":"red","value":5}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT round(100.0 * countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) / count(), 2) as value FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND Timestamp >= now() - INTERVAL 3 HOUR", "format": "table" }]
+    },
+    {
+      "id": 3, "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "title": "P95 Latency (ms)",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":500},{"color":"red","value":1000}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT round(quantile(0.95)(Duration / 1000000), 2) as value FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND Timestamp >= now() - INTERVAL 3 HOUR", "format": "table" }]
+    },
+    {
+      "id": 4, "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "title": "Success Rate %",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"red","value":0},{"color":"yellow","value":95},{"color":"green","value":99}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT round(100.0 * countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) < 500) / count(), 2) as value FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND Timestamp >= now() - INTERVAL 3 HOUR", "format": "table" }]
+    },
+    {
+      "id": 5, "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "title": "JVM Threads",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":50},{"color":"red","value":100}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT max(Value) as value FROM otel_metrics_sum WHERE ServiceName = 'news-app' AND MetricName = 'jvm.thread.count' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 6, "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "title": "Loaded Classes",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT max(Value) as value FROM otel_metrics_sum WHERE ServiceName = 'news-app' AND MetricName = 'jvm.class.count' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 7, "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "title": "Request Rate Over Time (req/min)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(Timestamp) as time, count() as `requests/min` FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND $__timeFilter(Timestamp) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 8, "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "title": "Latency Percentiles Over Time (ms)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(Timestamp) as time, round(quantileIf(0.50)(Duration / 1000000, 1=1), 2) as p50, round(quantileIf(0.95)(Duration / 1000000, 1=1), 2) as p95, round(quantileIf(0.99)(Duration / 1000000, 1=1), 2) as p99 FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND $__timeFilter(Timestamp) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 9, "gridPos": { "x": 0, "y": 12, "w": 24, "h": 8 },
+      "title": "Top Endpoints — Latency & Error Rate",
+      "type": "table",
+      "options": { "sortBy": [{ "displayName": "p99_ms", "desc": true }] },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT SpanAttributes['http.request.method'] as method, SpanAttributes['http.route'] as endpoint, count() as request_count, round(quantile(0.50)(Duration / 1000000), 2) as p50_ms, round(quantile(0.95)(Duration / 1000000), 2) as p95_ms, round(quantile(0.99)(Duration / 1000000), 2) as p99_ms, round(100.0 * countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) / count(), 2) as error_rate_pct FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND $__timeFilter(Timestamp) GROUP BY method, endpoint ORDER BY p99_ms DESC LIMIT 20", "format": "table" }]
+    },
+    {
+      "id": 10, "gridPos": { "x": 0, "y": 20, "w": 24, "h": 8 },
+      "title": "Error Endpoints — Top by Error Count",
+      "type": "table",
+      "options": { "sortBy": [{ "displayName": "errors", "desc": true }] },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT SpanAttributes['http.route'] as endpoint, SpanAttributes['http.request.method'] as method, count() as total_requests, countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) as errors, round(100.0 * countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) / count(), 2) as error_pct FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND $__timeFilter(Timestamp) AND endpoint != '' GROUP BY endpoint, method HAVING errors > 0 ORDER BY errors DESC LIMIT 20", "format": "table" }]
+    },
+    {
+      "id": 11, "gridPos": { "x": 0, "y": 28, "w": 8, "h": 7 },
+      "title": "HTTP Status Code Distribution",
+      "type": "piechart",
+      "options": { "legend": { "displayMode": "list", "placement": "right" } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT countIf(SpanAttributes['http.response.status_code']='200') as `HTTP 200`, countIf(SpanAttributes['http.response.status_code']='201') as `HTTP 201`, countIf(SpanAttributes['http.response.status_code']='204') as `HTTP 204`, countIf(SpanAttributes['http.response.status_code']='400') as `HTTP 400`, countIf(SpanAttributes['http.response.status_code']='401') as `HTTP 401`, countIf(SpanAttributes['http.response.status_code']='403') as `HTTP 403`, countIf(SpanAttributes['http.response.status_code']='404') as `HTTP 404`, countIf(SpanAttributes['http.response.status_code']='500') as `HTTP 500`, countIf(SpanAttributes['http.response.status_code']='502') as `HTTP 502`, countIf(SpanAttributes['http.response.status_code']='503') as `HTTP 503` FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND $__timeFilter(Timestamp)", "format": "table" }]
+    },
+    {
+      "id": 12, "gridPos": { "x": 8, "y": 28, "w": 8, "h": 7 },
+      "title": "HTTP Method Distribution",
+      "type": "piechart",
+      "options": { "legend": { "displayMode": "list", "placement": "right" } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT countIf(SpanAttributes['http.request.method']='GET') as GET, countIf(SpanAttributes['http.request.method']='POST') as POST, countIf(SpanAttributes['http.request.method']='PUT') as PUT, countIf(SpanAttributes['http.request.method']='DELETE') as DELETE, countIf(SpanAttributes['http.request.method']='PATCH') as PATCH FROM otel_traces WHERE ServiceName = 'news-app' AND SpanKind = 'Server' AND $__timeFilter(Timestamp)", "format": "table" }]
+    },
+    {
+      "id": 13, "gridPos": { "x": 16, "y": 28, "w": 8, "h": 7 },
+      "title": "HTTP Duration by Endpoint (avg ms)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, concat(Attributes['http.request.method'], ' ', Attributes['http.route']) as metric, round(avg(Sum / Count) * 1000, 2) as value FROM otel_metrics_histogram WHERE ServiceName = 'news-app' AND MetricName = 'http.server.request.duration' AND Count > 0 AND $__timeFilter(TimeUnix) GROUP BY time, metric ORDER BY time", "format": "table" }],
+      "transformations": [{ "id": "prepareTimeSeries", "options": { "strategy": "wideSeries" } }]
+    },
+    {
+      "id": 14, "gridPos": { "x": 0, "y": 35, "w": 12, "h": 8 },
+      "title": "JVM Heap & Non-Heap Memory (GB)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "decgbytes", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(sumIf(Value, Attributes['jvm.memory.type']='heap') / 1073741824, 3) as `heap`, round(sumIf(Value, Attributes['jvm.memory.type']='non_heap') / 1073741824, 3) as `non-heap` FROM otel_metrics_sum WHERE ServiceName = 'news-app' AND MetricName = 'jvm.memory.used' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 15, "gridPos": { "x": 12, "y": 35, "w": 12, "h": 8 },
+      "title": "JVM GC Duration Over Time (avg ms)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "lineWidth": 2 }, "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":50},{"color":"red","value":200}] } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avg(Sum / Count) * 1000, 2) as `avg-gc-ms` FROM otel_metrics_histogram WHERE ServiceName = 'news-app' AND MetricName = 'jvm.gc.duration' AND Count > 0 AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 16, "gridPos": { "x": 0, "y": 43, "w": 12, "h": 8 },
+      "title": "JVM Thread Count Over Time",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, max(Value) as threads FROM otel_metrics_sum WHERE ServiceName = 'news-app' AND MetricName = 'jvm.thread.count' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 17, "gridPos": { "x": 12, "y": 43, "w": 12, "h": 8 },
+      "title": "Error Logs (WARN / ERROR)",
+      "type": "logs",
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "showTime": true },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT Timestamp as timestamp, Body as body, SeverityText as level, ServiceName FROM otel_logs WHERE ServiceName = 'news-app' AND SeverityText IN ('WARN','ERROR') AND $__timeFilter(Timestamp) ORDER BY Timestamp DESC LIMIT 200", "format": "logs" }]
+    },
+    {
+      "id": 18, "gridPos": { "x": 0, "y": 51, "w": 24, "h": 7 },
+      "title": "Application Logs",
+      "type": "logs",
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "showTime": true },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT Timestamp as timestamp, Body as body, SeverityText as level, ServiceName FROM otel_logs WHERE ServiceName = 'news-app' AND $__timeFilter(Timestamp) ORDER BY Timestamp DESC LIMIT 200", "format": "logs" }]
+    }
+  ]
+}

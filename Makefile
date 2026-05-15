@@ -5,7 +5,9 @@ ENV_FILE ?= .env
 PROCESSING_SERVICES := imperium-canonical-enrichment-driver imperium-classification-driver imperium-redis-projector imperium-postgres-projector imperium-qdrant-projector
 
 BACKEND_SERVICES := kafka kafka-broker-2 schema-registry news-source-db redis qdrant imperium-redis-projector imperium-postgres-projector imperium-qdrant-projector redis-ui
-BACKEND_PROFILES := --profile backbone --profile source --profile serving --profile processing
+BACKEND_PROFILES := --profile backbone --profile source --profile serving --profile projectors --profile ui
+BACKEND_APP_PROFILES := --profile backend-app
+BACKEND_APP_SERVICE := news-app
 
 .PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test \
         cdc-up cdc-down cdc-clean cdc-verify cdc-validate cdc-reset-and-verify \
@@ -13,7 +15,8 @@ BACKEND_PROFILES := --profile backbone --profile source --profile serving --prof
         processing-up processing-logs processing-validate processing-fresh-reset \
         source-db-init source-db-refresh source-db-temp-sink \
         clone-news clone-bulk clone-schedule seed-redis seed-import-csv \
-        clean-all-from-source redis-projector-reset backend-up backend-down backend-logs
+        clean-all-from-source redis-projector-reset backend-up backend-down backend-logs \
+        backend-app-up backend-app-down backend-app-logs
 
 # ─── Infrastructure ────────────────────────────────────────────────────────────
 infra-config:
@@ -112,6 +115,15 @@ backend-down:
 
 backend-logs:
 	$(COMPOSE) --env-file $(ENV_FILE) $(BACKEND_PROFILES) logs -f $(BACKEND_SERVICES)
+
+backend-app-up:
+	$(COMPOSE) --env-file $(ENV_FILE) $(BACKEND_APP_PROFILES) up -d --build $(BACKEND_APP_SERVICE)
+
+backend-app-down:
+	$(COMPOSE) --env-file $(ENV_FILE) $(BACKEND_APP_PROFILES) stop $(BACKEND_APP_SERVICE)
+
+backend-app-logs:
+	$(COMPOSE) --env-file $(ENV_FILE) $(BACKEND_APP_PROFILES) logs -f $(BACKEND_APP_SERVICE)
 
 # ─── Utilities ─────────────────────────────────────────────────────────────────
 smoke-test:

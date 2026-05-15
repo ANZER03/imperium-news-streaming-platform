@@ -1,14 +1,14 @@
 server:
-  port: 8999
+  port: ${SERVER_PORT:8999}
 spring:
   application:
     name: news-app
   
   # R2DBC Reactive PostgreSQL
   r2dbc:
-    url: r2dbc:postgresql://localhost:35432/imperium-news-source
-    username: postgres
-    password: postgres
+    url: ${SPRING_R2DBC_URL:r2dbc:postgresql://localhost:35432/imperium-news-source}
+    username: ${SPRING_R2DBC_USERNAME:postgres}
+    password: ${SPRING_R2DBC_PASSWORD:postgres}
     pool:
       initial-size: 5
       max-size: 20
@@ -16,19 +16,19 @@ spring:
   # Reactive Redis
   data:
     redis:
-      host: localhost
-      port: 46379
-      password: 
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:46379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
       timeout: 2000ms
 
   # Spring AI / Qdrant
   ai:
     vectorstore:
       qdrant:
-        host: localhost
-        port: 46334 # gRPC port for Qdrant
-        api-key: 
-        collection-name: imperium_articles
+        host: ${SPRING_AI_VECTORSTORE_QDRANT_HOST:localhost}
+        port: ${SPRING_AI_VECTORSTORE_QDRANT_PORT:46334} # gRPC port for Qdrant
+        api-key: ${SPRING_AI_VECTORSTORE_QDRANT_API_KEY:}
+        collection-name: ${SPRING_AI_VECTORSTORE_QDRANT_COLLECTION_NAME:imperium_articles}
 
   # Exclude Spring AI Auto-configurations
   autoconfigure:
@@ -45,3 +45,29 @@ management:
   endpoint:
     health:
       show-details: always
+
+feed:
+  inject-page-max: 5
+  inject-per-topic: 3
+  scroll-per-topic: 12
+  seek-max-iterations: 4
+  max-topics-per-request: 64
+  scroll-batch-multiplier: 1.5
+  weight-scale: 0.0
+  v2:
+    page-size-default: 40
+    page-size-min: 5
+    page-size-max: 50
+    inject-page-max: 5
+    inject-per-topic: 3
+    scroll-per-topic: 25
+    seek-max-iterations: 3
+    max-topics-per-request: 64
+    weight-scale: 0.0
+    session-ttl-hours: 12
+    session-idle-threshold-hours: 4
+    lock-ttl-ms: 1500
+    hydration-concurrency: 32
+    seen:
+      ttl-days: 14
+      prune-on-write: true

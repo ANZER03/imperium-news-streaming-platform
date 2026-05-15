@@ -1,0 +1,42 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - imperium-net
+
+services:
+  news-app:
+    <<: *service-defaults
+    build:
+      context: ../backend/news-app
+      dockerfile: Dockerfile
+    container_name: imperium-news-app
+    hostname: news-app
+    profiles:
+      - backend-app
+    ports:
+      - "8999:8999"
+    environment:
+      SERVER_PORT: 8999
+      SPRING_R2DBC_URL: r2dbc:postgresql://news-source-db:5432/imperium-news-source
+      SPRING_R2DBC_USERNAME: postgres
+      SPRING_R2DBC_PASSWORD: postgres
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_AI_VECTORSTORE_QDRANT_HOST: qdrant
+      SPRING_AI_VECTORSTORE_QDRANT_PORT: 6334
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: news-app
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=imperium-local,service.namespace=backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
+    volumes:
+      - ${PWD}/obser/otel/otel-javaagent.jar:/otel/otel-javaagent.jar:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8999/actuator/health | grep '\"status\":\"UP\"' > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12

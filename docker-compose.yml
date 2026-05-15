@@ -7,6 +7,8 @@ include:
   - compose/spark-drivers.yml
   - compose/projectors.yml
   - compose/serving.yml
+  - compose/backend.yml
+  - compose/observability.yml
   - compose/ui.yml
 
 networks:
@@ -25,6 +27,12 @@ volumes:
     name: imperium-redis-data
   redisinsight-data:
     name: imperium-redisinsight-data
+  observability-clickhouse-data:
+    name: imperium-observability-clickhouse-data
+  observability-hyperdx-mongo-data:
+    name: imperium-observability-hyperdx-mongo-data
+  observability-grafana-data:
+    name: imperium-observability-grafana-data
   qdrant-data:
     name: imperium-qdrant-data
   spark-master-data:
