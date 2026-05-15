@@ -1,7 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
-import { articleService } from '@/lib/services';
 import { Onboarding } from '@/components/Onboarding/Onboarding';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
@@ -12,25 +11,13 @@ import { ArticleView } from '@/components/Feed/ArticleView';
 import { AnimatePresence } from 'motion/react';
 
 export default function Home() {
-  const { isOnboarded, selectedArticle, userId } = useAppStore();
+  const { isOnboarded, selectedArticle } = useAppStore();
   const [mounted, setMounted] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // Flush viewed articles when user navigates away or closes tab
-  useEffect(() => {
-    if (!userId) return;
-    const flush = () => {
-      if (document.visibilityState === 'hidden') {
-        articleService.flushViewed(userId);
-      }
-    };
-    document.addEventListener('visibilitychange', flush);
-    return () => document.removeEventListener('visibilitychange', flush);
-  }, [userId]);
 
   if (!mounted) return null;
 
@@ -43,19 +30,21 @@ export default function Home() {
       <div className="w-full bg-editorial-bg lg:mb-0 font-sans">
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
 
-        <div className="grid lg:grid-cols-[250px_minmax(0,1fr)_340px] max-w-full">
-          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        <div className="max-w-[1280px] mx-auto">
+          <div className="grid justify-center lg:grid-cols-[275px_minmax(0,600px)_350px]">
+            <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-          <main className="min-w-0 border-t border-editorial-border lg:border-none relative bg-white">
-            <FeedList />
-            <AnimatePresence>
-              {selectedArticle && (
-                <ArticleView key="article-view" />
-              )}
-            </AnimatePresence>
-          </main>
+            <main className="min-w-0 border-t border-editorial-border lg:border-t-0 lg:border-x lg:border-editorial-border relative bg-editorial-bg">
+              <FeedList />
+              <AnimatePresence>
+                {selectedArticle && (
+                  <ArticleView key="article-view" />
+                )}
+              </AnimatePresence>
+            </main>
 
-          <Rightbar />
+            <Rightbar />
+          </div>
         </div>
       </div>
       <MobileNav />

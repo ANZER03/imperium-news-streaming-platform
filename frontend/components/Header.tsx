@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
+import { useScrollDirection } from '@/hooks/use-scroll-direction';
 import { Search, Menu, ChevronLeft, ChevronRight, Bookmark, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAppStore } from '@/lib/store';
@@ -19,6 +20,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { activeTopic, activeView, setTopic, setView } = useAppStore();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const visible = useScrollDirection();
 
   useEffect(() => {
     topicService.getAll().then(setTopics).catch(() => {});
@@ -37,7 +39,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 border-b border-editorial-border bg-editorial-bg z-40 flex flex-col">
+    <header className={`sticky top-0 border-b border-editorial-border bg-editorial-bg z-40 flex flex-col transition-transform duration-300 ${visible ? 'translate-y-0' : '-translate-y-full lg:translate-y-0'}`}>
       <div className="flex items-center justify-between gap-3 px-4 py-4 md:px-8 w-full">
         {/* LOGO */}
         <div className="flex items-center shrink-0">
