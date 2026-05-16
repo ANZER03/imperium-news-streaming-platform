@@ -26,27 +26,34 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-editorial-bg text-editorial-ink font-sans flex flex-col relative">
-      <div className="w-full bg-editorial-bg lg:mb-0 font-sans">
-        <Header onMenuClick={() => setIsSidebarOpen(true)} />
+    <div className="min-h-screen bg-editorial-bg text-editorial-ink font-sans relative">
+      <Header onMenuClick={() => setIsSidebarOpen(true)} />
 
-        <div className="max-w-[1280px] mx-auto">
-          <div className="grid justify-center lg:grid-cols-[275px_minmax(0,600px)_350px]">
-            <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <div className="flex min-h-screen w-full justify-center">
+        {/* Left sidebar */}
+        <div className="hidden lg:block w-[320px] xl:w-[360px] shrink-0">
+          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        </div>
 
-            <main className="min-w-0 border-t border-editorial-border lg:border-t-0 lg:border-x lg:border-editorial-border relative bg-editorial-bg">
-              <FeedList />
-              <AnimatePresence>
-                {selectedArticle && (
-                  <ArticleView key="article-view" />
-                )}
-              </AnimatePresence>
-            </main>
+        {/* Mobile sidebar */}
+        <div className="lg:hidden">
+          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        </div>
 
-            <Rightbar />
-          </div>
+        {/* Center feed */}
+        <main className="w-full max-w-[600px] border-x border-editorial-border relative bg-editorial-bg">
+          <FeedList />
+          <AnimatePresence>
+            {selectedArticle && <ArticleView key="article-view" />}
+          </AnimatePresence>
+        </main>
+
+        {/* Right sidebar */}
+        <div className="hidden lg:block w-[350px] xl:w-[380px] shrink-0">
+          <Rightbar />
         </div>
       </div>
+
       <MobileNav />
     </div>
   );
