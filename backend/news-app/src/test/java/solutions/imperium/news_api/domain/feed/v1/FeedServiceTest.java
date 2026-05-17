@@ -1,4 +1,13 @@
-package solutions.imperium.news_api.domain.feed;
+package solutions.imperium.news_api.domain.feed.v1;
+
+import solutions.imperium.news_api.domain.feed.v1.FeedRepository;
+import solutions.imperium.news_api.domain.feed.v1.FeedProperties;
+import solutions.imperium.news_api.domain.feed.v1.FeedService;
+import solutions.imperium.news_api.domain.feed.v1.FeedSession;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidate;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidateBucket;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidateSource;
+import solutions.imperium.news_api.domain.feed.v1.ScoredArticle;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

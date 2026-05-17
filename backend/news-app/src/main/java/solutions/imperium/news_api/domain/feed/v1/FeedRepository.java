@@ -1,4 +1,10 @@
-package solutions.imperium.news_api.domain.feed;
+package solutions.imperium.news_api.domain.feed.v1;
+
+import solutions.imperium.news_api.domain.feed.v1.FeedSession;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidate;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidateBucket;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidateSource;
+import solutions.imperium.news_api.domain.feed.v1.ScoredArticle;
 
 import solutions.imperium.news_api.core.Constants;
 import solutions.imperium.news_api.domain.article.Article;

@@ -71,3 +71,22 @@ feed:
     seen:
       ttl-days: 14
       prune-on-write: true
+  scanner:
+    page-size-default: 40
+    page-size-min: 5
+    page-size-max: 50
+    window-millis: 14400          # 4 hours in seconds (ZSET scores are epoch seconds)
+    per-topic-limit: 50
+    max-topics-per-request: 100
+    max-windows-per-request: 12
+    scanner-concurrency: 16
+    read-id-check-concurrency: 16
+    max-buffer-size: 400
+    max-intervals: 128
+    session-ttl-hours: 4
+    session-idle-threshold-hours: 4
+    read-state-ttl-days: 12
+    lock-ttl-ms: 1500
+    freshness-coefficient: 0.0
+    freshness-grace-ms: 0
+    topic-weights: {}

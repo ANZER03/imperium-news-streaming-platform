@@ -190,3 +190,36 @@ Accept: application/json
 ### 4e. Verify Bookmarks after removal
 GET {{baseUrl}}/users/{{userId}}/bookmarks
 Accept: application/json
+
+
+### =============================================================
+### V3 Feed Scanner — /api/v3/feed*
+### Algorithm: timestamp-window scanner with read intervals + read IDs.
+### Storage: feed:read:intervals:* (JSON), feed:read:ids:* (SET),
+###          feed:session:* (HASH). News-card hydration reuses news:* HASH
+###          (V2 path) and falls back to PostgreSQL for misses.
+### =============================================================
+
+### V3-1. Personalized feed — first page
+GET http://localhost:8999/api/v3/feed?userId=u-1&limit=20
+Accept: application/json
+
+###
+
+### V3-2. Personalized feed — second page (use sessionId from V3-1 response)
+GET http://localhost:8999/api/v3/feed?userId=u-1&sessionId=REPLACE_WITH_SESSION_ID&limit=20
+Accept: application/json
+
+###
+
+### V3-3. Topic feed
+GET http://localhost:8999/api/v3/feed/topic?userId=u-1&topicId=science_technology&limit=20
+Accept: application/json
+
+###
+
+### V3-4. Latest feed (country fallback ZSET)
+GET http://localhost:8999/api/v3/feed/latest?userId=u-1&limit=20
+Accept: application/json
+
+###

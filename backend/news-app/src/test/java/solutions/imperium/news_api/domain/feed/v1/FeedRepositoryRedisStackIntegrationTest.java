@@ -1,4 +1,9 @@
-package solutions.imperium.news_api.domain.feed;
+package solutions.imperium.news_api.domain.feed.v1;
+
+import solutions.imperium.news_api.domain.feed.v1.FeedRepository;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidate;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidateBucket;
+import solutions.imperium.news_api.domain.feed.v1.FeedCandidateSource;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,7 @@
-package solutions.imperium.news_api.domain.feed;
+package solutions.imperium.news_api.domain.feed.v1;
+
+import solutions.imperium.news_api.domain.feed.v1.FeedService;
+import solutions.imperium.news_api.domain.feed.v1.FeedController;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
