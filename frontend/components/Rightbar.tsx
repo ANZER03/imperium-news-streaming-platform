@@ -1,10 +1,27 @@
+'use client';
+
 import React from 'react';
-import { TrendingUp, Send } from 'lucide-react';
-import Image from 'next/image';
+import { Search } from 'lucide-react';
+import { useAppStore } from '@/lib/store';
 
 export function Rightbar() {
   return (
-    <aside className="hidden border-l border-editorial-border bg-editorial-bg px-6 py-6 space-y-8 lg:block lg:sticky lg:top-[126px] h-[calc(100vh-126px)] overflow-y-auto no-scrollbar">
+    <aside className="w-full max-w-[380px] border-l border-editorial-border bg-editorial-bg pl-12 pr-6 pt-8 pb-6 space-y-8 sticky top-0 h-screen overflow-y-auto no-scrollbar">
+      <div className="flex items-center rounded-2xl bg-editorial-surface px-4 py-2.5 text-editorial-muted focus-within:ring-1 focus-within:ring-editorial-accent transition-shadow">
+        <Search className="mr-3 h-5 w-5 shrink-0" />
+        <input
+          className="w-full bg-transparent text-sm text-editorial-ink outline-none placeholder:text-editorial-muted/70"
+          type="text"
+          placeholder="Search news, topics, people..."
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const val = e.currentTarget.value.trim();
+              if (val) useAppStore.getState().setSearchQuery(val);
+            }
+          }}
+        />
+      </div>
+
       <div className="space-y-6">
         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-editorial-accent">Trending Perspectives</h4>
 

@@ -6,8 +6,7 @@ import { bookmarkService } from './services/bookmark.service';
 interface AppState {
   userId: string | null;
   interests: string[];
-  country: string | null;
-  countryId: number | null;
+  countryIds: number[];
   isOnboarded: boolean;
   selectedArticle: Article | null;
   savedArticles: string[];
@@ -15,7 +14,7 @@ interface AppState {
   activeTopic: string;
   searchQuery: string;
 
-  completeOnboarding: (interests: string[], country: string, countryId: number, userId: string) => void;
+  completeOnboarding: (interests: string[], countryIds: number[], userId: string) => void;
   openArticle: (article: Article) => void;
   closeArticle: () => void;
   toggleSaved: (articleId: string) => void;
@@ -32,8 +31,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       userId: null,
       interests: [],
-      country: null,
-      countryId: null,
+      countryIds: [],
       isOnboarded: false,
       selectedArticle: null,
       savedArticles: [],
@@ -41,10 +39,9 @@ export const useAppStore = create<AppState>()(
       activeTopic: 'All',
       searchQuery: '',
 
-      completeOnboarding: (interests, country, countryId, userId) => set(() => ({
+      completeOnboarding: (interests, countryIds, userId) => set(() => ({
         interests,
-        country,
-        countryId,
+        countryIds,
         isOnboarded: true,
         userId,
       })),
@@ -84,8 +81,7 @@ export const useAppStore = create<AppState>()(
       resetOnboarding: () => set({
         isOnboarded: false,
         interests: [],
-        country: null,
-        countryId: null,
+        countryIds: [],
         userId: null,
       }),
 
@@ -104,8 +100,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         userId: state.userId,
         interests: state.interests,
-        country: state.country,
-        countryId: state.countryId,
+        countryIds: state.countryIds,
         isOnboarded: state.isOnboarded,
         savedArticles: state.savedArticles,
       }),

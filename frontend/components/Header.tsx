@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Search, Menu, ChevronLeft, ChevronRight, Bookmark, X } from 'lucide-react';
-import Link from 'next/link';
+import { useScrollDirection } from '@/hooks/use-scroll-direction';
+import { Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { AnimatePresence, motion } from 'motion/react';
 import { topicService } from '@/lib/services';
@@ -14,10 +14,9 @@ interface HeaderProps {
 
 const SPECIAL_TOPICS = ['For You', 'Latest'];
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function TopicCarousel({ className = '' }: { className?: string }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { activeTopic, activeView, setTopic, setView } = useAppStore();
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const { activeTopic, activeView, setTopic } = useAppStore();
   const [topics, setTopics] = useState<Topic[]>([]);
 
   useEffect(() => {
@@ -37,30 +36,86 @@ export function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 border-b border-editorial-border bg-editorial-bg z-40 flex flex-col">
-      <div className="flex items-center justify-between gap-3 px-4 py-4 md:px-8 w-full">
-        {/* LOGO */}
-        <div className="flex items-center shrink-0">
-          <button onClick={() => setView('feed')} className="flex items-center">
-            {/* Desktop Logo (with text) */}
-            <img 
-              src="/imperium_logo.svg" 
-              alt="Imperium"
-              className="hidden md:block h-8 md:h-10 w-auto object-contain"
-            />
-            {/* Mobile Logo (symbol only) */}
-            <img 
-              src="/logo.svg" 
-              alt="Imperium"
-              className="md:hidden h-10 w-auto object-contain"
-            />
-          </button>
+    <div className={`relative border-b border-editorial-border px-4 md:px-8 bg-editorial-bg flex items-center group ${className}`}>
+      <button 
+        onClick={scrollLeft}
+        className="absolute left-0 z-10 hidden h-full items-center justify-center bg-gradient-to-r from-editorial-bg via-editorial-bg to-transparent px-2 md:px-4 text-editorial-muted hover:text-editorial-ink group-hover:flex"
+      >
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+
+      <nav 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-x-auto no-scrollbar scroll-smooth"
+      >
+        <div className="flex min-w-max items-center gap-6 md:gap-8 text-[15px] font-medium text-editorial-muted font-sans pb-0">
+          {SPECIAL_TOPICS.map((label) => {
+            const key = label === 'For You' ? 'All' : label;
+            const isSelected = activeView === 'feed' && activeTopic === key;
+            return (
+              <button
+                key={label}
+                onClick={() => setTopic(key)}
+                className={`py-3.5 transition font-sans ${
+                  isSelected
+                    ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
+                    : 'hover:text-editorial-ink'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+
+          {topics.map(({ topicId, displayName }) => {
+            const isSelected = activeView === 'feed' && activeTopic === topicId;
+            return (
+              <button
+                key={topicId}
+                onClick={() => setTopic(topicId)}
+                className={`py-3.5 transition font-sans ${
+                  isSelected
+                    ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
+                    : 'hover:text-editorial-ink'
+                }`}
+              >
+                {displayName}
+              </button>
+            );
+          })}
         </div>
+      </nav>
+
+      <button 
+        onClick={scrollRight}
+        className="absolute right-0 z-10 hidden h-full items-center justify-center bg-gradient-to-l from-editorial-bg via-editorial-bg to-transparent px-2 md:px-4 text-editorial-muted hover:text-editorial-ink group-hover:flex"
+      >
+        <ChevronRight className="h-5 w-5" />
+      </button>
+    </div>
+  );
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const visible = useScrollDirection();
+
+  return (
+    <header className={`sticky top-0 border-b border-editorial-border bg-editorial-bg z-40 flex flex-col transition-transform duration-300 lg:hidden ${visible ? 'translate-y-0' : '-translate-y-full'}`}>
+      <div className="flex items-center justify-between gap-3 px-2 py-3 w-full">
+        {/* LOGO — taps to toggle sidebar */}
+        <button onClick={onMenuClick} className="flex items-center shrink-0">
+          <img
+            src="/logo.svg"
+            alt="Imperium"
+            className="h-9 w-auto object-contain"
+          />
+        </button>
 
         {/* SEARCH (Right) */}
         <div className="flex items-center gap-3 md:gap-6 flex-1 justify-end">
           {/* Mobile Search Input With Animation */}
-          <div className="md:hidden flex flex-1 justify-end relative h-10 w-full max-w-[200px]">
+          <div className="flex flex-1 justify-end relative h-10 w-full max-w-[200px]">
             <AnimatePresence initial={false}>
               {!isMobileSearchOpen ? (
                 <motion.button 
@@ -108,84 +163,10 @@ export function Header({ onMenuClick }: HeaderProps) {
               )}
             </AnimatePresence>
           </div>
-
-          {/* Desktop Search Input */}
-          <div className="hidden md:flex items-center rounded-2xl bg-editorial-surface px-4 py-2.5 text-editorial-muted focus-within:ring-1 focus-within:ring-editorial-accent transition-shadow flex-1 max-w-xs">
-            <Search className="mr-3 h-5 w-5 shrink-0" />
-            <input 
-              className="w-full bg-transparent text-sm text-editorial-ink outline-none placeholder:text-editorial-muted/70" 
-              type="text" 
-              placeholder="Search news, topics, people..." 
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = e.currentTarget.value.trim();
-                  if (val) useAppStore.getState().setSearchQuery(val);
-                }
-              }}
-            />
-          </div>
         </div>
       </div>
 
-      <div className="relative border-t border-editorial-border px-4 md:px-8 bg-editorial-bg flex items-center group">
-        <button 
-          onClick={scrollLeft}
-          className="absolute left-0 z-10 hidden h-full items-center justify-center bg-gradient-to-r from-editorial-bg via-editorial-bg to-transparent px-2 md:px-4 text-editorial-muted hover:text-editorial-ink group-hover:flex"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-
-        <nav 
-          ref={scrollContainerRef}
-          className="flex-1 overflow-x-auto no-scrollbar scroll-smooth"
-        >
-          <div className="flex min-w-max items-center gap-6 md:gap-8 text-[15px] font-medium text-editorial-muted font-sans pb-0">
-            {/* Special tabs: For You, Latest */}
-            {SPECIAL_TOPICS.map((label) => {
-              const key = label === 'For You' ? 'All' : label;
-              const isSelected = activeView === 'feed' && activeTopic === key;
-              return (
-                <button
-                  key={label}
-                  onClick={() => setTopic(key)}
-                  className={`py-3.5 transition font-sans ${
-                    isSelected
-                      ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
-                      : 'hover:text-editorial-ink'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-
-            {/* Topic tabs from API — same list as onboarding */}
-            {topics.map(({ topicId, displayName }) => {
-              const isSelected = activeView === 'feed' && activeTopic === topicId;
-              return (
-                <button
-                  key={topicId}
-                  onClick={() => setTopic(topicId)}
-                  className={`py-3.5 transition font-sans ${
-                    isSelected
-                      ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
-                      : 'hover:text-editorial-ink'
-                  }`}
-                >
-                  {displayName}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-
-        <button 
-          onClick={scrollRight}
-          className="absolute right-0 z-10 hidden h-full items-center justify-center bg-gradient-to-l from-editorial-bg via-editorial-bg to-transparent px-2 md:px-4 text-editorial-muted hover:text-editorial-ink group-hover:flex"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-      </div>
+      <TopicCarousel />
     </header>
   );
 }

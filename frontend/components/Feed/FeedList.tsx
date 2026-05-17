@@ -7,6 +7,7 @@ import { useAppStore } from '@/lib/store';
 import { NewsCard } from './NewsCard';
 import { SkeletonCard } from './SkeletonCard';
 import { ExploreHeader } from './ExploreHeader';
+import { TopicCarousel } from '@/components/Header';
 import { motion } from 'motion/react';
 import { Loader2, Bookmark, RefreshCw } from 'lucide-react';
 import { resolveTopicId } from '@/lib/utils/topic';
@@ -234,6 +235,7 @@ export function FeedList() {
 
   return (
     <div className="flex flex-col">
+      <TopicCarousel className="hidden lg:flex sticky top-0 z-30" />
       {activeView === 'explore' && <ExploreHeader />}
       {activeView === 'search' && (
         <div className="px-6 py-8 md:px-8 border-b border-editorial-border bg-editorial-surface/30">

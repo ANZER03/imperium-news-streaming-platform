@@ -27,7 +27,7 @@ public class UserServiceTest {
     @Test
     public void testOnboardUser() {
         UserOnboardReq req = new UserOnboardReq();
-        req.setCountryId(1);
+        req.setCountryIds(List.of(1));
         req.setTopics(List.of("tech", "business"));
 
         when(userRepository.saveUserPreferences(anyString(), eq(req))).thenReturn(Mono.just(true));

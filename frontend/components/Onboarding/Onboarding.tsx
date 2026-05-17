@@ -1,22 +1,39 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '@/lib/store';
-import { ChevronRight, ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Check, Loader2, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { countryService, topicService, userService } from '@/lib/services';
 import { Country, Topic } from '@/lib/types';
+
+const toFlag = (code: string) =>
+  code.toUpperCase().replace(/[A-Z]/g, c => String.fromCodePoint(0x1F1E6 - 65 + c.charCodeAt(0)));
+
 
 export function Onboarding() {
   const { completeOnboarding } = useAppStore();
   const [view, setView] = useState<'welcome' | 'onboarding'>('welcome');
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedCountryId, setSelectedCountryId] = useState<number | ''>('');
+  const [selectedCountryIds, setSelectedCountryIds] = useState<number[]>([]);
   
   const [countries, setCountries] = useState<Country[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [countrySearch, setCountrySearch] = useState('');
+  const [countryOpen, setCountryOpen] = useState(false);
+  const countryRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (countryRef.current && !countryRef.current.contains(e.target as Node)) {
+        setCountryOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -46,18 +63,22 @@ export function Onboarding() {
     );
   };
 
+  const toggleCountry = (id: number) => {
+    setSelectedCountryIds(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  };
+
   const handleComplete = async () => {
-    if (selectedTopics.length >= 3 && selectedCountryId !== '') {
+    if (selectedTopics.length >= 3 && selectedCountryIds.length > 0) {
       try {
         setIsRegistering(true);
         setError(null);
-        
-        const { userId } = await userService.onboard(selectedCountryId as number, selectedTopics);
-        
-        const countryName = countries.find(c => c.countryId === selectedCountryId)?.countryName || '';
+
+        const { userId } = await userService.onboard(selectedCountryIds, selectedTopics);
         const topicNames = selectedTopics.map(id => topics.find(t => t.topicId === id)?.displayName || id);
 
-        completeOnboarding(topicNames, countryName, selectedCountryId as number, userId);
+        completeOnboarding(topicNames, selectedCountryIds, userId);
       } catch (err) {
         console.error('Registration failed:', err);
         setError('Failed to create your profile. Please try again.');
@@ -223,22 +244,96 @@ export function Onboarding() {
                 <p className="text-editorial-muted text-sm">We'll show you local and regional news.</p>
               </div>
 
-              <div className="relative mb-10">
-                <select
-                  value={selectedCountryId}
-                  onChange={(e) => setSelectedCountryId(Number(e.target.value))}
+              {/* Country picker — multi-select */}
+              <div className="relative mb-10" ref={countryRef}>
+                {/* Selected chips */}
+                {selectedCountryIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {selectedCountryIds.map(id => {
+                      const c = countries.find(c => c.countryId === id);
+                      if (!c) return null;
+                      return (
+                        <span key={id} className="flex items-center gap-1.5 bg-brand-500 text-white text-sm font-medium px-3 py-1 rounded-full">
+                          <span className="text-base leading-none">{toFlag(c.abbreviation)}</span>
+                          {c.countryName}
+                          <button type="button" onClick={() => toggleCountry(id)} className="ml-1 hover:opacity-70">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Trigger */}
+                <button
+                  type="button"
                   disabled={isRegistering}
-                  className={`w-full h-14 bg-editorial-surface border border-editorial-border rounded-xl px-4 text-sm font-medium appearance-none outline-none focus:border-brand-500 transition-colors ${selectedCountryId !== '' ? 'text-editorial-ink' : 'text-editorial-muted'
-                    } ${isRegistering ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => setCountryOpen(o => !o)}
+                  className={`w-full h-14 bg-editorial-surface border rounded-xl px-4 text-sm font-medium flex items-center justify-between transition-colors outline-none
+                    ${countryOpen ? 'border-brand-500' : 'border-editorial-border'}
+                    ${isRegistering ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <option value="" disabled>Select your country…</option>
-                  {countries.map(c => (
-                    <option key={c.countryId} value={c.countryId}>{c.countryName}</option>
-                  ))}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-editorial-muted/50">
-                  <ChevronRight className="w-5 h-5 rotate-90" />
-                </div>
+                  <span className="text-editorial-muted">
+                    {selectedCountryIds.length === 0 ? 'Select countries…' : `${selectedCountryIds.length} selected — add more`}
+                  </span>
+                  <ChevronRight className={`w-4 h-4 text-editorial-muted/60 transition-transform ${countryOpen ? '-rotate-90' : 'rotate-90'}`} />
+                </button>
+
+                <AnimatePresence>
+                  {countryOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute z-50 mt-2 w-full bg-white border border-editorial-border rounded-xl shadow-lg overflow-hidden"
+                    >
+                      {/* Search */}
+                      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-editorial-border">
+                        <Search className="w-4 h-4 text-editorial-muted shrink-0" />
+                        <input
+                          autoFocus
+                          value={countrySearch}
+                          onChange={e => setCountrySearch(e.target.value)}
+                          placeholder="Search country…"
+                          className="flex-1 bg-transparent text-sm text-editorial-ink outline-none placeholder:text-editorial-muted/60"
+                        />
+                        {countrySearch && (
+                          <button onClick={() => setCountrySearch('')}>
+                            <X className="w-3.5 h-3.5 text-editorial-muted" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* List */}
+                      <ul className="max-h-52 overflow-y-auto">
+                        {countries
+                          .filter(c => c.countryName.toLowerCase().includes(countrySearch.toLowerCase()))
+                          .map(c => {
+                            const selected = selectedCountryIds.includes(c.countryId);
+                            return (
+                              <li key={c.countryId}>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCountry(c.countryId)}
+                                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-editorial-surface
+                                    ${selected ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-editorial-ink'}`}
+                                >
+                                  <span className="text-lg leading-none">{toFlag(c.abbreviation)}</span>
+                                  {c.countryName}
+                                  {selected && <Check className="w-4 h-4 ml-auto" />}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        {countries.filter(c => c.countryName.toLowerCase().includes(countrySearch.toLowerCase())).length === 0 && (
+                          <li className="px-4 py-6 text-sm text-center text-editorial-muted">No country found</li>
+                        )}
+                      </ul>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {error && (
@@ -249,8 +344,8 @@ export function Onboarding() {
 
               <button
                 onClick={handleComplete}
-                disabled={selectedTopics.length < 3 || selectedCountryId === '' || isRegistering}
-                className={`w-full h-14 rounded-2xl flex items-center justify-center gap-2 font-bold transition-all active:scale-95 ${selectedTopics.length >= 3 && selectedCountryId !== '' && !isRegistering
+                disabled={selectedTopics.length < 3 || selectedCountryIds.length === 0 || isRegistering}
+                className={`w-full h-14 rounded-2xl flex items-center justify-center gap-2 font-bold transition-all active:scale-95 ${selectedTopics.length >= 3 && selectedCountryIds.length > 0 && !isRegistering
                   ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'
                   : 'bg-editorial-border text-editorial-muted/50 cursor-not-allowed opacity-50'
                   }`}
@@ -263,7 +358,7 @@ export function Onboarding() {
                 ) : (
                   <>
                     Continue to my feed
-                    {selectedTopics.length >= 3 && selectedCountryId !== '' && <ChevronRight className="w-5 h-5" />}
+                    {selectedTopics.length >= 3 && selectedCountryIds.length > 0 && <ChevronRight className="w-5 h-5" />}
                   </>
                 )}
               </button>

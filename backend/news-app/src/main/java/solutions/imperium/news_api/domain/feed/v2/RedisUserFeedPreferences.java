@@ -58,6 +58,10 @@ public class RedisUserFeedPreferences implements UserFeedPreferences {
         List<Integer> ids = new ArrayList<>();
         if (countryIdsRaw != null) {
             String text = String.valueOf(countryIdsRaw).trim();
+            // Strip surrounding quotes written by Jackson String serialization (e.g. "\"[1,2]\"" → "[1,2]")
+            if (text.startsWith("\"") && text.endsWith("\"") && text.length() >= 2) {
+                text = text.substring(1, text.length() - 1);
+            }
             if (text.startsWith("[")) {
                 try {
                     List<Object> raw = objectMapper.readValue(text, new TypeReference<>() {});

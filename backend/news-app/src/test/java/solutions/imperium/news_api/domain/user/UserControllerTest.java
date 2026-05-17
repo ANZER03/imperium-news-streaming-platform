@@ -39,7 +39,7 @@ public class UserControllerTest {
         when(userService.onboardUser(any(UserOnboardReq.class))).thenReturn(Mono.just(mockUserId));
 
         UserOnboardReq req = new UserOnboardReq();
-        req.setCountryId(1);
+        req.setCountryIds(List.of(1));
         req.setTopics(List.of("tech", "business"));
 
         webTestClient.post()
