@@ -1,4 +1,6 @@
-package solutions.imperium.news_api.domain.feed;
+package solutions.imperium.news_api.domain.feed.v1;
+
+import solutions.imperium.news_api.domain.feed.v1.FeedService;
 
 import solutions.imperium.news_api.core.PageResult;
 import solutions.imperium.news_api.domain.feed.dto.ArticleCardDto;

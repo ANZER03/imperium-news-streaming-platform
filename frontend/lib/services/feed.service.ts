@@ -2,7 +2,10 @@ import { fetchApi } from '../api-client';
 import { Article } from '../types';
 import { normalizeImageUrl } from '../utils/image';
 
-interface FeedV2Response {
+// Backend V3 (feed-scanner) JSON shape. Identical to V2's PageResult<ArticleCardDto>:
+// the @JsonProperty mappings on the Java side make the wire format version-agnostic,
+// so the same TS shape covers both /api/v2/feed* and /api/v3/feed*.
+interface FeedScannerResponse {
   data: BackendArticleCard[];
   sessionId: string;
   sessionAnchor: number | null;
@@ -45,7 +48,7 @@ function mapCard(card: BackendArticleCard): Article {
   };
 }
 
-function toPage(res: FeedV2Response): FeedPage {
+function toPage(res: FeedScannerResponse): FeedPage {
   return {
     data: res.data.map(mapCard),
     sessionId: res.sessionId,
@@ -66,19 +69,19 @@ function buildParams(userId: string, sessionId: string | undefined, limit: numbe
 export const feedService = {
   getFeed: async (userId: string, sessionId?: string, limit = 40): Promise<FeedPage> => {
     const params = buildParams(userId, sessionId, limit);
-    const res = await fetchApi<FeedV2Response>(`/api/v2/feed?${params}`);
+    const res = await fetchApi<FeedScannerResponse>(`/api/v3/feed?${params}`);
     return toPage(res);
   },
 
   getByTopic: async (userId: string, topicId: string, sessionId?: string, limit = 40): Promise<FeedPage> => {
     const params = buildParams(userId, sessionId, limit, { topicId });
-    const res = await fetchApi<FeedV2Response>(`/api/v2/feed/topic?${params}`);
+    const res = await fetchApi<FeedScannerResponse>(`/api/v3/feed/topic?${params}`);
     return toPage(res);
   },
 
   getLatest: async (userId: string, sessionId?: string, limit = 40): Promise<FeedPage> => {
     const params = buildParams(userId, sessionId, limit);
-    const res = await fetchApi<FeedV2Response>(`/api/v2/feed/latest?${params}`);
+    const res = await fetchApi<FeedScannerResponse>(`/api/v3/feed/latest?${params}`);
     return toPage(res);
   },
 };

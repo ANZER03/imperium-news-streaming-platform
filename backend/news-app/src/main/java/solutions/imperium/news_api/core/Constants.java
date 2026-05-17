@@ -14,4 +14,10 @@ public class Constants {
     public static final String KEY_COUNTRIES_LIST = "countries:list";
     public static final String KEY_FEED_COUNTRY = "feed:country:%s";
     public static final String KEY_FEED_COUNTRY_TOPIC = "feed:country:%s:topic:%s"; // %s = countryId, topicId
+
+    // Feed Scanner (V3 algorithm) keys — see backend/news-app/feed_v3_prd.md
+    public static final String KEY_FEED_READ_INTERVALS = "feed:read:intervals:%s:%s"; // %s = userId, scopeHash
+    public static final String KEY_FEED_READ_IDS = "feed:read:ids:%s:%s";              // %s = userId, scopeHash
+    public static final String KEY_FEED_SCANNER_SESSION = "feed:session:%s:%s";        // %s = userId, sessionId
+    public static final String KEY_FEED_SCANNER_LOCK = "feed:lock:%s:%s";              // %s = userId, sessionId
 }
