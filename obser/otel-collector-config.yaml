@@ -6,6 +6,11 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  redis:
+    endpoint: redis:6379
+    collection_interval: 10s
+    password: ${env:REDIS_PASSWORD}
+
 processors:
   resourcedetection:
     detectors: [env, system]
@@ -13,6 +18,15 @@ processors:
 
   resource:
     attributes:
+      - key: deployment.environment
+        value: imperium-local
+        action: upsert
+
+  resource/redis:
+    attributes:
+      - key: service.name
+        value: redis
+        action: upsert
       - key: deployment.environment
         value: imperium-local
         action: upsert
@@ -53,6 +67,11 @@ service:
     metrics:
       receivers: [otlp]
       processors: [resourcedetection, resource, batch]
+      exporters: [clickhouse, debug]
+
+    metrics/redis:
+      receivers: [redis]
+      processors: [resourcedetection, resource/redis, batch]
       exporters: [clickhouse, debug]
 
     logs:

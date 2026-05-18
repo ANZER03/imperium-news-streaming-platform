@@ -1,0 +1,172 @@
+{
+  "uid": "redis-server",
+  "title": "Redis Server",
+  "tags": ["redis", "database", "infra"],
+  "timezone": "browser",
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "title": "Connected Clients",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT argMax(Value, TimeUnix) AS value FROM otel_metrics_sum WHERE MetricName = 'redis.clients.connected' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "title": "Memory Used (MB)",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT round(argMax(Value, TimeUnix) / 1048576, 2) AS value FROM otel_metrics_gauge WHERE MetricName = 'redis.memory.used' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "title": "Memory RSS (MB)",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT round(argMax(Value, TimeUnix) / 1048576, 2) AS value FROM otel_metrics_gauge WHERE MetricName = 'redis.memory.rss' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "title": "Fragmentation Ratio",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT round(argMax(Value, TimeUnix), 2) AS value FROM otel_metrics_gauge WHERE MetricName = 'redis.memory.fragmentation_ratio' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "title": "Keyspace Hits",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT argMax(Value, TimeUnix) AS value FROM otel_metrics_sum WHERE MetricName = 'redis.keyspace.hits' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "title": "DB Keys",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT argMax(Value, TimeUnix) AS value FROM otel_metrics_gauge WHERE MetricName = 'redis.db.keys' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "title": "Memory Usage Trend (MB)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, round(maxIf(Value, MetricName='redis.memory.used') / 1048576, 2) AS used_mb, round(maxIf(Value, MetricName='redis.memory.rss') / 1048576, 2) AS rss_mb, round(maxIf(Value, MetricName='redis.memory.peak') / 1048576, 2) AS peak_mb FROM otel_metrics_gauge WHERE MetricName IN ('redis.memory.used','redis.memory.rss','redis.memory.peak') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "title": "Commands Processed / sec",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, round((max(Value) - min(Value)) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0), 2) AS commands_per_sec FROM otel_metrics_sum WHERE MetricName = 'redis.commands.processed' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "title": "Keyspace Hits vs Misses / sec",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, round((maxIf(Value, MetricName='redis.keyspace.hits') - minIf(Value, MetricName='redis.keyspace.hits')) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0), 2) AS hits_per_sec, round((maxIf(Value, MetricName='redis.keyspace.misses') - minIf(Value, MetricName='redis.keyspace.misses')) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0), 2) AS misses_per_sec FROM otel_metrics_sum WHERE MetricName IN ('redis.keyspace.hits','redis.keyspace.misses') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "title": "Network I/O (KB/s)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, round((maxIf(Value, MetricName='redis.net.input') - minIf(Value, MetricName='redis.net.input')) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0) / 1024, 2) AS net_input_kbps, round((maxIf(Value, MetricName='redis.net.output') - minIf(Value, MetricName='redis.net.output')) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0) / 1024, 2) AS net_output_kbps FROM otel_metrics_sum WHERE MetricName IN ('redis.net.input','redis.net.output') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "title": "Keys Evicted & Expired / sec",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, round((maxIf(Value, MetricName='redis.keys.evicted') - minIf(Value, MetricName='redis.keys.evicted')) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0), 4) AS evicted_per_sec, round((maxIf(Value, MetricName='redis.keys.expired') - minIf(Value, MetricName='redis.keys.expired')) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0), 4) AS expired_per_sec FROM otel_metrics_sum WHERE MetricName IN ('redis.keys.evicted','redis.keys.expired') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "title": "Connected Clients Trend",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, max(Value) AS connected_clients FROM otel_metrics_sum WHERE MetricName = 'redis.clients.connected' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    }
+  ]
+}

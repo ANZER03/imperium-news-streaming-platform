@@ -59,6 +59,7 @@ services:
 
   otel-collector:
     <<: *service-defaults
+    restart: unless-stopped
     image: otel/opentelemetry-collector-contrib:latest
     container_name: imperium-obs-otel-collector
     hostname: otel-collector
@@ -85,13 +86,14 @@ services:
 
   grafana:
     <<: *service-defaults
+    restart: unless-stopped
     image: grafana/grafana-oss:latest
     container_name: imperium-obs-grafana
     hostname: grafana
     profiles:
       - observability
     ports:
-      - "${OBS_GRAFANA_PORT:-48092}:3000"
+      - "${OBS_GRAFANA_PORT:-43001}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: grafana123
