@@ -37,6 +37,14 @@ services:
       KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS}
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: kafka-1
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 15s
@@ -45,6 +53,7 @@ services:
       start_period: 30s
     volumes:
       - kafka-1-data:/var/lib/kafka/data
+      - ${PWD}/obser/otel:/otel:ro
 
   kafka-broker-2:
     <<: *service-defaults
@@ -74,6 +83,14 @@ services:
       KAFKA_MESSAGE_MAX_BYTES: 2097152
       KAFKA_REPLICA_FETCH_MAX_BYTES: 2097152
       CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: kafka-2
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9093 > /dev/null 2>&1"]
       interval: 15s
@@ -82,6 +99,7 @@ services:
       start_period: 30s
     volumes:
       - kafka-2-data:/var/lib/kafka/data
+      - ${PWD}/obser/otel:/otel:ro
 
   schema-registry:
     <<: *service-defaults
@@ -143,6 +161,14 @@ services:
       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       KAFKA_HEAP_OPTS: ${CONNECT_HEAP_OPTS}
       OFFSET_FLUSH_INTERVAL_MS: ${CONNECT_OFFSET_FLUSH_INTERVAL_MS:-10000}
+      KAFKA_OPTS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: kafka-connect
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8083/connectors > /dev/null"]
       interval: 15s
@@ -151,3 +177,4 @@ services:
       start_period: 60s
     volumes:
       - connect-data:/kafka/data
+      - ${PWD}/obser/otel:/otel:ro
