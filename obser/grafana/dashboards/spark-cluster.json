@@ -1,0 +1,110 @@
+{
+  "uid": "spark-cluster",
+  "title": "Spark Cluster",
+  "tags": ["spark", "jvm"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "title": "Alive Workers",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"red","value":0},{"color":"yellow","value":1},{"color":"green","value":2}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT argMax(Value, TimeUnix) as value FROM otel_metrics_gauge WHERE ServiceName = 'spark-master' AND MetricName = 'metrics_master_aliveWorkers_Value' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 2, "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "title": "Running Apps",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"blue","value":0},{"color":"green","value":1}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT argMax(Value, TimeUnix) as value FROM otel_metrics_gauge WHERE ServiceName = 'spark-master' AND MetricName = 'metrics_master_apps_Value' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 3, "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "title": "Waiting Apps",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":1},{"color":"red","value":3}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT argMax(Value, TimeUnix) as value FROM otel_metrics_gauge WHERE ServiceName = 'spark-master' AND MetricName = 'metrics_master_waitingApps_Value' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 4, "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "title": "Worker Cores Used",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"blue","value":0},{"color":"green","value":1}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT sum(Value) as value FROM otel_metrics_gauge WHERE ServiceName LIKE 'spark-worker%' AND MetricName = 'metrics_worker_coresUsed_Value' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 5, "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "title": "Worker Cores Free",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"red","value":0},{"color":"yellow","value":1},{"color":"green","value":2}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT sum(Value) as value FROM otel_metrics_gauge WHERE ServiceName LIKE 'spark-worker%' AND MetricName = 'metrics_worker_coresFree_Value' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 6, "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "title": "Worker Executors",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT sum(Value) as value FROM otel_metrics_gauge WHERE ServiceName LIKE 'spark-worker%' AND MetricName = 'metrics_worker_executors_Value' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 7, "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "title": "CPU Usage Over Time (%)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "lineWidth": 2 }, "thresholds": { "steps": [{"color":"green","value":0},{"color":"red","value":80}] } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, ServiceName='spark-master') * 100, 2) as `spark-master`, round(avgIf(Value, ServiceName='spark-worker-1') * 100, 2) as `spark-worker-1`, round(avgIf(Value, ServiceName='spark-worker-2') * 100, 2) as `spark-worker-2` FROM otel_metrics_gauge WHERE ServiceName LIKE 'spark-%' AND MetricName = 'jvm.cpu.recent_utilization' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 8, "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "title": "Heap Memory Used Over Time (GB)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "decgbytes", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(sumIf(Value, ServiceName='spark-master') / 1073741824, 3) as `spark-master`, round(sumIf(Value, ServiceName='spark-worker-1') / 1073741824, 3) as `spark-worker-1`, round(sumIf(Value, ServiceName='spark-worker-2') / 1073741824, 3) as `spark-worker-2` FROM otel_metrics_sum WHERE ServiceName LIKE 'spark-%' AND MetricName = 'jvm.memory.used' AND Attributes['jvm.memory.type'] = 'heap' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 9, "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "title": "Worker Memory Used vs Free (MB)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, MetricName='metrics_worker_memUsed_MB_Value'), 0) as `mem-used`, round(avgIf(Value, MetricName='metrics_worker_memFree_MB_Value'), 0) as `mem-free` FROM otel_metrics_gauge WHERE ServiceName LIKE 'spark-worker%' AND MetricName IN ('metrics_worker_memUsed_MB_Value','metrics_worker_memFree_MB_Value') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 10, "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "title": "Thread Count Over Time",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, maxIf(Value, ServiceName='spark-master') as `spark-master`, maxIf(Value, ServiceName='spark-worker-1') as `spark-worker-1`, maxIf(Value, ServiceName='spark-worker-2') as `spark-worker-2` FROM otel_metrics_sum WHERE ServiceName LIKE 'spark-%' AND MetricName = 'jvm.thread.count' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 11, "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "title": "GC Time — Young & Old Generation (ms)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, MetricName='metrics_jvm_G1_Young_Generation_time_Value'), 2) as `gc-young-ms`, round(avgIf(Value, MetricName='metrics_jvm_G1_Old_Generation_time_Value'), 2) as `gc-old-ms` FROM otel_metrics_gauge WHERE ServiceName LIKE 'spark-%' AND MetricName IN ('metrics_jvm_G1_Young_Generation_time_Value','metrics_jvm_G1_Old_Generation_time_Value') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 12, "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "title": "Task Queue Size",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2 }, "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":20},{"color":"red","value":50}] } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, maxIf(Value, ServiceName='spark-master') as `spark-master`, maxIf(Value, ServiceName='spark-worker-1') as `spark-worker-1`, maxIf(Value, ServiceName='spark-worker-2') as `spark-worker-2` FROM otel_metrics_gauge WHERE ServiceName LIKE 'spark-%' AND MetricName = 'queueSize' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 13, "gridPos": { "x": 0, "y": 28, "w": 24, "h": 8 },
+      "title": "Memory Pool Breakdown — Spark Master (MB)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "lineWidth": 1 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, MetricName LIKE '%Eden%used%') / 1048576, 2) as `G1-Eden`, round(avgIf(Value, MetricName LIKE '%Survivor%used%') / 1048576, 2) as `G1-Survivor`, round(avgIf(Value, MetricName LIKE '%Old%used%') / 1048576, 2) as `G1-Old` FROM otel_metrics_gauge WHERE ServiceName = 'spark-master' AND MetricName LIKE 'metrics_jvm_pools_G1%used%' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 14, "gridPos": { "x": 0, "y": 36, "w": 24, "h": 7 },
+      "title": "Spark Logs",
+      "type": "logs",
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showTime": true },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT Timestamp as timestamp, Body as body, SeverityText as level, ServiceName FROM otel_logs WHERE ServiceName LIKE 'spark-%' AND $__timeFilter(Timestamp) ORDER BY Timestamp DESC LIMIT 200", "format": "logs" }]
+    }
+  ]
+}

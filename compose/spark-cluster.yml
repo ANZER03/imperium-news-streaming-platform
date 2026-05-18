@@ -20,6 +20,14 @@ services:
       - "${SPARK_MASTER_EXTERNAL_PORT:-47077}:7077"
     environment:
       SPARK_NO_DAEMONIZE: "true"
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-master
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080 > /dev/null"]
       interval: 10s
@@ -28,6 +36,7 @@ services:
     volumes:
       - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline:ro
       - spark-master-data:/opt/spark/work-dir
+      - ${PWD}/obser/otel:/otel:ro
 
   spark-worker:
     <<: *service-defaults
@@ -50,6 +59,14 @@ services:
       SPARK_WORKER_WEBUI_PORT: 8081
       SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-4}
       SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-6g}
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-worker-1
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081 > /dev/null"]
       interval: 10s
@@ -58,6 +75,7 @@ services:
     volumes:
       - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline:ro
       - spark-worker-1-data:/opt/spark/work-dir
+      - ${PWD}/obser/otel:/otel:ro
 
   spark-worker-2:
     <<: *service-defaults
@@ -80,6 +98,14 @@ services:
       SPARK_WORKER_WEBUI_PORT: 8081
       SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-4}
       SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-6g}
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-worker-2
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081 > /dev/null"]
       interval: 10s
@@ -88,6 +114,7 @@ services:
     volumes:
       - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline:ro
       - spark-worker-2-data:/opt/spark/work-dir
+      - ${PWD}/obser/otel:/otel:ro
 
   spark-worker-3:
     <<: *service-defaults
@@ -110,6 +137,14 @@ services:
       SPARK_WORKER_WEBUI_PORT: 8081
       SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-4}
       SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-6g}
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-worker-3
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081 > /dev/null"]
       interval: 10s
@@ -118,4 +153,5 @@ services:
     volumes:
       - ../apps/processing/news-pipeline:/opt/imperium/news-pipeline:ro
       - spark-worker-3-data:/opt/spark/work-dir
+      - ${PWD}/obser/otel:/otel:ro
 
