@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
-import { useScrollDirection } from '@/hooks/use-scroll-direction';
+import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import { Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { useAppStore } from '@/lib/store';
 import { AnimatePresence, motion } from 'motion/react';
+import { useScrollDirection } from '@/hooks/use-scroll-direction';
 import { topicService } from '@/lib/services';
 import { Topic } from '@/lib/types';
 
@@ -12,11 +13,15 @@ interface HeaderProps {
   onMenuClick: () => void;
 }
 
-const SPECIAL_TOPICS = ['For You', 'Latest'];
+const SPECIAL_TOPICS: ReadonlyArray<{ label: string; href: string }> = [
+  { label: 'For You', href: '/' },
+  { label: 'Latest', href: '/latest' },
+];
 
 export function TopicCarousel({ className = '' }: { className?: string }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { activeTopic, activeView, setTopic } = useAppStore();
+  const pathname = usePathname();
+  const params = useParams<{ topicId?: string }>();
   const [topics, setTopics] = useState<Topic[]>([]);
 
   useEffect(() => {
@@ -35,27 +40,30 @@ export function TopicCarousel({ className = '' }: { className?: string }) {
     }
   };
 
+  const activeTopicId = params?.topicId;
+
   return (
-    <div className={`relative border-b border-editorial-border px-4 md:px-8 bg-editorial-bg flex items-center group ${className}`}>
-      <button 
+    <div
+      className={`relative border-b border-editorial-border px-4 md:px-8 bg-editorial-bg flex items-center group ${className}`}
+    >
+      <button
         onClick={scrollLeft}
         className="absolute left-0 z-10 hidden h-full items-center justify-center bg-gradient-to-r from-editorial-bg via-editorial-bg to-transparent px-2 md:px-4 text-editorial-muted hover:text-editorial-ink group-hover:flex"
       >
         <ChevronLeft className="h-5 w-5" />
       </button>
 
-      <nav 
+      <nav
         ref={scrollContainerRef}
         className="flex-1 overflow-x-auto no-scrollbar scroll-smooth"
       >
         <div className="flex min-w-max items-center gap-6 md:gap-8 text-[15px] font-medium text-editorial-muted font-sans pb-0">
-          {SPECIAL_TOPICS.map((label) => {
-            const key = label === 'For You' ? 'All' : label;
-            const isSelected = activeView === 'feed' && activeTopic === key;
+          {SPECIAL_TOPICS.map(({ label, href }) => {
+            const isSelected = pathname === href;
             return (
-              <button
+              <Link
                 key={label}
-                onClick={() => setTopic(key)}
+                href={href}
                 className={`py-3.5 transition font-sans ${
                   isSelected
                     ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
@@ -63,16 +71,16 @@ export function TopicCarousel({ className = '' }: { className?: string }) {
                 }`}
               >
                 {label}
-              </button>
+              </Link>
             );
           })}
 
           {topics.map(({ topicId, displayName }) => {
-            const isSelected = activeView === 'feed' && activeTopic === topicId;
+            const isSelected = activeTopicId === topicId;
             return (
-              <button
+              <Link
                 key={topicId}
-                onClick={() => setTopic(topicId)}
+                href={`/topic/${topicId}`}
                 className={`py-3.5 transition font-sans ${
                   isSelected
                     ? 'border-b-[3px] border-editorial-accent text-editorial-ink'
@@ -80,13 +88,13 @@ export function TopicCarousel({ className = '' }: { className?: string }) {
                 }`}
               >
                 {displayName}
-              </button>
+              </Link>
             );
           })}
         </div>
       </nav>
 
-      <button 
+      <button
         onClick={scrollRight}
         className="absolute right-0 z-10 hidden h-full items-center justify-center bg-gradient-to-l from-editorial-bg via-editorial-bg to-transparent px-2 md:px-4 text-editorial-muted hover:text-editorial-ink group-hover:flex"
       >
@@ -97,19 +105,28 @@ export function TopicCarousel({ className = '' }: { className?: string }) {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
+  const router = useRouter();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const visible = useScrollDirection();
 
+  const submitSearch = (raw: string) => {
+    const val = raw.trim();
+    if (!val) return;
+    router.push(`/search?q=${encodeURIComponent(val)}`);
+    setIsMobileSearchOpen(false);
+  };
+
   return (
-    <header className={`sticky top-0 border-b border-editorial-border bg-editorial-bg z-40 flex flex-col transition-transform duration-300 lg:hidden ${visible ? 'translate-y-0' : '-translate-y-full'}`}>
+    <header
+      className={`sticky top-0 border-b border-editorial-border bg-editorial-bg z-40 flex flex-col transition-transform duration-300 lg:hidden ${
+        visible ? 'translate-y-0' : '-translate-y-full'
+      }`}
+    >
       <div className="flex items-center justify-between gap-3 px-2 py-3 w-full">
         {/* LOGO — taps to toggle sidebar */}
         <button onClick={onMenuClick} className="flex items-center shrink-0">
-          <img
-            src="/logo.svg"
-            alt="Imperium"
-            className="h-9 w-auto object-contain"
-          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Imperium" className="h-9 w-auto object-contain" />
         </button>
 
         {/* SEARCH (Right) */}
@@ -118,7 +135,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           <div className="flex flex-1 justify-end relative h-10 w-full max-w-[200px]">
             <AnimatePresence initial={false}>
               {!isMobileSearchOpen ? (
-                <motion.button 
+                <motion.button
                   key="search-btn"
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -139,24 +156,23 @@ export function Header({ onMenuClick }: HeaderProps) {
                   className="absolute right-0 flex items-center rounded-2xl bg-editorial-surface px-3 py-2 text-editorial-muted focus-within:ring-1 focus-within:ring-editorial-accent z-20 h-10 overflow-hidden shadow-sm"
                 >
                   <Search className="mr-2 h-4 w-4 shrink-0" />
-                  <input 
+                  <input
                     autoFocus
-                    className="w-full bg-transparent text-sm text-editorial-ink outline-none placeholder:text-editorial-muted/70 min-w-0" 
-                    type="text" 
-                    placeholder="Search..." 
+                    className="w-full bg-transparent text-sm text-editorial-ink outline-none placeholder:text-editorial-muted/70 min-w-0"
+                    type="text"
+                    placeholder="Search..."
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        const val = e.currentTarget.value.trim();
-                        if (val) {
-                          useAppStore.getState().setSearchQuery(val);
-                          setIsMobileSearchOpen(false);
-                        }
+                        submitSearch(e.currentTarget.value);
                       } else if (e.key === 'Escape') {
                         setIsMobileSearchOpen(false);
                       }
                     }}
                   />
-                  <button onClick={() => setIsMobileSearchOpen(false)} className="ml-2 shrink-0">
+                  <button
+                    onClick={() => setIsMobileSearchOpen(false)}
+                    className="ml-2 shrink-0"
+                  >
                     <X className="h-4 w-4 text-editorial-muted transition-colors hover:text-editorial-ink" />
                   </button>
                 </motion.div>
