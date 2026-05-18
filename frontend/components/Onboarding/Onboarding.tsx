@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { ChevronRight, ArrowLeft, Check, Loader2, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11,6 +12,7 @@ const toFlag = (code: string) =>
 
 
 export function Onboarding() {
+  const router = useRouter();
   const { completeOnboarding } = useAppStore();
   const [view, setView] = useState<'welcome' | 'onboarding'>('welcome');
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
@@ -79,6 +81,7 @@ export function Onboarding() {
         const topicNames = selectedTopics.map(id => topics.find(t => t.topicId === id)?.displayName || id);
 
         completeOnboarding(topicNames, selectedCountryIds, userId);
+        router.replace('/');
       } catch (err) {
         console.error('Registration failed:', err);
         setError('Failed to create your profile. Please try again.');

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Article } from './types';
 import { bookmarkService } from './services/bookmark.service';
 
 interface AppState {
@@ -8,22 +7,11 @@ interface AppState {
   interests: string[];
   countryIds: number[];
   isOnboarded: boolean;
-  selectedArticle: Article | null;
   savedArticles: string[];
-  activeView: 'feed' | 'saved' | 'search' | 'explore';
-  activeTopic: string;
-  searchQuery: string;
 
   completeOnboarding: (interests: string[], countryIds: number[], userId: string) => void;
-  openArticle: (article: Article) => void;
-  closeArticle: () => void;
   toggleSaved: (articleId: string) => void;
   resetOnboarding: () => void;
-  setView: (view: 'feed' | 'saved' | 'search' | 'explore') => void;
-  setTopic: (topic: string) => void;
-  setSearchQuery: (query: string) => void;
-  setExploreTopic: (topic: string) => void;
-  setExploreQuery: (query: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -33,22 +21,15 @@ export const useAppStore = create<AppState>()(
       interests: [],
       countryIds: [],
       isOnboarded: false,
-      selectedArticle: null,
       savedArticles: [],
-      activeView: 'feed',
-      activeTopic: 'All',
-      searchQuery: '',
 
-      completeOnboarding: (interests, countryIds, userId) => set(() => ({
-        interests,
-        countryIds,
-        isOnboarded: true,
-        userId,
-      })),
-
-      openArticle: (article) => set({ selectedArticle: article }),
-
-      closeArticle: () => set({ selectedArticle: null }),
+      completeOnboarding: (interests, countryIds, userId) =>
+        set(() => ({
+          interests,
+          countryIds,
+          isOnboarded: true,
+          userId,
+        })),
 
       toggleSaved: (articleId) => {
         const { userId, savedArticles } = get();
@@ -57,7 +38,7 @@ export const useAppStore = create<AppState>()(
         // Optimistic update
         set({
           savedArticles: isSaved
-            ? savedArticles.filter(id => id !== articleId)
+            ? savedArticles.filter((id) => id !== articleId)
             : [...savedArticles, articleId],
         });
 
@@ -72,28 +53,19 @@ export const useAppStore = create<AppState>()(
             set((state) => ({
               savedArticles: isSaved
                 ? [...state.savedArticles, articleId]
-                : state.savedArticles.filter(id => id !== articleId),
+                : state.savedArticles.filter((id) => id !== articleId),
             }));
           });
         }
       },
 
-      resetOnboarding: () => set({
-        isOnboarded: false,
-        interests: [],
-        countryIds: [],
-        userId: null,
-      }),
-
-      setView: (view) => set({ activeView: view, activeTopic: 'All', selectedArticle: null, searchQuery: '' }),
-
-      setTopic: (topic) => set({ activeTopic: topic, activeView: 'feed', selectedArticle: null, searchQuery: '' }),
-
-      setSearchQuery: (query: string) => set({ searchQuery: query, activeView: 'search', selectedArticle: null }),
-
-      setExploreTopic: (topic: string) => set({ activeTopic: topic, searchQuery: '', selectedArticle: null }),
-
-      setExploreQuery: (query: string) => set({ searchQuery: query, activeTopic: 'All', selectedArticle: null }),
+      resetOnboarding: () =>
+        set({
+          isOnboarded: false,
+          interests: [],
+          countryIds: [],
+          userId: null,
+        }),
     }),
     {
       name: 'imperium-storage',
@@ -104,6 +76,6 @@ export const useAppStore = create<AppState>()(
         isOnboarded: state.isOnboarded,
         savedArticles: state.savedArticles,
       }),
-    }
-  )
+    },
+  ),
 );

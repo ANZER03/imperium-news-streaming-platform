@@ -1,10 +1,12 @@
 'use client';
-import React, { useState } from 'react';
-import { Article } from '@/lib/types';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Heart, MessageCircle, Share, Bookmark, MoreHorizontal } from 'lucide-react';
+import { Article } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { relativeTime } from '@/lib/utils/time';
+import { articleCache } from '@/lib/utils/article-cache';
 
 interface ActionBtnProps {
   icon: React.ElementType;
@@ -17,9 +19,15 @@ function ActionBtn({ icon: Icon, count, onClick, active }: ActionBtnProps) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 group transition-colors ${active ? 'text-editorial-accent' : 'text-editorial-muted hover:text-editorial-accent'}`}
+      className={`flex items-center gap-1.5 group transition-colors ${
+        active ? 'text-editorial-accent' : 'text-editorial-muted hover:text-editorial-accent'
+      }`}
     >
-      <div className={`p-1.5 rounded-full transition-colors ${active ? 'bg-editorial-accent/10' : 'group-hover:bg-editorial-accent/10'}`}>
+      <div
+        className={`p-1.5 rounded-full transition-colors ${
+          active ? 'bg-editorial-accent/10' : 'group-hover:bg-editorial-accent/10'
+        }`}
+      >
         <Icon className="w-[18px] h-[18px]" fill={active ? 'currentColor' : 'none'} />
       </div>
       {count !== undefined && <span className="text-[13px]">{count}</span>}
@@ -28,11 +36,19 @@ function ActionBtn({ icon: Icon, count, onClick, active }: ActionBtnProps) {
 }
 
 export function NewsCard({ article }: { article: Article }) {
-  const { openArticle, toggleSaved, savedArticles } = useAppStore();
+  const { toggleSaved, savedArticles } = useAppStore();
   const isSaved = savedArticles.includes(article.id);
   const [liked, setLiked] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
+  // Seed the in-memory cache with whatever we know from the listing payload
+  // so the modal/full-page view can render title/image/source/topic
+  // immediately when the user clicks. This does NOT fire any network call.
+  useEffect(() => {
+    articleCache.set(article);
+  }, [article]);
+
+  // Stop the inner action buttons from triggering the surrounding <Link>.
   const stop = (fn: (e: React.MouseEvent) => void) => (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -40,13 +56,15 @@ export function NewsCard({ article }: { article: Article }) {
   };
 
   const handleSave = stop(() => toggleSaved(article.id));
-  const handleLike = stop(() => setLiked(v => !v));
+  const handleLike = stop(() => setLiked((v) => !v));
   const handleShare = stop(async () => {
-    const shareData = { title: article.title, url: article.url ?? window.location.href };
+    if (typeof window === 'undefined') return;
+    const url = `${window.location.origin}/article/${article.id}`;
+    const shareData = { title: article.title, url };
     if (navigator.share) {
       await navigator.share(shareData).catch(() => {});
     } else {
-      await navigator.clipboard.writeText(shareData.url).catch(() => {});
+      await navigator.clipboard.writeText(url).catch(() => {});
     }
   });
   const handleNoOp = stop(() => {});
@@ -54,24 +72,36 @@ export function NewsCard({ article }: { article: Article }) {
   const displayName = article.author || article.sourceName || 'Unknown';
 
   return (
-    <article
-      className="p-4 bg-editorial-bg border-b border-editorial-border cursor-pointer flex flex-col hover:bg-editorial-surface transition-colors"
-      onClick={() => openArticle(article)}
+    <Link
+      href={`/article/${article.id}`}
+      // No prefetch — detail is fetched on click by ArticleContent.
+      prefetch={false}
+      className="block p-4 bg-editorial-bg border-b border-editorial-border cursor-pointer flex flex-col hover:bg-editorial-surface transition-colors"
     >
       {/* Header row */}
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-          <span className="text-[15px] font-bold text-editorial-ink leading-tight">{displayName}</span>
+          <span className="text-[15px] font-bold text-editorial-ink leading-tight">
+            {displayName}
+          </span>
           {article.sourceName && article.author && article.sourceName !== article.author && (
             <span className="text-[13px] text-editorial-muted">· {article.sourceName}</span>
           )}
-          <span className="text-[13px] text-editorial-muted">· {relativeTime(article.publishedAt)}</span>
+          <span className="text-[13px] text-editorial-muted">
+            · {relativeTime(article.publishedAt)}
+          </span>
         </div>
-        <MoreHorizontal className="w-5 h-5 text-editorial-muted shrink-0 ml-2" onClick={handleNoOp} />
+        <MoreHorizontal
+          className="w-5 h-5 text-editorial-muted shrink-0 ml-2"
+          onClick={handleNoOp}
+        />
       </div>
 
       {/* Title */}
-      <h2 className="text-xl font-serif font-bold text-editorial-ink leading-tight mb-1" dir="auto">
+      <h2
+        className="text-xl font-serif font-bold text-editorial-ink leading-tight mb-1"
+        dir="auto"
+      >
         {article.title}
       </h2>
 
@@ -92,7 +122,9 @@ export function NewsCard({ article }: { article: Article }) {
             src={article.imageUrl}
             alt={article.title}
             fill
-            className={`object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            className={`object-cover transition-opacity duration-300 ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
             referrerPolicy="no-referrer"
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageLoaded(true)}
@@ -108,6 +140,6 @@ export function NewsCard({ article }: { article: Article }) {
         <ActionBtn icon={Bookmark} onClick={handleSave} active={isSaved} />
         <ActionBtn icon={Share} onClick={handleShare} />
       </div>
-    </article>
+    </Link>
   );
 }
