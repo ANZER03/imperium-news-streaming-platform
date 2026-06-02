@@ -1,5 +1,5 @@
 x-service-defaults: &service-defaults
-  restart: "no"
+  restart: unless-stopped
   networks:
     - imperium-net
 
@@ -45,10 +45,10 @@ services:
     profiles:
       - observability
     ports:
-      - "${OBS_HYPERDX_PORT:-48091}:8080"
+      - "${OBS_HYPERDX_PORT:-48086}:8080"
     environment:
       MONGO_URI: "mongodb://hyperdx-mongo:27017/hyperdx"
-      FRONTEND_URL: "http://localhost:${OBS_HYPERDX_PORT:-48091}"
+      FRONTEND_URL: "http://localhost:${OBS_HYPERDX_PORT:-48086}"
       HYPERDX_API_KEY: ${OBS_HYPERDX_API_KEY:-imperium-local-dev}
       DEFAULT_CONNECTIONS: '[{"name":"Imperium ClickHouse","host":"http://clickhouse:8123","username":"${OBS_CLICKHOUSE_USER:-admin}","password":"${OBS_CLICKHOUSE_PASSWORD:-clickstack123}"}]'
     depends_on:
@@ -78,11 +78,6 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:13133 || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
 
   grafana:
     <<: *service-defaults
