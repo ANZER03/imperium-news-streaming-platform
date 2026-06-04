@@ -23,7 +23,7 @@ function mapDetail(detail: BackendArticleDetail): Article {
     title: detail.title,
     excerpt: '',
     topic: detail.topic,
-    imageUrl: normalizeImageUrl(detail.image_url),
+    imageUrl: normalizeImageUrl(detail.image_url, detail.url),
     sourceName: detail.source_name,
     publishedAt: detail.published_at,
     content: detail.bodyText,
