@@ -29,6 +29,10 @@ function isActiveRoute(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function shouldFillIcon(id: string) {
+  return id === 'feed' || id === 'notif' || id === 'saved' || id === 'profile';
+}
+
 export function MobileNav() {
   const pathname = usePathname();
   const visible = useScrollDirection();
@@ -50,20 +54,21 @@ export function MobileNav() {
               : 'text-editorial-muted hover:text-editorial-ink'
           }`;
 
-          if (item.kind === 'link') {
-            return (
-              <Link key={item.id} href={item.href} className={className}>
-                <Icon
-                  className="h-[22px] w-[22px]"
-                  strokeWidth={active ? 2.5 : 2}
-                  fill={active && item.id === 'saved' ? 'currentColor' : 'none'}
-                />
-              </Link>
-            );
-          }
-          return (
+          return item.kind === 'link' ? (
+            <Link key={item.id} href={item.href} className={className}>
+              <Icon
+                className="h-[22px] w-[22px]"
+                strokeWidth={active ? 2.75 : 2}
+                fill={active && shouldFillIcon(item.id) ? 'currentColor' : 'none'}
+              />
+            </Link>
+          ) : (
             <button key={item.id} className={className} type="button">
-              <Icon className="h-[22px] w-[22px]" strokeWidth={2} fill="none" />
+              <Icon
+                className="h-[22px] w-[22px]"
+                strokeWidth={active ? 2.75 : 2}
+                fill={active && shouldFillIcon(item.id) ? 'currentColor' : 'none'}
+              />
             </button>
           );
         })}

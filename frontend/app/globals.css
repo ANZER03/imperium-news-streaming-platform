@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --color-editorial-accent: #6F3FF5;
+  --color-editorial-ink: #16131D;
+  --color-editorial-muted: #6E6A7A;
+  --color-editorial-bg: #FFFFFF;
+  --color-editorial-border: #E9E6F2;
+  --color-editorial-surface: #F7F5FB;
+  --dot-color: rgba(0, 0, 0, 0.08);
+}
+
+.dark {
+  --color-editorial-accent: #1c9cf0;
+  --color-editorial-ink: #e7e9ea;
+  --color-editorial-muted: #72767a;
+  --color-editorial-bg: #000000;
+  --color-editorial-border: #242628;
+  --color-editorial-surface: #17181c;
+  --dot-color: rgba(255, 255, 255, 0.08);
+}
+
 @theme {
   --color-brand-50: #f4f7ff;
   --color-brand-100: #e6edff;
@@ -7,12 +29,12 @@
   --color-brand-600: #4c3dde;
   --color-brand-700: #3A0A78;
   
-  --color-editorial-accent: var(--color-brand-500);
-  --color-editorial-ink: #16131D;
-  --color-editorial-muted: #6E6A7A;
-  --color-editorial-bg: #FFFFFF;
-  --color-editorial-border: #E9E6F2;
-  --color-editorial-surface: #F7F5FB;
+  --color-editorial-accent: var(--color-editorial-accent);
+  --color-editorial-ink: var(--color-editorial-ink);
+  --color-editorial-muted: var(--color-editorial-muted);
+  --color-editorial-bg: var(--color-editorial-bg);
+  --color-editorial-border: var(--color-editorial-border);
+  --color-editorial-surface: var(--color-editorial-surface);
 
   --font-sans: var(--font-inter), var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-playfair), ui-serif, Georgia, serif;
@@ -45,7 +67,7 @@
   }
 
   .bg-dot-pattern {
-    background-image: radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+    background-image: radial-gradient(var(--dot-color) 1px, transparent 1px);
     background-size: 20px 20px;
   }
 }

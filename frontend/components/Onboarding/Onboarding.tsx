@@ -109,7 +109,7 @@ export function Onboarding() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-white">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-editorial-bg">
         <Loader2 className="w-10 h-10 text-brand-500 animate-spin mb-4" />
         <p className="text-editorial-muted font-medium">Preparing your questionnaire...</p>
       </div>
@@ -117,7 +117,7 @@ export function Onboarding() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-white font-sans text-editorial-ink selection:bg-brand-100 overflow-x-hidden flex flex-col items-center justify-center p-6 md:p-12 lg:p-16">
+    <div className="min-h-[100dvh] bg-editorial-bg font-sans text-editorial-ink selection:bg-brand-100 overflow-x-hidden flex flex-col items-center justify-center p-6 md:p-12 lg:p-16">
       <motion.div
         key="onboarding-form"
         initial={{ opacity: 0, scale: 0.98 }}
@@ -208,7 +208,7 @@ export function Onboarding() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.15 }}
-                className="absolute z-50 mt-2 w-full bg-white border border-editorial-border rounded-xl shadow-lg overflow-hidden"
+                className="absolute z-50 mt-2 w-full bg-editorial-surface border border-editorial-border rounded-xl shadow-lg overflow-hidden"
               >
                 {/* Search */}
                 <div className="flex items-center gap-2 px-3 py-2.5 border-b border-editorial-border">
@@ -239,7 +239,7 @@ export function Onboarding() {
                             type="button"
                             onClick={() => toggleCountry(c.countryId)}
                             className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-editorial-surface
-                              ${selected ? 'bg-brand-50 text-brand-650 font-semibold' : 'text-editorial-ink'}`}
+                              ${selected ? 'bg-brand-500/10 text-brand-500 font-semibold' : 'text-editorial-ink'}`}
                           >
                             <span className="text-lg leading-none">{toFlag(c.abbreviation)}</span>
                             {c.countryName}
@@ -258,7 +258,7 @@ export function Onboarding() {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-sm font-medium">
+          <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-sm font-medium">
             {error}
           </div>
         )}

@@ -92,8 +92,8 @@ export function AuthForm() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-white font-sans text-editorial-ink selection:bg-brand-100 overflow-x-hidden">
-      <div className="flex flex-col lg:flex-row min-h-[100dvh] lg:h-screen w-full bg-white lg:overflow-hidden">
+    <div className="min-h-[100dvh] bg-editorial-bg font-sans text-editorial-ink selection:bg-brand-100 overflow-x-hidden">
+      <div className="flex flex-col lg:flex-row min-h-[100dvh] lg:h-screen w-full bg-editorial-bg lg:overflow-hidden">
         
         {/* Left Section (Dark Theme) - Fixed on desktop */}
         <div className="hidden lg:flex lg:w-1/2 h-full bg-dark-glow text-white relative flex-col overflow-hidden justify-between p-12 shrink-0">
@@ -235,7 +235,7 @@ export function AuthForm() {
               </div>
 
               {authError && (
-                <div className="p-3.5 bg-rose-50 border border-rose-100 rounded text-rose-600 text-xs font-semibold leading-relaxed">
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded text-rose-500 text-xs font-semibold leading-relaxed">
                   {authError}
                 </div>
               )}
