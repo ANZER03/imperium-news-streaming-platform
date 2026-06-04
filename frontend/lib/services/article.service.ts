@@ -55,7 +55,6 @@ export const articleService = {
     const promise = (async () => {
       const detail = await fetchApi<BackendArticleDetail>(
         `/api/v1/articles/${id}`,
-        { signal },
       );
       return articleCache.set(mapDetail(detail));
     })().finally(() => {

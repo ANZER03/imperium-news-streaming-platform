@@ -1,11 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Home, Search, Bell, Bookmark, User, Settings, MoreHorizontal } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '@/lib/store';
+import { authService } from '@/lib/services/auth.service';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -45,8 +47,29 @@ function isActiveRoute(pathname: string, href: string) {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { userId } = useAppStore();
+  const router = useRouter();
+  const { userId, resetOnboarding } = useAppStore();
   const handle = userId ? `@${userId.slice(0, 8)}` : '@you';
+
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDropdown]);
+
+  const handleLogout = async () => {
+    await authService.logout();
+    resetOnboarding();
+    router.push('/welcome');
+  };
 
   return (
     <>
@@ -125,9 +148,32 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               })}
             </nav>
 
-            {/* Profile at bottom */}
-            <div className="mt-auto w-full">
-              <button className="flex items-center gap-3 p-3 rounded-full hover:bg-editorial-surface transition-colors w-full lg:w-[220px]">
+            {/* Profile at bottom with dropdown */}
+            <div className="mt-auto w-full relative" ref={dropdownRef}>
+              <AnimatePresence>
+                {showDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute bottom-full left-0 mb-3 w-full lg:w-[220px] bg-white border border-editorial-border rounded-2xl shadow-xl z-50 p-2"
+                  >
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex items-center justify-between group"
+                    >
+                      <span>Log out {handle}</span>
+                      <span className="text-rose-450 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button
+                onClick={() => setShowDropdown(prev => !prev)}
+                className="flex items-center gap-3 p-3 rounded-full hover:bg-editorial-surface transition-colors w-full lg:w-[220px]"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userId ?? 'imperium'}`}
