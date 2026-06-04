@@ -47,3 +47,20 @@ services:
       QDRANT_URL: http://qdrant:6333
       QDRANT_COLLECTION: imperium_articles
     command: ["python", "qdrant_projector.py"]
+
+  imperium-elasticsearch-projector:
+    <<: *service-defaults
+    build:
+      context: ../apps/processing/news-pipeline/jobs/projections
+    container_name: imperium-elasticsearch-projector
+    hostname: imperium-elasticsearch-projector
+    profiles:
+      - projectors
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_INDEX: imperium_articles_search
+      ELASTICSEARCH_BATCH_SIZE: ${ELASTICSEARCH_BATCH_SIZE:-5000}
+      KAFKA_GROUP_ID: ${ELASTICSEARCH_PROJECTOR_GROUP_ID:-imperium-elasticsearch-projector-group-v1}
+    command: ["python", "elasticsearch_projector.py"]
