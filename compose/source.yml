@@ -42,7 +42,14 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       xpack.security.http.ssl.enabled: "false"
-      ES_JAVA_OPTS: ${ELASTICSEARCH_JAVA_OPTS:--Xms1g -Xmx1g}
+      ES_JAVA_OPTS: "${ELASTICSEARCH_JAVA_OPTS:--Xms1g -Xmx1g} -javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: elasticsearch
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=imperium-local,service.namespace=source
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health > /dev/null"]
       interval: 10s
@@ -51,6 +58,7 @@ services:
       start_period: 30s
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
+      - ${PWD}/obser/otel/otel-javaagent.jar:/otel/otel-javaagent.jar:ro
 
   clone-news:
     <<: *service-defaults

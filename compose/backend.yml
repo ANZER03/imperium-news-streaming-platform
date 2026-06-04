@@ -24,6 +24,8 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_AI_VECTORSTORE_QDRANT_HOST: qdrant
       SPRING_AI_VECTORSTORE_QDRANT_PORT: 6334
+      SEARCH_ELASTICSEARCH_BASE_URL: http://elasticsearch:9200
+      SEARCH_ELASTICSEARCH_INDEX: imperium_articles_search
       JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
       OTEL_SERVICE_NAME: news-app
       OTEL_RESOURCE_ATTRIBUTES: deployment.environment=imperium-local,service.namespace=backend

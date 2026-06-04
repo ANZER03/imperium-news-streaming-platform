@@ -191,6 +191,41 @@ Accept: application/json
 GET {{baseUrl}}/users/{{userId}}/bookmarks
 Accept: application/json
 
+###
+
+### ——————————————————————————————————————————————
+### STAGE 4: ARTICLE FULL-TEXT SEARCH (Elasticsearch)
+### ——————————————————————————————————————————————
+### Backed by imperium_articles_search. Requires Elasticsearch projector to be running.
+
+### 5a. Full-text search by title/body
+GET {{baseUrl}}/search/articles?q=العين&limit=5
+Accept: application/json
+
+###
+
+### 5b. Full-text search with source, country, and date range filters
+GET {{baseUrl}}/search/articles?q=العين&sourceName=sharjah24.ae&countryId=12&from=2026-01-01T00:00:00Z&limit=2
+Accept: application/json
+
+###
+
+### 5c. Exact date filter
+GET {{baseUrl}}/search/articles?sourceName=sharjah24.ae&date=2026-04-24&limit=5
+Accept: application/json
+
+###
+
+### 5d. Filter-only search by source domain, language, and video flag
+GET {{baseUrl}}/search/articles?sourceDomain=www.sharjah24.ae&languageCode=AR&isVideo=false&page=0&limit=10
+Accept: application/json
+
+###
+
+### 5e. Rubric and classification filters
+GET {{baseUrl}}/search/articles?classificationStatus=enriched&rubricId=0&limit=10
+Accept: application/json
+
 
 ### =============================================================
 ### V3 Feed Scanner — /api/v3/feed*

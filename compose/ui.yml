@@ -50,3 +50,23 @@ services:
       - ui
     ports:
       - "${PG_UI_EXTERNAL_PORT:-48084}:8080"
+
+  kibana:
+    <<: *service-defaults
+    image: ${KIBANA_IMAGE:-docker.elastic.co/kibana/kibana:8.15.5}
+    container_name: imperium-kibana
+    hostname: kibana
+    profiles:
+      - ui
+    ports:
+      - "${KIBANA_EXTERNAL_PORT:-45601}:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      XPACK_SECURITY_ENABLED: "false"
+      TELEMETRY_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status > /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 60s

@@ -103,15 +103,22 @@ class ElasticsearchHttpClient:
         create.raise_for_status()
         logger.info(f"Created Elasticsearch index {self.index_name}")
 
-    def bulk(self, operations: List[Dict[str, Any]]) -> None:
+    def bulk(self, operations: List[Dict[str, Any]]) -> int:
         if not operations:
-            return
+            return 0
         lines = []
         for operation in operations:
             action = operation["action"]
             document_id = operation["id"]
             lines.append(json.dumps({action: {"_index": self.index_name, "_id": document_id}}, separators=(",", ":")))
-            if action != "delete":
+            if action == "update":
+                lines.append(
+                    json.dumps(
+                        {"doc": operation["document"], "doc_as_upsert": True},
+                        separators=(",", ":"),
+                    )
+                )
+            else:
                 lines.append(json.dumps(operation["document"], separators=(",", ":")))
         payload = "\n".join(lines) + "\n"
         response = self.session.post(
@@ -123,27 +130,35 @@ class ElasticsearchHttpClient:
         response.raise_for_status()
         result = response.json()
         if result.get("errors"):
-            failures = [
-                item
-                for item in result.get("items", [])
-                if (item.get("index") or item.get("delete") or {}).get("error")
-            ]
-            raise RuntimeError(f"Elasticsearch bulk request had {len(failures)} failed items")
+            failures = _bulk_failures(result, operations)
+            for failure in failures[:10]:
+                logger.error(
+                    "Elasticsearch bulk item failed: action=%s id=%s status=%s type=%s reason=%s",
+                    failure.get("action"),
+                    failure.get("id"),
+                    failure.get("status"),
+                    failure.get("type"),
+                    failure.get("reason"),
+                )
+            if len(failures) > 10:
+                logger.error("Elasticsearch bulk suppressed %s additional item failures", len(failures) - 10)
+            return len(failures)
+        return 0
 
 
 def build_document(data: Dict[str, Any]) -> Dict[str, Any]:
     document = {
         "article_id": data.get("article_id"),
-        "source_news_id": data.get("source_news_id"),
-        "link_id": data.get("link_id"),
-        "authority_id": data.get("authority_id"),
-        "country_id": data.get("country_id"),
+        "source_news_id": _int_or_none(data.get("source_news_id")),
+        "link_id": _int_or_none(data.get("link_id")),
+        "authority_id": _int_or_none(data.get("authority_id")),
+        "country_id": _int_or_none(data.get("country_id")),
         "country_name": data.get("country_name"),
         "source_name": data.get("source_name"),
         "source_domain": data.get("source_domain"),
-        "rubric_id": data.get("rubric_id"),
+        "rubric_id": _int_or_none(data.get("rubric_id")),
         "rubric_title": data.get("rubric_title"),
-        "language_id": data.get("language_id"),
+        "language_id": _int_or_none(data.get("language_id")),
         "language_code": data.get("language_code"),
         "classification_status": data.get("classification_status"),
         "title": data.get("title") or "",
@@ -151,10 +166,10 @@ def build_document(data: Dict[str, Any]) -> Dict[str, Any]:
         "body_text_clean": data.get("body_text_clean") or "",
         "excerpt": data.get("excerpt") or "",
         "url": data.get("url"),
-        "image_url": data.get("image_url"),
-        "video_url": data.get("video_url"),
+        "image_url": _bounded_text(data.get("image_url"), 4096),
+        "video_url": _bounded_text(data.get("video_url"), 4096),
         "reporter": data.get("reporter"),
-        "source_date_text": data.get("source_date_text"),
+        "source_date_text": _bounded_text(data.get("source_date_text"), 4096),
         "published_at": _timestamp_millis(data.get("published_at")),
         "crawled_at": _timestamp_millis(data.get("crawled_at")),
         "processed_at": _timestamp_millis(data.get("processed_at")),
@@ -162,15 +177,14 @@ def build_document(data: Dict[str, Any]) -> Dict[str, Any]:
         "is_visible": _is_searchable(data),
         "dimension_status": data.get("dimension_status"),
         "missing_dimensions": data.get("missing_dimensions") or [],
-        "schema_version": data.get("schema_version"),
+        "schema_version": _int_or_none(data.get("schema_version")),
     }
     return {key: value for key, value in document.items() if value is not None}
 
 
 def process_batch(messages: List[Message], client: ElasticsearchHttpClient, avro_deserializer) -> None:
     operations = []
-    indexed_count = 0
-    deleted_count = 0
+    upserted_count = 0
     skipped_count = 0
 
     for msg in messages:
@@ -183,22 +197,18 @@ def process_batch(messages: List[Message], client: ElasticsearchHttpClient, avro
                 continue
 
             article_id = str(data["article_id"])
-            if data.get("is_delete") or not _is_searchable(data):
-                operations.append({"action": "delete", "id": article_id})
-                deleted_count += 1
-                continue
-
-            operations.append({"action": "index", "id": article_id, "document": build_document(data)})
-            indexed_count += 1
+            operations.append({"action": "update", "id": article_id, "document": build_document(data)})
+            upserted_count += 1
         except Exception as exc:
             logger.error(f"Failed to build Elasticsearch operation: {exc}", exc_info=True)
             skipped_count += 1
 
     if operations:
-        client.bulk(operations)
+        failed_count = client.bulk(operations)
+        upserted_count = max(upserted_count - failed_count, 0)
         logger.info(
-            f"Elasticsearch bulk applied: {indexed_count} indexed, "
-            f"{deleted_count} deleted, {skipped_count} skipped."
+            f"Elasticsearch bulk applied: {upserted_count} upserted, "
+            f"{skipped_count} skipped, {failed_count} failed."
         )
 
 
@@ -233,6 +243,47 @@ def _timestamp_millis(value: Any) -> int | None:
             return int(numeric)
         return int(numeric * 1000)
     return None
+
+
+def _bulk_failures(result: Dict[str, Any], operations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    failures = []
+    for index, item in enumerate(result.get("items", [])):
+        action = next(iter(item.keys()), None)
+        outcome = item.get(action) if action else None
+        if not outcome or "error" not in outcome:
+            continue
+        operation = operations[index] if index < len(operations) else {}
+        error = outcome.get("error") or {}
+        failures.append(
+            {
+                "action": action,
+                "id": outcome.get("_id") or operation.get("id"),
+                "status": outcome.get("status"),
+                "type": error.get("type"),
+                "reason": error.get("reason"),
+            }
+        )
+    return failures
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _bounded_text(value: Any, max_len: int) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    if len(text) > max_len:
+        return text[:max_len]
+    return text
 
 
 def main() -> None:
