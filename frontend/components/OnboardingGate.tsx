@@ -19,6 +19,7 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const isOnboarded = useAppStore((state) => state.isOnboarded);
+  const userId = useAppStore((state) => state.userId);
 
   const [hydrated, setHydrated] = useState(false);
   const redirected = useRef(false);
@@ -37,20 +38,27 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    if (isOnboarded) {
-      redirected.current = false;
+
+    if (!userId) {
+      if (redirected.current) return;
+      redirected.current = true;
+      router.replace('/welcome');
       return;
     }
-    if (redirected.current) return;
-    if (pathname === '/onboarding') return;
-    redirected.current = true;
-    router.replace('/onboarding');
-  }, [hydrated, isOnboarded, pathname, router]);
 
-  // While hydrating OR redirecting to /onboarding, render nothing to avoid
-  // showing the protected shell briefly.
+    if (!isOnboarded) {
+      if (redirected.current) return;
+      redirected.current = true;
+      router.replace('/onboarding');
+      return;
+    }
+
+    redirected.current = false;
+  }, [hydrated, userId, isOnboarded, router]);
+
+  // While hydrating OR redirecting, render nothing to avoid showing the protected shell briefly.
   if (!hydrated) return null;
-  if (!isOnboarded) return null;
+  if (!userId || !isOnboarded) return null;
 
   return <>{children}</>;
 }

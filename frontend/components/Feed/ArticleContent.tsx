@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   ArrowUp,
@@ -18,6 +17,7 @@ import { Article } from '@/lib/types';
 import { relativeTime } from '@/lib/utils/time';
 import { getTopicMeta } from '@/lib/utils/topic';
 import { articleCache } from '@/lib/utils/article-cache';
+import { ArticleImage } from './ArticleImage';
 
 interface LocalComment {
   id: string;
@@ -53,15 +53,12 @@ export function ArticleContent({ articleId, onClose }: ArticleContentProps) {
   const [bodyLoading, setBodyLoading] = useState(
     () => !articleCache.hasFullDetail(articleId),
   );
-  const [imageLoaded, setImageLoaded] = useState(false);
+
   const [showComments, setShowComments] = useState(false);
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<LocalComment[]>([]);
 
-  // Ref to the underlying <img> element so we can detect when it's already
-  // loaded from the browser's cache. `next/image` forwards refs to the
-  // rendered <img>.
-  const imgRef = useRef<HTMLImageElement>(null);
+
 
   useEffect(() => {
     const cached = articleCache.get(articleId);
@@ -92,22 +89,7 @@ export function ArticleContent({ articleId, onClose }: ArticleContentProps) {
     return () => controller.abort();
   }, [articleId]);
 
-  // Synchronously detect cached images. `<img>.complete` is true the moment
-  // the browser has the bitmap (including memory cache). We must do this in
-  // useLayoutEffect — running after paint would briefly show the empty
-  // placeholder even when the image is already available.
-  useLayoutEffect(() => {
-    if (!detail?.imageUrl) {
-      setImageLoaded(false);
-      return;
-    }
-    const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth > 0) {
-      setImageLoaded(true);
-    } else {
-      setImageLoaded(false);
-    }
-  }, [detail?.imageUrl]);
+
 
   const isSaved = savedArticles.includes(articleId);
   const topic = getTopicMeta(detail?.topic);
@@ -237,24 +219,12 @@ export function ArticleContent({ articleId, onClose }: ArticleContentProps) {
 
             {/* Hero image */}
             {detail.imageUrl && (
-              <div className="relative aspect-video w-full overflow-hidden rounded-sm mb-10 bg-editorial-surface">
-                {!imageLoaded && (
-                  <div className="absolute inset-0 z-10 bg-gradient-to-r from-editorial-surface via-white/60 to-editorial-surface animate-[shimmer_2s_infinite]" />
-                )}
-                <Image
-                  ref={imgRef}
-                  src={detail.imageUrl}
-                  alt={detail.title}
-                  fill
-                  className={`object-cover transition-opacity duration-300 ${
-                    imageLoaded ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  referrerPolicy="no-referrer"
-                  onLoad={() => setImageLoaded(true)}
-                  onError={() => setImageLoaded(true)}
-                  unoptimized
-                />
-              </div>
+              <ArticleImage
+                src={detail.imageUrl}
+                alt={detail.title}
+                fill
+                containerClassName="relative aspect-video w-full overflow-hidden rounded-sm mb-10 bg-editorial-surface"
+              />
             )}
 
             {/* Body */}
@@ -355,14 +325,13 @@ export function ArticleContent({ articleId, onClose }: ArticleContentProps) {
               {/* Article context strip */}
               <div className="flex items-start gap-3 p-4 border-b border-editorial-border shrink-0">
                 {detail?.imageUrl && (
-                  <div className="w-14 h-14 rounded-lg overflow-hidden bg-editorial-surface shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={detail.imageUrl}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  <ArticleImage
+                    src={detail.imageUrl}
+                    alt=""
+                    width={56}
+                    height={56}
+                    containerClassName="w-14 h-14 rounded-lg overflow-hidden bg-editorial-surface shrink-0 relative"
+                  />
                 )}
                 <div className="flex-1 min-w-0">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-editorial-accent">

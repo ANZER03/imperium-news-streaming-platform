@@ -3,13 +3,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import { Onboarding } from '@/components/Onboarding/Onboarding';
+import { Welcome } from '@/components/Onboarding/Welcome';
 
-export default function OnboardingPage() {
+export default function WelcomePage() {
   const router = useRouter();
   const isOnboarded = useAppStore((state) => state.isOnboarded);
   const userId = useAppStore((state) => state.userId);
-
   const [hydrated, setHydrated] = useState(false);
   const redirected = useRef(false);
 
@@ -19,30 +18,24 @@ export default function OnboardingPage() {
       return;
     }
     const unsub = useAppStore.persist?.onFinishHydration(() => setHydrated(true));
-    return () => {
-      unsub?.();
-    };
+    return () => unsub?.();
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
     if (redirected.current) return;
 
-    if (!userId) {
+    if (userId) {
       redirected.current = true;
-      router.replace('/welcome');
-      return;
-    }
-
-    if (isOnboarded) {
-      redirected.current = true;
-      router.replace('/');
-      return;
+      if (isOnboarded) {
+        router.replace('/');
+      } else {
+        router.replace('/onboarding');
+      }
     }
   }, [hydrated, userId, isOnboarded, router]);
 
-  if (!hydrated) return null;
-  if (!userId || isOnboarded) return null;
+  if (!hydrated || userId) return null;
 
-  return <Onboarding />;
+  return <Welcome />;
 }

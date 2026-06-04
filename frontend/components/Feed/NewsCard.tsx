@@ -1,12 +1,12 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Heart, MessageCircle, Share, Bookmark, MoreHorizontal } from 'lucide-react';
 import { Article } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { relativeTime } from '@/lib/utils/time';
 import { articleCache } from '@/lib/utils/article-cache';
+import { ArticleImage } from './ArticleImage';
 
 interface ActionBtnProps {
   icon: React.ElementType;
@@ -39,7 +39,7 @@ export function NewsCard({ article }: { article: Article }) {
   const { toggleSaved, savedArticles } = useAppStore();
   const isSaved = savedArticles.includes(article.id);
   const [liked, setLiked] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+
 
   // Seed the in-memory cache with whatever we know from the listing payload
   // so the modal/full-page view can render title/image/source/topic
@@ -114,23 +114,11 @@ export function NewsCard({ article }: { article: Article }) {
 
       {/* Image */}
       {article.imageUrl && (
-        <div className="w-full relative aspect-video rounded-xl overflow-hidden my-2 border border-editorial-border bg-editorial-surface">
-          {!imageLoaded && (
-            <div className="absolute inset-0 z-10 bg-gradient-to-r from-editorial-surface via-white/60 to-editorial-surface animate-[shimmer_2s_infinite]" />
-          )}
-          <Image
-            src={article.imageUrl}
-            alt={article.title}
-            fill
-            className={`object-cover transition-opacity duration-300 ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            referrerPolicy="no-referrer"
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageLoaded(true)}
-            unoptimized
-          />
-        </div>
+        <ArticleImage
+          src={article.imageUrl}
+          alt={article.title}
+          fill
+        />
       )}
 
       {/* Action bar */}

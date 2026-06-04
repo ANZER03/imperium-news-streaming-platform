@@ -1,11 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { Home, Search, Bell, Bookmark, User, Settings, MoreHorizontal } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Home, Search, Bell, Bookmark, User, Settings, MoreHorizontal, Sun, Moon } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '@/lib/store';
+import { authService } from '@/lib/services/auth.service';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -38,6 +40,10 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { kind: 'button', id: 'settings',icon: Settings,label: 'Settings' },
 ];
 
+function shouldFillIcon(id: string) {
+  return id === 'feed' || id === 'notif' || id === 'saved' || id === 'profile';
+}
+
 function isActiveRoute(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -45,8 +51,33 @@ function isActiveRoute(pathname: string, href: string) {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { userId } = useAppStore();
+  const router = useRouter();
+  const { userId, resetOnboarding, theme, setTheme } = useAppStore();
   const handle = userId ? `@${userId.slice(0, 8)}` : '@you';
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDropdown]);
+
+  const handleLogout = async () => {
+    await authService.logout();
+    resetOnboarding();
+    router.push('/welcome');
+  };
 
   return (
     <>
@@ -91,24 +122,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     : 'font-medium text-editorial-muted hover:text-editorial-ink'
                 }`;
 
-                if (item.kind === 'link') {
-                  return (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      onClick={onClose}
-                      className={baseClass}
-                    >
-                      <Icon
-                        className="w-[26px] h-[26px] shrink-0"
-                        strokeWidth={active ? 2.5 : 2}
-                      />
-                      <span className="text-xl">{item.label}</span>
-                    </Link>
-                  );
-                }
-
-                return (
+                return item.kind === 'link' ? (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    onClick={onClose}
+                    className={baseClass}
+                  >
+                    <Icon
+                      className="w-[26px] h-[26px] shrink-0"
+                      strokeWidth={active ? 2.75 : 2}
+                      fill={active && shouldFillIcon(item.id) ? 'currentColor' : 'none'}
+                    />
+                    <span className="text-xl">{item.label}</span>
+                  </Link>
+                ) : (
                   <button
                     key={item.id}
                     onClick={item.onClick}
@@ -117,7 +145,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   >
                     <Icon
                       className="w-[26px] h-[26px] shrink-0"
-                      strokeWidth={2}
+                      strokeWidth={active ? 2.75 : 2}
+                      fill={active && shouldFillIcon(item.id) ? 'currentColor' : 'none'}
                     />
                     <span className="text-xl">{item.label}</span>
                   </button>
@@ -125,9 +154,52 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               })}
             </nav>
 
-            {/* Profile at bottom */}
-            <div className="mt-auto w-full">
-              <button className="flex items-center gap-3 p-3 rounded-full hover:bg-editorial-surface transition-colors w-full lg:w-[220px]">
+            {/* Profile at bottom with dropdown */}
+            <div className="mt-auto w-full relative" ref={dropdownRef}>
+              <AnimatePresence>
+                {showDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute bottom-full left-0 mb-3 w-full lg:w-[220px] bg-editorial-bg border border-editorial-border rounded-2xl shadow-xl z-50 p-2"
+                  >
+                    <button
+                      onClick={toggleTheme}
+                      className="w-full text-left px-4 py-3 text-sm font-semibold text-editorial-ink hover:bg-editorial-surface rounded-xl transition-colors flex items-center gap-2.5 group"
+                      type="button"
+                    >
+                      {theme === 'dark' ? (
+                        <>
+                          <Sun className="w-4 h-4 shrink-0 text-editorial-accent" />
+                          <span>Light Mode</span>
+                        </>
+                      ) : (
+                        <>
+                          <Moon className="w-4 h-4 shrink-0 text-editorial-accent" />
+                          <span>Dark Mode</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="h-px bg-editorial-border my-1" />
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors flex items-center justify-between group"
+                    >
+                      <span>Log out {handle}</span>
+                      <span className="text-rose-450 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button
+                onClick={() => setShowDropdown(prev => !prev)}
+                className="flex items-center gap-3 p-3 rounded-full hover:bg-editorial-surface transition-colors w-full lg:w-[220px]"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userId ?? 'imperium'}`}

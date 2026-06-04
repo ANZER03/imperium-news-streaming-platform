@@ -1,0 +1,115 @@
+{
+  "uid": "kafka-cluster",
+  "title": "Kafka Cluster",
+  "tags": ["kafka"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "title": "Brokers Online",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"red","value":0},{"color":"yellow","value":1},{"color":"green","value":2}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT count(DISTINCT ServiceName) as value FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND TimeUnix > now() - INTERVAL 1 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 2, "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "title": "Producer Send Rate (rec/s)",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"blue","value":0},{"color":"green","value":0.5}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT round(max(Value), 2) as value FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName = 'kafka.producer.record_send_rate' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 3, "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "title": "Consumer Connections",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"blue","value":0},{"color":"green","value":1}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT round(max(Value), 0) as value FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName = 'kafka.consumer.connection_count' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 4, "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "title": "Producer Latency Avg (ms)",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":50},{"color":"red","value":200}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT round(max(Value), 2) as value FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName = 'kafka.producer.request_latency_avg' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 5, "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "title": "CPU % (kafka-1)",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":60},{"color":"red","value":80}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT round(argMax(Value, TimeUnix) * 100, 2) as value FROM otel_metrics_gauge WHERE ServiceName = 'kafka-1' AND MetricName = 'jvm.cpu.recent_utilization' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 6, "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "title": "CPU % (kafka-2)",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":60},{"color":"red","value":80}] } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT round(argMax(Value, TimeUnix) * 100, 2) as value FROM otel_metrics_gauge WHERE ServiceName = 'kafka-2' AND MetricName = 'jvm.cpu.recent_utilization' AND TimeUnix > now() - INTERVAL 5 MINUTE", "format": "table" }]
+    },
+    {
+      "id": 7, "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "title": "CPU Usage Over Time (%)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, ServiceName='kafka-1') * 100, 2) as `kafka-1`, round(avgIf(Value, ServiceName='kafka-2') * 100, 2) as `kafka-2` FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName = 'jvm.cpu.recent_utilization' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 8, "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "title": "Heap Memory Used (GB)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "decgbytes", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(sumIf(Value, ServiceName='kafka-1') / 1073741824, 3) as `kafka-1`, round(sumIf(Value, ServiceName='kafka-2') / 1073741824, 3) as `kafka-2` FROM otel_metrics_sum WHERE ServiceName LIKE 'kafka-%' AND MetricName = 'jvm.memory.used' AND Attributes['jvm.memory.type'] = 'heap' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 9, "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "title": "Producer vs Consumer Byte Rate (bytes/s)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, MetricName='kafka.producer.outgoing_byte_rate'), 2) as `producer-out`, round(avgIf(Value, MetricName='kafka.consumer.incoming_byte_rate'), 2) as `consumer-in` FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName IN ('kafka.producer.outgoing_byte_rate','kafka.consumer.incoming_byte_rate') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 10, "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "title": "Producer Request Latency (ms)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } }, "overrides": [{"matcher":{"id":"byName","options":"latency-max"},"properties":[{"id":"custom.lineStyle","value":{"dash":[4,4],"fill":"dash"}}]}] },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, MetricName='kafka.producer.request_latency_avg'), 2) as `latency-avg`, round(avgIf(Value, MetricName='kafka.producer.request_latency_max'), 2) as `latency-max` FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName IN ('kafka.producer.request_latency_avg','kafka.producer.request_latency_max') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 11, "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "title": "Producer Batch Size (bytes)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, MetricName='kafka.producer.batch_size_avg'), 2) as `batch-avg`, round(avgIf(Value, MetricName='kafka.producer.batch_size_max'), 2) as `batch-max` FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName IN ('kafka.producer.batch_size_avg','kafka.producer.batch_size_max') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 12, "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "title": "Producer Buffer Utilization (%)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "lineWidth": 2 }, "min": 0, "max": 100, "thresholds": { "steps": [{"color":"green","value":0},{"color":"yellow","value":70},{"color":"red","value":90}] } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round((1 - avgIf(Value, MetricName='kafka.producer.buffer_available_bytes') / avgIf(Value, MetricName='kafka.producer.buffer_total_bytes')) * 100, 2) as `buffer-used-%` FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName IN ('kafka.producer.buffer_available_bytes','kafka.producer.buffer_total_bytes') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 13, "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "title": "Consumer Fetch Rate & Records Rate (per/s)",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, MetricName='kafka.consumer.fetch_rate'), 2) as `fetch-rate`, round(avgIf(Value, MetricName='kafka.consumer.records_consumed_rate'), 2) as `records-rate` FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName IN ('kafka.consumer.fetch_rate','kafka.consumer.records_consumed_rate') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 14, "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "title": "Producer Records per Request & Requests In-Flight",
+      "type": "timeseries",
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2 } } },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT toStartOfMinute(TimeUnix) as time, round(avgIf(Value, MetricName='kafka.producer.records_per_request_avg'), 2) as `records-per-req`, round(avgIf(Value, MetricName='kafka.producer.requests_in_flight'), 2) as `in-flight` FROM otel_metrics_gauge WHERE ServiceName LIKE 'kafka-%' AND MetricName IN ('kafka.producer.records_per_request_avg','kafka.producer.requests_in_flight') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time", "format": "table" }]
+    },
+    {
+      "id": 15, "gridPos": { "x": 0, "y": 36, "w": 24, "h": 7 },
+      "title": "Kafka Logs",
+      "type": "logs",
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "showTime": true },
+      "targets": [{ "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" }, "rawSql": "SELECT Timestamp as timestamp, Body as body, SeverityText as level, ServiceName FROM otel_logs WHERE ServiceName LIKE 'kafka-%' AND $__timeFilter(Timestamp) ORDER BY Timestamp DESC LIMIT 200", "format": "logs" }]
+    }
+  ]
+}

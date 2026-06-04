@@ -4,24 +4,42 @@ import { bookmarkService } from './services/bookmark.service';
 
 interface AppState {
   userId: string | null;
+  userToken: string | null;
+  userName: string | null;
+  userEmail: string | null;
   interests: string[];
   countryIds: number[];
   isOnboarded: boolean;
   savedArticles: string[];
+  theme: 'light' | 'dark';
 
+  loginUser: (userId: string, token: string, email: string, name: string) => void;
   completeOnboarding: (interests: string[], countryIds: number[], userId: string) => void;
   toggleSaved: (articleId: string) => void;
   resetOnboarding: () => void;
+  setTheme: (theme: 'light' | 'dark') => void;
 }
 
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       userId: null,
+      userToken: null,
+      userName: null,
+      userEmail: null,
       interests: [],
       countryIds: [],
       isOnboarded: false,
       savedArticles: [],
+      theme: 'light',
+
+      loginUser: (userId, token, email, name) =>
+        set(() => ({
+          userId,
+          userToken: token,
+          userEmail: email,
+          userName: name,
+        })),
 
       completeOnboarding: (interests, countryIds, userId) =>
         set(() => ({
@@ -65,16 +83,25 @@ export const useAppStore = create<AppState>()(
           interests: [],
           countryIds: [],
           userId: null,
+          userToken: null,
+          userName: null,
+          userEmail: null,
         }),
+
+      setTheme: (theme) => set({ theme }),
     }),
     {
       name: 'imperium-storage',
       partialize: (state) => ({
         userId: state.userId,
+        userToken: state.userToken,
+        userName: state.userName,
+        userEmail: state.userEmail,
         interests: state.interests,
         countryIds: state.countryIds,
         isOnboarded: state.isOnboarded,
         savedArticles: state.savedArticles,
+        theme: state.theme,
       }),
     },
   ),
