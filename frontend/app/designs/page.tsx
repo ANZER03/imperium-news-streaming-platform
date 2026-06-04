@@ -29,6 +29,30 @@ const authDesigns = [
   { v: 10, label: 'Cinematic Dark Mode', desc: 'Full screen dark layout, neon-purple outline active glows' },
 ];
 
+const searchDesigns = [
+  { v: 1, label: 'Editorial Colonnade', desc: 'Serif text, divided columns for trends, clear input underlines' },
+  { v: 2, label: 'Category Grid Hub', desc: 'Card groups for topics, graphical custom date-slider filter' },
+  { v: 3, label: 'Palantir Intelligence Node', desc: 'Dark theme, high data density, node-like metadata connections' },
+  { v: 4, label: 'Bloomberg x Twitter Feed', desc: 'Real-time ticker stream, trending tags, sentiment charts' },
+  { v: 5, label: 'Modular Bento Analytics', desc: 'SaaS grid layout, dynamic widgets updating with search input' },
+  { v: 6, label: 'Global Threat Matrix', desc: 'Multi-column data table approach, structured analytical filters' },
+  { v: 7, label: 'Editorial Azure', desc: 'Blue monochrome paper theme, sentiment sidebar under trends' },
+  { v: 8, label: 'Editorial Crimson', desc: 'Cream & Red classic paper, true 3-column layout' },
+  { v: 9, label: 'Editorial Forest', desc: 'Eco-green mint theme, wide horizontal sentiment bar above results' },
+  { v: 10, label: 'Editorial Sepia', desc: 'Vintage brown layout with a massive graphic-style sentiment block' },
+  { v: 11, label: 'Editorial Noir', desc: 'Dark mode newspaper, sentiment vertical bars in top infobox' },
+  { v: 12, label: 'Option 1 (Left Thumbnail)', desc: 'Compact list cards with square images on the left, horizontal sentiment bars' },
+  { v: 13, label: 'Option 2 (Top Image Grid)', desc: '2-column card grid with banner images on top, concentric radial sentiment rings' },
+  { v: 14, label: 'Option 3 (Split Overlay)', desc: 'Grayscale image backdrops inside cards with minimal text overlay, summary boxes' },
+  { v: 15, label: 'Option 4 (Magazine Hero)', desc: 'Large Hero card for first result followed by compact list items, custom matrix table' },
+  { v: 16, label: 'Option 5 (Timeline Flow)', desc: 'Vertical timeline line with circular photo nodes, text-gauge readout' },
+  { v: 17, label: 'Option 10 (Dense Strips)', desc: 'Minimal horizontal strips displaying hover-to-zoom images, vertical progress charts' },
+  { v: 18, label: 'Option 7 (Asymmetric Deck)', desc: 'Offset card borders with thick shadow offsets, minimal donut charts' },
+  { v: 19, label: 'Option 8 (Double Broadsheet)', desc: 'Double-border cards containing boxed images, segmented block grids' },
+  { v: 20, label: 'Option 9 (Retro Offset Shadow)', desc: 'Retro bold outline offset shadows, larger square images, dot-matrix progress' },
+  { v: 21, label: 'Option 10 (50/50 Split Card)', desc: 'Horizontal cards divided 50/50 between image and text, summary stats layout' },
+];
+
 export default function DesignsIndex() {
   return (
     <div className="min-h-screen bg-editorial-bg font-sans px-6 py-12 max-w-3xl mx-auto">
@@ -80,7 +104,7 @@ export default function DesignsIndex() {
         </div>
       </section>
 
-      <section>
+      <section className="mb-12">
         <h2 className="text-xs font-bold uppercase tracking-widest text-editorial-muted mb-5 border-b border-editorial-border pb-3">
           Auth (Signup / Signin) — 10 variants
         </h2>
@@ -88,7 +112,28 @@ export default function DesignsIndex() {
           {authDesigns.map(({ v, label, desc }) => (
             <Link key={v} href={`/designs/auth/v${v}`}
               className="flex items-center gap-4 p-4 rounded-xl hover:bg-editorial-surface transition-colors group">
-              <span className="text-2xl font-serif font-bold text-editorial-accent/30 group-hover:text-editorial-accent transition-colors w-8 shrink-0">
+              <span className="text-2xl font-serif font-bold text-[#6F3FF5]/30 group-hover:text-[#6F3FF5] transition-colors w-8 shrink-0">
+                {v}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-editorial-ink group-hover:text-editorial-accent transition-colors">{label}</p>
+                <p className="text-xs text-editorial-muted mt-0.5">{desc}</p>
+              </div>
+              <span className="ml-auto text-editorial-muted group-hover:text-editorial-accent transition-colors text-lg">→</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-12">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-editorial-muted mb-5 border-b border-editorial-border pb-3">
+          Search Dialog — 10 variants
+        </h2>
+        <div className="space-y-3">
+          {searchDesigns.map(({ v, label, desc }) => (
+            <Link key={v} href={`/designs/search/v${v}`}
+              className="flex items-center gap-4 p-4 rounded-xl hover:bg-editorial-surface transition-colors group">
+              <span className="text-2xl font-serif font-bold text-[#6F3FF5]/30 group-hover:text-[#6F3FF5] transition-colors w-8 shrink-0">
                 {v}
               </span>
               <div>
