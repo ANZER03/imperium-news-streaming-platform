@@ -11,6 +11,12 @@ receivers:
     collection_interval: 10s
     password: ${env:REDIS_PASSWORD}
 
+  elasticsearch:
+    endpoint: http://elasticsearch:9200
+    collection_interval: 10s
+    nodes: [_all]
+    indices: [_all]
+
 processors:
   resourcedetection:
     detectors: [env, system]
@@ -26,6 +32,15 @@ processors:
     attributes:
       - key: service.name
         value: redis
+        action: upsert
+      - key: deployment.environment
+        value: imperium-local
+        action: upsert
+
+  resource/elasticsearch:
+    attributes:
+      - key: service.name
+        value: elasticsearch
         action: upsert
       - key: deployment.environment
         value: imperium-local
@@ -72,6 +87,11 @@ service:
     metrics/redis:
       receivers: [redis]
       processors: [resourcedetection, resource/redis, batch]
+      exporters: [clickhouse, debug]
+
+    metrics/elasticsearch:
+      receivers: [elasticsearch]
+      processors: [resourcedetection, resource/elasticsearch, batch]
       exporters: [clickhouse, debug]
 
     logs:

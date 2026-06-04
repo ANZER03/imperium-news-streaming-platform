@@ -1,0 +1,181 @@
+{
+  "uid": "elasticsearch-server",
+  "title": "Elasticsearch Server",
+  "tags": ["elasticsearch", "search", "infra"],
+  "timezone": "browser",
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "title": "Cluster Health",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "1": { "text": "Green", "color": "green" }, "2": { "text": "Yellow", "color": "yellow" }, "3": { "text": "Red", "color": "red" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 2 }, { "color": "red", "value": 3 } ] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT multiIf(argMaxIf(Value, TimeUnix, Attributes['status'] = 'red') = 1, 3, argMaxIf(Value, TimeUnix, Attributes['status'] = 'yellow') = 1, 2, 1) AS value FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.cluster.health' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "title": "Nodes",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT argMax(Value, TimeUnix) AS value FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.cluster.nodes' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "title": "Data Nodes",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT argMax(Value, TimeUnix) AS value FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.cluster.data_nodes' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "title": "Shards",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT argMaxIf(Value, TimeUnix, Attributes['state'] = 'active') AS value FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.cluster.shards' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "title": "Store Size (MB)",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT round(argMax(Value, TimeUnix) / 1048576, 2) AS value FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.index.shards.size' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "title": "Documents",
+      "type": "stat",
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT argMax(Value, TimeUnix) AS value FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.index.documents' AND TimeUnix > now() - INTERVAL 5 MINUTE",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "title": "OS Memory (MB)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, round(maxIf(Value, Attributes['state'] = 'used') / 1048576, 2) AS used_mb, round(maxIf(Value, Attributes['state'] = 'free') / 1048576, 2) AS free_mb FROM otel_metrics_gauge WHERE MetricName = 'elasticsearch.os.memory' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "title": "Indexing and Search Operations / sec",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, round((maxIf(Value, Attributes['operation'] = 'index') - minIf(Value, Attributes['operation'] = 'index')) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0), 4) AS index_ops_per_sec, round((maxIf(Value, Attributes['operation'] = 'query') - minIf(Value, Attributes['operation'] = 'query')) / nullIf(dateDiff('second', min(TimeUnix), max(TimeUnix)), 0), 4) AS query_ops_per_sec FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.index.operations.completed' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "title": "Open HTTP Connections",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, max(Value) AS open_connections FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.node.http.connections' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "title": "Thread Pool Queue",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, max(Value) AS queued_tasks FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.node.thread_pool.tasks.queued' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "title": "Disk Free vs Total (MB)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, round(maxIf(Value, MetricName = 'elasticsearch.node.fs.disk.free') / 1048576, 2) AS free_mb, round(maxIf(Value, MetricName = 'elasticsearch.node.fs.disk.total') / 1048576, 2) AS total_mb FROM otel_metrics_sum WHERE MetricName IN ('elasticsearch.node.fs.disk.free','elasticsearch.node.fs.disk.total') AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "title": "Cluster Health Trend",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-obs" },
+          "rawSql": "SELECT toStartOfMinute(TimeUnix) AS time, multiIf(maxIf(Value, Attributes['status'] = 'red') = 1, 3, maxIf(Value, Attributes['status'] = 'yellow') = 1, 2, 1) AS health FROM otel_metrics_sum WHERE MetricName = 'elasticsearch.cluster.health' AND $__timeFilter(TimeUnix) GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ]
+    }
+  ]
+}

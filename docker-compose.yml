@@ -35,6 +35,8 @@ volumes:
     name: imperium-observability-grafana-data
   qdrant-data:
     name: imperium-qdrant-data
+  elasticsearch-data:
+    name: imperium-elasticsearch-data
   spark-master-data:
     name: imperium-spark-master-data
   spark-worker-1-data:

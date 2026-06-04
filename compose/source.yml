@@ -29,6 +29,29 @@ services:
       - source-db:/var/lib/postgresql/data
       - ../infrastructure/postgres/initdb:/docker-entrypoint-initdb.d:ro
 
+  elasticsearch:
+    <<: *service-defaults
+    image: ${ELASTICSEARCH_IMAGE}
+    container_name: imperium-elasticsearch
+    hostname: elasticsearch
+    profiles:
+      - source
+    ports:
+      - "${ELASTICSEARCH_EXTERNAL_PORT:-49200}:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+      ES_JAVA_OPTS: ${ELASTICSEARCH_JAVA_OPTS:--Xms1g -Xmx1g}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+
   clone-news:
     <<: *service-defaults
     build:
