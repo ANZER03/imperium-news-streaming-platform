@@ -50,6 +50,8 @@ x-phase3-driver-defaults: &phase3-driver-defaults
 
     - phase3-checkpoints:/tmp/imperium/checkpoints
 
+    - ${PWD}/obser/otel:/otel:ro
+
 services:
   imperium-topic-embedding-driver:
     <<: *phase3-driver-defaults
@@ -70,6 +72,13 @@ services:
       NVIDIA_EMBEDDING_MODEL: embeddinggemma-300M-Q8_0.gguf
       TAXONOMY_VERSION: medtop-v2
       EMBEDDING_BATCH_SIZE: "13"
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-driver-topic-embedding
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
     command: >
       bash -lc '
       python3 /opt/imperium/news-pipeline/jobs/phase3_topic_embedding_refresh.py
@@ -93,6 +102,13 @@ services:
       REFERENCE_TRIGGER_PROCESSING_TIME: 5 seconds
       REFERENCE_MAX_OFFSETS_PER_TRIGGER: 10000
       DIMENSION_DB_BATCH_SIZE: 50000
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-driver-dimension-reference
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
 
     command: >
       bash -lc '
@@ -125,6 +141,13 @@ services:
       AUTHORITY_TRIGGER_PROCESSING_TIME: 5 seconds
       AUTHORITY_MAX_OFFSETS_PER_TRIGGER: 200000
       DIMENSION_DB_BATCH_SIZE: 50000
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-driver-dimension-authority
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
 
     command: >
       bash -lc '
@@ -157,6 +180,13 @@ services:
       LINKS_TRIGGER_PROCESSING_TIME: 5 seconds
       LINKS_MAX_OFFSETS_PER_TRIGGER: 200000
       DIMENSION_DB_BATCH_SIZE: 50000
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-driver-dimension-links
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
 
     command: >
       bash -lc '
@@ -188,6 +218,13 @@ services:
       CANONICAL_MAX_OFFSETS_PER_TRIGGER: 5000
       CANONICAL_TRIGGER_PROCESSING_TIME: 3 seconds
       CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-driver-canonical-enrichment
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
 
     ports:
       - "${CANONICAL_UI_EXTERNAL_PORT:-48100}:4040"
@@ -232,6 +269,13 @@ services:
       CLASSIFICATION_NVIDIA_RPM_BUDGET: 24
       CLASSIFIED_DLQ_TOPIC: imperium.news.classified.dlq
       CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-driver-classification
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
 
     ports:
       - "${CLASSIFICATION_UI_EXTERNAL_PORT:-48101}:4040"
@@ -252,4 +296,51 @@ services:
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       /opt/imperium/news-pipeline/jobs/phase3_classification_runtime.py
+      '
+
+  imperium-trending-driver:
+    <<: *phase3-driver-defaults
+    restart: "no"
+    container_name: imperium-trending-driver
+    hostname: imperium-trending-driver
+    environment:
+      PYTHONPATH: /opt/imperium/news-pipeline/src
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_DSN: postgresql://postgres:postgres@news-source-db:5432/imperium-news-source
+      REDIS_URL: redis://redis:6379/0
+      CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
+      CLASSIFIED_TOPIC: imperium.news.classified
+      TRENDING_STARTING_OFFSETS: 5h-ago
+      TRENDING_MAX_OFFSETS_PER_TRIGGER: "50000"
+      TRENDING_TRIGGER_PROCESSING_TIME: 60 seconds
+      TRENDING_WINDOW_SIZE: 5 hours
+      TRENDING_SLIDE_INTERVAL: 5 minutes
+      TRENDING_WATERMARK: 30 minutes
+      TRENDING_GLOBAL_MIN_COUNT: "5"
+      TRENDING_COUNTRY_MIN_COUNT: "3"
+      TRENDING_TOPIC_MIN_COUNT: "3"
+      TRENDING_GLOBAL_TOP_N: "100"
+      TRENDING_COUNTRY_TOP_N: "50"
+      TRENDING_TOPIC_TOP_N: "50"
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
+      OTEL_SERVICE_NAME: spark-driver-trending
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+    ports:
+      - "44044:4040"
+    command: >
+      bash -lc '
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.executor.cores=1
+      --conf spark.cores.max=2
+      --conf spark.executor.memory=1g
+      --conf spark.driver.memory=1g
+      --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
+      /opt/imperium/news-pipeline/jobs/trending_driver.py
       '
