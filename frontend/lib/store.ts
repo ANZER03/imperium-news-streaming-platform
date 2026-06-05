@@ -12,12 +12,14 @@ interface AppState {
   isOnboarded: boolean;
   savedArticles: string[];
   theme: 'light' | 'dark';
+  isSearchOpen: boolean;
 
   loginUser: (userId: string, token: string, email: string, name: string) => void;
   completeOnboarding: (interests: string[], countryIds: number[], userId: string) => void;
   toggleSaved: (articleId: string) => void;
   resetOnboarding: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
+  setSearchOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -32,6 +34,7 @@ export const useAppStore = create<AppState>()(
       isOnboarded: false,
       savedArticles: [],
       theme: 'light',
+      isSearchOpen: false,
 
       loginUser: (userId, token, email, name) =>
         set(() => ({
@@ -89,6 +92,7 @@ export const useAppStore = create<AppState>()(
         }),
 
       setTheme: (theme) => set({ theme }),
+      setSearchOpen: (isSearchOpen) => set({ isSearchOpen }),
     }),
     {
       name: 'imperium-storage',

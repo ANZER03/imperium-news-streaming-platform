@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Search, Bell, Bookmark, User } from 'lucide-react';
 import { useScrollDirection } from '@/hooks/use-scroll-direction';
+import { useAppStore } from '@/lib/store';
 
 interface NavLink {
   id: string;
@@ -18,7 +19,7 @@ type NavItem = (NavLink & { kind: 'link' }) | (NavButton & { kind: 'button' });
 
 const ITEMS: ReadonlyArray<NavItem> = [
   { kind: 'link',   id: 'feed',    icon: Home,     href: '/' },
-  { kind: 'link',   id: 'explore', icon: Search,   href: '/explore' },
+  { kind: 'button', id: 'explore', icon: Search },
   { kind: 'button', id: 'notif',   icon: Bell },
   { kind: 'link',   id: 'saved',   icon: Bookmark, href: '/saved' },
   { kind: 'button', id: 'profile', icon: User },
@@ -36,6 +37,7 @@ function shouldFillIcon(id: string) {
 export function MobileNav() {
   const pathname = usePathname();
   const visible = useScrollDirection();
+  const { setSearchOpen } = useAppStore();
 
   return (
     <nav
@@ -63,7 +65,14 @@ export function MobileNav() {
               />
             </Link>
           ) : (
-            <button key={item.id} className={className} type="button">
+            <button 
+              key={item.id} 
+              className={className} 
+              type="button"
+              onClick={() => {
+                if (item.id === 'explore') setSearchOpen(true);
+              }}
+            >
               <Icon
                 className="h-[22px] w-[22px]"
                 strokeWidth={active ? 2.75 : 2}

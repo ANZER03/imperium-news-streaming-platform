@@ -41,17 +41,41 @@ public class ArticleSearchRepository {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("from", filter.page() * limit);
         body.put("size", limit);
+        body.set("_source", searchResultSourceFields());
         body.set("query", buildQuery(filter));
         ArrayNode sort = body.putArray("sort");
         ObjectNode scoreSort = objectMapper.createObjectNode();
         scoreSort.put("_score", "desc");
         sort.add(scoreSort);
         ObjectNode dateSort = objectMapper.createObjectNode();
-        ObjectNode publishedSort = dateSort.putObject("published_at");
-        publishedSort.put("order", "desc");
-        publishedSort.put("missing", "_last");
+        ObjectNode crawledSort = dateSort.putObject("crawled_at");
+        crawledSort.put("order", "desc");
+        crawledSort.put("missing", "_last");
         sort.add(dateSort);
         return body;
+    }
+
+    private ObjectNode searchResultSourceFields() {
+        ObjectNode source = objectMapper.createObjectNode();
+        ArrayNode includes = source.putArray("includes");
+        includes.add("article_id");
+        includes.add("classification_status");
+        includes.add("country_id");
+        includes.add("country_name");
+        includes.add("crawled_at");
+        includes.add("excerpt");
+        includes.add("image_url");
+        includes.add("is_video");
+        includes.add("language_code");
+        includes.add("processed_at");
+        includes.add("published_at");
+        includes.add("rubric_id");
+        includes.add("rubric_title");
+        includes.add("source_domain");
+        includes.add("source_name");
+        includes.add("title");
+        includes.add("url");
+        return source;
     }
 
     private ObjectNode buildQuery(ArticleSearchFilter filter) {
@@ -96,16 +120,16 @@ public class ArticleSearchRepository {
             return;
         }
         ObjectNode range = objectMapper.createObjectNode();
-        ObjectNode publishedAt = range.putObject("published_at");
+        ObjectNode crawledAt = range.putObject("crawled_at");
         if (date != null) {
-            publishedAt.put("gte", date.atStartOfDay().atOffset(ZoneOffset.UTC).toString());
-            publishedAt.put("lt", date.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC).toString());
+            crawledAt.put("gte", date.atStartOfDay().atOffset(ZoneOffset.UTC).toString());
+            crawledAt.put("lt", date.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC).toString());
         } else {
             if (from != null) {
-                publishedAt.put("gte", from.withOffsetSameInstant(ZoneOffset.UTC).toString());
+                crawledAt.put("gte", from.withOffsetSameInstant(ZoneOffset.UTC).toString());
             }
             if (to != null) {
-                publishedAt.put("lte", to.withOffsetSameInstant(ZoneOffset.UTC).toString());
+                crawledAt.put("lte", to.withOffsetSameInstant(ZoneOffset.UTC).toString());
             }
         }
         ObjectNode rangeWrapper = objectMapper.createObjectNode();

@@ -43,6 +43,9 @@ class ArticleSearchRepositoryTest {
 
         assertThat(body.path("from").asInt()).isEqualTo(25);
         assertThat(body.path("size").asInt()).isEqualTo(25);
+        assertThat(body.path("_source").path("includes").toString())
+                .contains("article_id", "title", "excerpt", "crawled_at")
+                .doesNotContain("body_text", "body_text_clean");
         JsonNode bool = body.path("query").path("bool");
         assertThat(bool.path("must").get(0).path("multi_match").path("query").asText()).isEqualTo("renewable energy");
         assertThat(bool.path("must").get(0).path("multi_match").path("fields").toString())

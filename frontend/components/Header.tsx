@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useScrollDirection } from '@/hooks/use-scroll-direction';
 import { topicService } from '@/lib/services';
 import { Topic } from '@/lib/types';
+import { useAppStore } from '@/lib/store';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -105,16 +106,8 @@ export function TopicCarousel({ className = '' }: { className?: string }) {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const router = useRouter();
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const { setSearchOpen } = useAppStore();
   const visible = useScrollDirection();
-
-  const submitSearch = (raw: string) => {
-    const val = raw.trim();
-    if (!val) return;
-    router.push(`/search?q=${encodeURIComponent(val)}`);
-    setIsMobileSearchOpen(false);
-  };
 
   return (
     <header
@@ -131,54 +124,12 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         {/* SEARCH (Right) */}
         <div className="flex items-center gap-3 md:gap-6 flex-1 justify-end">
-          {/* Mobile Search Input With Animation */}
-          <div className="flex flex-1 justify-end relative h-10 w-full max-w-[200px]">
-            <AnimatePresence initial={false}>
-              {!isMobileSearchOpen ? (
-                <motion.button
-                  key="search-btn"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute right-0 flex h-10 w-10 items-center justify-center rounded-xl text-editorial-muted z-10"
-                  onClick={() => setIsMobileSearchOpen(true)}
-                >
-                  <Search className="h-6 w-6 text-editorial-ink" />
-                </motion.button>
-              ) : (
-                <motion.div
-                  key="search-input"
-                  initial={{ opacity: 0, width: 40 }}
-                  animate={{ opacity: 1, width: '100%' }}
-                  exit={{ opacity: 0, width: 40 }}
-                  transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
-                  className="absolute right-0 flex items-center rounded-2xl bg-editorial-surface px-3 py-2 text-editorial-muted focus-within:ring-1 focus-within:ring-editorial-accent z-20 h-10 overflow-hidden shadow-sm"
-                >
-                  <Search className="mr-2 h-4 w-4 shrink-0" />
-                  <input
-                    autoFocus
-                    className="w-full bg-transparent text-sm text-editorial-ink outline-none placeholder:text-editorial-muted/70 min-w-0"
-                    type="text"
-                    placeholder="Search..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        submitSearch(e.currentTarget.value);
-                      } else if (e.key === 'Escape') {
-                        setIsMobileSearchOpen(false);
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={() => setIsMobileSearchOpen(false)}
-                    className="ml-2 shrink-0"
-                  >
-                    <X className="h-4 w-4 text-editorial-muted transition-colors hover:text-editorial-ink" />
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <button
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-editorial-muted hover:text-editorial-ink transition-colors z-10 bg-editorial-surface/50"
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search className="h-5 w-5 md:h-6 md:w-6" />
+          </button>
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Rightbar } from '@/components/Rightbar';
 import { MobileNav } from '@/components/MobileNav';
 import { OnboardingGate } from '@/components/OnboardingGate';
+import { SearchDialog } from '@/components/SearchDialog';
 
 /**
  * (main) route group layout — renders the shared shell (Header / Sidebar /
@@ -60,6 +61,9 @@ export default function MainLayout({
 
         <MobileNav />
       </div>
+
+      {/* Global Search Dialog overlay */}
+      <SearchDialog />
 
       {/* Parallel @modal slot — rendered as an overlay above the shell. */}
       {modal}
