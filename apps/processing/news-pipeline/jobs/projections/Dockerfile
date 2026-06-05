@@ -11,5 +11,6 @@ COPY utils.py .
 COPY qdrant_projector.py .
 COPY redis_projector.py .
 COPY postgres_projector.py .
+COPY elasticsearch_projector.py .
 
 CMD ["python", "postgres_projector.py"]

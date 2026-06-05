@@ -90,3 +90,10 @@ feed:
     freshness-coefficient: 0.0
     freshness-grace-ms: 0
     topic-weights: {}
+
+search:
+  elasticsearch:
+    base-url: ${SEARCH_ELASTICSEARCH_BASE_URL:http://localhost:49200}
+    index: ${SEARCH_ELASTICSEARCH_INDEX:imperium_articles_search}
+    default-limit: 20
+    max-limit: 100

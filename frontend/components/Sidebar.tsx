@@ -33,7 +33,7 @@ type NavItem = (NavLink & { kind: 'link' }) | (NavButton & { kind: 'button' });
 
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { kind: 'link', id: 'feed',     icon: Home,     label: 'Home',          href: '/' },
-  { kind: 'link', id: 'explore',  icon: Search,   label: 'Explore',       href: '/explore' },
+  { kind: 'button', id: 'explore',icon: Search,   label: 'Explore' },
   { kind: 'button', id: 'notif',  icon: Bell,     label: 'Notifications' },
   { kind: 'link', id: 'saved',    icon: Bookmark, label: 'Saved',         href: '/saved' },
   { kind: 'button', id: 'profile',icon: User,     label: 'Profile' },
@@ -58,6 +58,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
+
+  const { setSearchOpen } = useAppStore();
 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -139,7 +141,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 ) : (
                   <button
                     key={item.id}
-                    onClick={item.onClick}
+                    onClick={() => {
+                      if (item.id === 'explore') {
+                        setSearchOpen(true);
+                        onClose();
+                      } else if (item.onClick) {
+                        item.onClick();
+                      }
+                    }}
                     className={baseClass}
                     type="button"
                   >
