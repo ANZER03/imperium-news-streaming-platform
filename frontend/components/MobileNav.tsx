@@ -19,7 +19,7 @@ type NavItem = (NavLink & { kind: 'link' }) | (NavButton & { kind: 'button' });
 
 const ITEMS: ReadonlyArray<NavItem> = [
   { kind: 'link',   id: 'feed',    icon: Home,     href: '/' },
-  { kind: 'button', id: 'explore', icon: Search },
+  { kind: 'link',   id: 'explore', icon: Search,   href: '/explore' },
   { kind: 'button', id: 'notif',   icon: Bell },
   { kind: 'link',   id: 'saved',   icon: Bookmark, href: '/saved' },
   { kind: 'button', id: 'profile', icon: User },
@@ -70,7 +70,7 @@ export function MobileNav() {
               className={className} 
               type="button"
               onClick={() => {
-                if (item.id === 'explore') setSearchOpen(true);
+                // Button click handlers here if needed
               }}
             >
               <Icon
