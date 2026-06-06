@@ -33,7 +33,7 @@ type NavItem = (NavLink & { kind: 'link' }) | (NavButton & { kind: 'button' });
 
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { kind: 'link', id: 'feed',     icon: Home,     label: 'Home',          href: '/' },
-  { kind: 'button', id: 'explore',icon: Search,   label: 'Explore' },
+  { kind: 'link', id: 'explore',  icon: Search,   label: 'Explore',       href: '/explore' },
   { kind: 'button', id: 'notif',  icon: Bell,     label: 'Notifications' },
   { kind: 'link', id: 'saved',    icon: Bookmark, label: 'Saved',         href: '/saved' },
   { kind: 'button', id: 'profile',icon: User,     label: 'Profile' },
@@ -142,10 +142,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <button
                     key={item.id}
                     onClick={() => {
-                      if (item.id === 'explore') {
-                        setSearchOpen(true);
-                        onClose();
-                      } else if (item.onClick) {
+                      if (item.onClick) {
                         item.onClick();
                       }
                     }}
