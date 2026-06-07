@@ -20,6 +20,8 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, expr
 from pyspark.sql.avro.functions import from_avro
 
+import pycountry
+from nltk.corpus import stopwords as nltk_sw
 import redis as redis_lib
 
 from imperium_news_pipeline.phase3.streaming import apply_trigger_processing_time
@@ -48,27 +50,28 @@ _STOPWORDS_DIR = (
 # Stopword loading
 # ---------------------------------------------------------------------------
 
-def load_stopwords(stopwords_dir: Path) -> dict[str, set[str]]:
-    """Load all stopword files into a language_code → set mapping."""
+def load_stopwords() -> dict[str, set[str]]:
+    """Build language_code → stopwords set from NLTK corpus using pycountry for auto-mapping."""
     result: dict[str, set[str]] = {}
-    if not stopwords_dir.is_dir():
-        logger.warning(f"Stopwords directory not found: {stopwords_dir}")
-        return {"unknown": set()}
-
-    for path in stopwords_dir.glob("*.txt"):
-        lang = path.stem  # e.g. "en", "fr", "blocked_terms"
-        if lang == "blocked_terms":
-            continue  # loaded separately
-        words = set()
-        for line in path.read_text(encoding="utf-8").splitlines():
-            word = line.strip().lower()
-            if word and not word.startswith("#"):
-                words.add(word)
-        result[lang] = words
-        logger.info(f"Loaded {len(words)} stopwords for language '{lang}'")
-
+    
+    for nltk_name in nltk_sw.fileids():
+        try:
+            lang = pycountry.languages.lookup(nltk_name)
+            if hasattr(lang, 'alpha_2'):
+                result[lang.alpha_2.lower()] = set(nltk_sw.words(nltk_name))
+        except LookupError:
+            # Fallback search for languages like greek, nepali, slovene
+            for lang in pycountry.languages:
+                if hasattr(lang, 'name') and nltk_name.lower() in lang.name.lower():
+                    if hasattr(lang, 'alpha_2'):
+                        result[lang.alpha_2.lower()] = set(nltk_sw.words(nltk_name))
+                        break
+                        
+    # Fallback for unknown languages -> English
     if "unknown" not in result:
-        result["unknown"] = set()
+        result["unknown"] = result.get("en", set())
+        
+    logger.info(f"Loaded NLTK stopwords for {len(result)} language codes")
     return result
 
 
@@ -155,7 +158,7 @@ def main() -> None:
 
     # Load stopwords + blocked terms
     stopwords_dir = Path(os.getenv("STOPWORDS_DIR", str(_STOPWORDS_DIR)))
-    stopwords_map = load_stopwords(stopwords_dir)
+    stopwords_map = load_stopwords()
     blocked_terms = load_blocked_terms(stopwords_dir)
 
     # Connect to Redis
@@ -182,6 +185,9 @@ def main() -> None:
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
+
+    # Broadcast stopwords map to all workers
+    stopwords_map_bc = spark.sparkContext.broadcast(stopwords_map)
 
     raw_reader = (
         spark.readStream.format("kafka")
@@ -219,7 +225,7 @@ def main() -> None:
         process_trending_batch(
             batch_df=batch_df,
             batch_id=bid,
-            stopwords_map=stopwords_map,
+            stopwords_map=stopwords_map_bc.value,
             blocked_terms=blocked_terms,
             postgres_dsn=postgres_dsn,
             redis_client=redis_client,

@@ -300,7 +300,7 @@ services:
 
   imperium-trending-driver:
     <<: *phase3-driver-defaults
-    restart: "no"
+    restart: unless-stopped
     container_name: imperium-trending-driver
     hostname: imperium-trending-driver
     environment:
@@ -311,10 +311,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
       CLASSIFIED_TOPIC: imperium.news.classified
-      TRENDING_STARTING_OFFSETS: 5h-ago
+      TRENDING_STARTING_OFFSETS: 12h-ago
       TRENDING_MAX_OFFSETS_PER_TRIGGER: "50000"
       TRENDING_TRIGGER_PROCESSING_TIME: 60 seconds
-      TRENDING_WINDOW_SIZE: 5 hours
+      TRENDING_WINDOW_SIZE: 12 hours
       TRENDING_SLIDE_INTERVAL: 5 minutes
       TRENDING_WATERMARK: 30 minutes
       TRENDING_GLOBAL_MIN_COUNT: "5"
