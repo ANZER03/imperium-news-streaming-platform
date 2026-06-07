@@ -150,34 +150,39 @@ def fetch_all_previous_counts(
     try:
         with psycopg.connect(dsn, autocommit=True) as conn:
             with conn.cursor() as cur:
-                # Build parameterised VALUES list: (%(ws_0)s, %(we_0)s, %(st_0)s, %(sv_0)s), ...
-                value_parts = []
-                params: dict[str, str] = {}
-                for i, (pws, pwe, st, sv) in enumerate(prev_keys):
-                    value_parts.append(
-                        f"(%(ws_{i})s::timestamptz, %(we_{i})s::timestamptz, "
-                        f"%(st_{i})s, %(sv_{i})s)"
-                    )
-                    params[f"ws_{i}"] = pws
-                    params[f"we_{i}"] = pwe
-                    params[f"st_{i}"] = st
-                    params[f"sv_{i}"] = sv
+                # Chunk prev_keys to avoid Postgres parameter limit (65535)
+                # 4 parameters per key, so max safe chunk size is ~16000. Use 10000.
+                CHUNK_SIZE = 10000
+                for chunk_idx in range(0, len(prev_keys), CHUNK_SIZE):
+                    chunk = prev_keys[chunk_idx : chunk_idx + CHUNK_SIZE]
 
-                query = _BATCH_PREVIOUS_COUNT_SQL.format(
-                    placeholders=", ".join(value_parts)
-                )
-                cur.execute(query, params)
+                    value_parts = []
+                    params: dict[str, str] = {}
+                    for i, (pws, pwe, st, sv) in enumerate(chunk):
+                        value_parts.append(
+                            f"(%(ws_{i})s::timestamptz, %(we_{i})s::timestamptz, "
+                            f"%(st_{i})s, %(sv_{i})s)"
+                        )
+                        params[f"ws_{i}"] = pws
+                        params[f"we_{i}"] = pwe
+                        params[f"st_{i}"] = st
+                        params[f"sv_{i}"] = sv
 
-                for db_row in cur.fetchall():
-                    db_ws, db_we, db_st, db_sv, term, term_type, count = db_row
-                    prev_key = (
-                        _iso_timestamp(db_ws),
-                        _iso_timestamp(db_we),
-                        db_st,
-                        db_sv,
+                    query = _BATCH_PREVIOUS_COUNT_SQL.format(
+                        placeholders=", ".join(value_parts)
                     )
-                    current_ws, current_we = prev_to_current.get(
-                        prev_key, (str(db_ws), str(db_we))
+                    cur.execute(query, params)
+
+                    for db_row in cur.fetchall():
+                        db_ws, db_we, db_st, db_sv, term, term_type, count = db_row
+                        prev_key = (
+                            _iso_timestamp(db_ws),
+                            _iso_timestamp(db_we),
+                            db_st,
+                            db_sv,
+                        )
+                        current_ws, current_we = prev_to_current.get(
+                            prev_key, (str(db_ws), str(db_we))
                     )
                     results.append({
                         "window_start": current_ws,
