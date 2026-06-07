@@ -145,9 +145,13 @@ def main() -> None:
     global_min = _env_int("TRENDING_GLOBAL_MIN_COUNT", 5)
     country_min = _env_int("TRENDING_COUNTRY_MIN_COUNT", 3)
     topic_min = _env_int("TRENDING_TOPIC_MIN_COUNT", 3)
+    country_topic_min = _env_int("TRENDING_COUNTRY_TOPIC_MIN_COUNT", 3)
+    global_topic_min = _env_int("TRENDING_GLOBAL_TOPIC_MIN_COUNT", 3)
     top_n_global = _env_int("TRENDING_GLOBAL_TOP_N", 100)
     top_n_country = _env_int("TRENDING_COUNTRY_TOP_N", 50)
     top_n_topic = _env_int("TRENDING_TOPIC_TOP_N", 50)
+    top_n_country_topic = _env_int("TRENDING_COUNTRY_TOPIC_TOP_N", 50)
+    top_n_global_topic = _env_int("TRENDING_GLOBAL_TOPIC_TOP_N", 50)
 
     # Load Avro schema
     schema_path = Path(os.getenv("CLASSIFIED_SCHEMA_PATH", str(_CLASSIFIED_SCHEMA_PATH)))
@@ -182,6 +186,10 @@ def main() -> None:
         .appName("imperium-trending-driver")
         .config("spark.sql.shuffle.partitions", "4")
         .config("spark.streaming.stopGracefullyOnShutdown", "true")
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("spark.io.compression.codec", "zstd")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
@@ -222,22 +230,30 @@ def main() -> None:
 
     # foreachBatch processor
     def _process(batch_df: DataFrame, bid: int) -> None:
-        process_trending_batch(
-            batch_df=batch_df,
-            batch_id=bid,
-            stopwords_map=stopwords_map_bc.value,
-            blocked_terms=blocked_terms,
-            postgres_dsn=postgres_dsn,
-            redis_client=redis_client,
-            window_size_seconds=window_size_s,
-            slide_interval_seconds=slide_interval_s,
-            global_min_count=global_min,
-            country_min_count=country_min,
-            topic_min_count=topic_min,
-            top_n_global=top_n_global,
-            top_n_country=top_n_country,
-            top_n_topic=top_n_topic,
-        )
+        try:
+            process_trending_batch(
+                batch_df=batch_df,
+                batch_id=bid,
+                stopwords_map=stopwords_map_bc.value,
+                blocked_terms=blocked_terms,
+                postgres_dsn=postgres_dsn,
+                redis_client=redis_client,
+                window_size_seconds=window_size_s,
+                slide_interval_seconds=slide_interval_s,
+                global_min_count=global_min,
+                country_min_count=country_min,
+                topic_min_count=topic_min,
+                country_topic_min_count=country_topic_min,
+                global_topic_min_count=global_topic_min,
+                top_n_global=top_n_global,
+                top_n_country=top_n_country,
+                top_n_topic=top_n_topic,
+                top_n_country_topic=top_n_country_topic,
+                top_n_global_topic=top_n_global_topic,
+            )
+        except Exception:
+            logger.error(f"batch={bid} FAILED — Spark will replay", exc_info=True)
+            raise  # re-raise for at-least-once (idempotent upserts are safe)
 
     writer = (
         stream.writeStream

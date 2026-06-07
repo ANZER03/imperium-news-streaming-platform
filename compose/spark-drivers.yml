@@ -337,6 +337,10 @@ services:
       --conf spark.cores.max=3
       --conf spark.executor.memory=3g
       --conf spark.driver.memory=5g
+      --conf spark.sql.adaptive.enabled=true
+      --conf spark.sql.adaptive.coalescePartitions.enabled=true
+      --conf spark.serializer=org.apache.spark.serializer.KryoSerializer
+      --conf spark.io.compression.codec=zstd
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       /opt/imperium/news-pipeline/jobs/trending_driver.py
