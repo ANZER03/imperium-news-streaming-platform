@@ -20,6 +20,8 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, expr
 from pyspark.sql.avro.functions import from_avro
 
+import pycountry
+from nltk.corpus import stopwords as nltk_sw
 import redis as redis_lib
 
 from imperium_news_pipeline.phase3.streaming import apply_trigger_processing_time
@@ -48,27 +50,28 @@ _STOPWORDS_DIR = (
 # Stopword loading
 # ---------------------------------------------------------------------------
 
-def load_stopwords(stopwords_dir: Path) -> dict[str, set[str]]:
-    """Load all stopword files into a language_code → set mapping."""
+def load_stopwords() -> dict[str, set[str]]:
+    """Build language_code → stopwords set from NLTK corpus using pycountry for auto-mapping."""
     result: dict[str, set[str]] = {}
-    if not stopwords_dir.is_dir():
-        logger.warning(f"Stopwords directory not found: {stopwords_dir}")
-        return {"unknown": set()}
-
-    for path in stopwords_dir.glob("*.txt"):
-        lang = path.stem  # e.g. "en", "fr", "blocked_terms"
-        if lang == "blocked_terms":
-            continue  # loaded separately
-        words = set()
-        for line in path.read_text(encoding="utf-8").splitlines():
-            word = line.strip().lower()
-            if word and not word.startswith("#"):
-                words.add(word)
-        result[lang] = words
-        logger.info(f"Loaded {len(words)} stopwords for language '{lang}'")
-
+    
+    for nltk_name in nltk_sw.fileids():
+        try:
+            lang = pycountry.languages.lookup(nltk_name)
+            if hasattr(lang, 'alpha_2'):
+                result[lang.alpha_2.lower()] = set(nltk_sw.words(nltk_name))
+        except LookupError:
+            # Fallback search for languages like greek, nepali, slovene
+            for lang in pycountry.languages:
+                if hasattr(lang, 'name') and nltk_name.lower() in lang.name.lower():
+                    if hasattr(lang, 'alpha_2'):
+                        result[lang.alpha_2.lower()] = set(nltk_sw.words(nltk_name))
+                        break
+                        
+    # Fallback for unknown languages -> English
     if "unknown" not in result:
-        result["unknown"] = set()
+        result["unknown"] = result.get("en", set())
+        
+    logger.info(f"Loaded NLTK stopwords for {len(result)} language codes")
     return result
 
 
@@ -142,9 +145,13 @@ def main() -> None:
     global_min = _env_int("TRENDING_GLOBAL_MIN_COUNT", 5)
     country_min = _env_int("TRENDING_COUNTRY_MIN_COUNT", 3)
     topic_min = _env_int("TRENDING_TOPIC_MIN_COUNT", 3)
+    country_topic_min = _env_int("TRENDING_COUNTRY_TOPIC_MIN_COUNT", 3)
+    global_topic_min = _env_int("TRENDING_GLOBAL_TOPIC_MIN_COUNT", 3)
     top_n_global = _env_int("TRENDING_GLOBAL_TOP_N", 100)
     top_n_country = _env_int("TRENDING_COUNTRY_TOP_N", 50)
     top_n_topic = _env_int("TRENDING_TOPIC_TOP_N", 50)
+    top_n_country_topic = _env_int("TRENDING_COUNTRY_TOPIC_TOP_N", 50)
+    top_n_global_topic = _env_int("TRENDING_GLOBAL_TOPIC_TOP_N", 50)
 
     # Load Avro schema
     schema_path = Path(os.getenv("CLASSIFIED_SCHEMA_PATH", str(_CLASSIFIED_SCHEMA_PATH)))
@@ -155,7 +162,7 @@ def main() -> None:
 
     # Load stopwords + blocked terms
     stopwords_dir = Path(os.getenv("STOPWORDS_DIR", str(_STOPWORDS_DIR)))
-    stopwords_map = load_stopwords(stopwords_dir)
+    stopwords_map = load_stopwords()
     blocked_terms = load_blocked_terms(stopwords_dir)
 
     # Connect to Redis
@@ -179,9 +186,16 @@ def main() -> None:
         .appName("imperium-trending-driver")
         .config("spark.sql.shuffle.partitions", "4")
         .config("spark.streaming.stopGracefullyOnShutdown", "true")
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("spark.io.compression.codec", "zstd")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
+
+    # Broadcast stopwords map to all workers
+    stopwords_map_bc = spark.sparkContext.broadcast(stopwords_map)
 
     raw_reader = (
         spark.readStream.format("kafka")
@@ -216,22 +230,30 @@ def main() -> None:
 
     # foreachBatch processor
     def _process(batch_df: DataFrame, bid: int) -> None:
-        process_trending_batch(
-            batch_df=batch_df,
-            batch_id=bid,
-            stopwords_map=stopwords_map,
-            blocked_terms=blocked_terms,
-            postgres_dsn=postgres_dsn,
-            redis_client=redis_client,
-            window_size_seconds=window_size_s,
-            slide_interval_seconds=slide_interval_s,
-            global_min_count=global_min,
-            country_min_count=country_min,
-            topic_min_count=topic_min,
-            top_n_global=top_n_global,
-            top_n_country=top_n_country,
-            top_n_topic=top_n_topic,
-        )
+        try:
+            process_trending_batch(
+                batch_df=batch_df,
+                batch_id=bid,
+                stopwords_map=stopwords_map_bc.value,
+                blocked_terms=blocked_terms,
+                postgres_dsn=postgres_dsn,
+                redis_client=redis_client,
+                window_size_seconds=window_size_s,
+                slide_interval_seconds=slide_interval_s,
+                global_min_count=global_min,
+                country_min_count=country_min,
+                topic_min_count=topic_min,
+                country_topic_min_count=country_topic_min,
+                global_topic_min_count=global_topic_min,
+                top_n_global=top_n_global,
+                top_n_country=top_n_country,
+                top_n_topic=top_n_topic,
+                top_n_country_topic=top_n_country_topic,
+                top_n_global_topic=top_n_global_topic,
+            )
+        except Exception:
+            logger.error(f"batch={bid} FAILED — Spark will replay", exc_info=True)
+            raise  # re-raise for at-least-once (idempotent upserts are safe)
 
     writer = (
         stream.writeStream

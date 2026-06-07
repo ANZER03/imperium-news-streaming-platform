@@ -7,7 +7,12 @@ RUN apt-get update && apt-get install -y curl python3-pip && rm -rf /var/lib/apt
 RUN pip3 install --no-cache-dir \
     kafka-python==2.0.2 \
     psycopg[binary]==3.2.3 \
-    redis==5.1.1
+    redis==5.1.1 \
+    nltk==3.9.1 \
+    pycountry==24.6.1
+
+RUN python3 -c "import nltk; nltk.download('stopwords', download_dir='/opt/nltk_data')"
+ENV NLTK_DATA=/opt/nltk_data
 
 ENV SCALA_VERSION=2.12
 ENV SPARK_VERSION=3.5.3

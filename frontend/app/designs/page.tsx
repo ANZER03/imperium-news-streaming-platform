@@ -29,6 +29,24 @@ const authDesigns = [
   { v: 10, label: 'Cinematic Dark Mode', desc: 'Full screen dark layout, neon-purple outline active glows' },
 ];
 
+const exploreDesigns = [
+  { v: 1, label: 'Editorial Stack', desc: 'Elegant serif fonts, thin borders, greyscale images that colorize on hover.' },
+  { v: 2, label: 'Neo-Brutalism', desc: 'Thick borders, harsh shadows, bright accents, oversized bold text.' },
+  { v: 3, label: 'Glassmorphic Floating', desc: 'Blurry background gradients, floating pill-shaped cards.' },
+  { v: 4, label: 'Panoramic Ticker', desc: 'Wide-aspect ratio cards, scrolling marquee ticker for keywords.' },
+  { v: 5, label: 'Minimalist Typographic', desc: 'No images, focusing purely on gorgeous oversized serif typography.' },
+  { v: 6, label: 'Cinematic Dark Mode', desc: 'Fully dark, deep black vignettes, glowing accent borders.' },
+  { v: 7, label: 'Retro Magazine', desc: 'Sepia background, dotted borders, classic newspaper layouts.' },
+  { v: 8, label: 'Interactive Accordion', desc: 'Cards are thin slices that expand to full width on hover.' },
+  { v: 9, label: 'Sleek Tech Lines', desc: 'Dark minimalist background, neon thin borders, tech-focused.' },
+  { v: 10, label: 'Asymmetric Grid Carousel', desc: 'Alternating vertical alignments giving a dynamic masonry feel horizontally.' },
+  { v: 11, label: 'X Clone (Faithful)', desc: 'Faithful recreation of the X dark mode trending layout with top-left text overlays and outline pills.' },
+  { v: 12, label: 'X-Inspired Minimalist', desc: 'Cleaner interpretation with borderless wider cards and prominent typography.' },
+  { v: 13, label: 'X-Inspired Glass', desc: 'Familiar horizontal structure but utilizes frosted glassmorphism for overlays.' },
+  { v: 14, label: 'X-Inspired Edge', desc: 'Dark mode layout with sharp edges and dense information layout.' },
+  { v: 15, label: 'X-Inspired Vibrant', desc: 'The classic X layout but heavily accented with brand colors for a pop of vibrancy.' },
+];
+
 const searchDesigns = [
   { v: 1, label: 'Editorial Colonnade', desc: 'Serif text, divided columns for trends, clear input underlines' },
   { v: 2, label: 'Category Grid Hub', desc: 'Card groups for topics, graphical custom date-slider filter' },
@@ -132,6 +150,27 @@ export default function DesignsIndex() {
         <div className="space-y-3">
           {searchDesigns.map(({ v, label, desc }) => (
             <Link key={v} href={`/designs/search/v${v}`}
+              className="flex items-center gap-4 p-4 rounded-xl hover:bg-editorial-surface transition-colors group">
+              <span className="text-2xl font-serif font-bold text-[#6F3FF5]/30 group-hover:text-[#6F3FF5] transition-colors w-8 shrink-0">
+                {v}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-editorial-ink group-hover:text-editorial-accent transition-colors">{label}</p>
+                <p className="text-xs text-editorial-muted mt-0.5">{desc}</p>
+              </div>
+              <span className="ml-auto text-editorial-muted group-hover:text-editorial-accent transition-colors text-lg">→</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-12">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-editorial-muted mb-5 border-b border-editorial-border pb-3">
+          Explore Carousel — 15 variants
+        </h2>
+        <div className="space-y-3">
+          {exploreDesigns.map(({ v, label, desc }) => (
+            <Link key={v} href={`/designs/explore/v${v}`}
               className="flex items-center gap-4 p-4 rounded-xl hover:bg-editorial-surface transition-colors group">
               <span className="text-2xl font-serif font-bold text-[#6F3FF5]/30 group-hover:text-[#6F3FF5] transition-colors w-8 shrink-0">
                 {v}

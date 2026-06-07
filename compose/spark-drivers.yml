@@ -57,7 +57,6 @@ services:
     <<: *phase3-driver-defaults
     container_name: imperium-topic-embedding-driver
     hostname: imperium-topic-embedding-driver
-    restart: "no"
     depends_on:
       news-source-db:
         condition: service_healthy
@@ -203,7 +202,6 @@ services:
 
   imperium-canonical-enrichment-driver:
     <<: *phase3-driver-defaults
-    restart: "no"
     container_name: imperium-canonical-enrichment-driver
     hostname: imperium-canonical-enrichment-driver
     environment:
@@ -249,7 +247,6 @@ services:
 
   imperium-classification-driver:
     <<: *phase3-driver-defaults
-    restart: "no"
     container_name: imperium-classification-driver
     hostname: imperium-classification-driver
     environment:
@@ -300,7 +297,7 @@ services:
 
   imperium-trending-driver:
     <<: *phase3-driver-defaults
-    restart: "no"
+    restart: unless-stopped
     container_name: imperium-trending-driver
     hostname: imperium-trending-driver
     environment:
@@ -312,7 +309,7 @@ services:
       CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
       CLASSIFIED_TOPIC: imperium.news.classified
       TRENDING_STARTING_OFFSETS: 5h-ago
-      TRENDING_MAX_OFFSETS_PER_TRIGGER: "50000"
+      TRENDING_MAX_OFFSETS_PER_TRIGGER: "10000"
       TRENDING_TRIGGER_PROCESSING_TIME: 60 seconds
       TRENDING_WINDOW_SIZE: 5 hours
       TRENDING_SLIDE_INTERVAL: 5 minutes
@@ -337,9 +334,13 @@ services:
       /opt/spark/bin/spark-submit
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
-      --conf spark.cores.max=2
-      --conf spark.executor.memory=1g
-      --conf spark.driver.memory=1g
+      --conf spark.cores.max=3
+      --conf spark.executor.memory=3g
+      --conf spark.driver.memory=5g
+      --conf spark.sql.adaptive.enabled=true
+      --conf spark.sql.adaptive.coalescePartitions.enabled=true
+      --conf spark.serializer=org.apache.spark.serializer.KryoSerializer
+      --conf spark.io.compression.codec=zstd
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       /opt/imperium/news-pipeline/jobs/trending_driver.py

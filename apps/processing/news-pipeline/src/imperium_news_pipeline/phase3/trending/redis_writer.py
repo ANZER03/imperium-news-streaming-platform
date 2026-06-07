@@ -19,6 +19,8 @@ from typing import Any, Dict, List
 
 import redis
 
+from imperium_news_pipeline.phase3.trending.retry import retry
+
 logger = logging.getLogger("TrendingRedisWriter")
 
 TREND_TTL_SECONDS = 7200  # 2 hours
@@ -32,12 +34,15 @@ def _safe_key_segment(value: str) -> str:
     return _RE_UNSAFE_KEY.sub("_", value.strip().lower()) if value else "unknown"
 
 
+@retry(max_attempts=3, base_delay=1.0, retryable=(redis.ConnectionError, redis.TimeoutError))
 def write_trends_to_redis(
     redis_client: redis.Redis,
     trends: List[Dict[str, Any]],
     top_n_global: int = 100,
     top_n_country: int = 50,
     top_n_topic: int = 50,
+    top_n_country_topic: int = 50,
+    top_n_global_topic: int = 50,
 ) -> int:
     """Write a batch of trend records to Redis.
 
@@ -62,11 +67,20 @@ def write_trends_to_redis(
 
         # Build sorted-set key
         if scope_type == "global":
-            zset_key = "trend:global:1h"
+            zset_key = "trend:global:5h"
         elif scope_type == "country":
-            zset_key = f"trend:country:{_safe_key_segment(scope_value)}:1h"
+            zset_key = f"trend:country:{_safe_key_segment(scope_value)}:5h"
         elif scope_type == "topic":
-            zset_key = f"trend:topic:{_safe_key_segment(scope_value)}:1h"
+            zset_key = f"trend:topic:{_safe_key_segment(scope_value)}:5h"
+        elif scope_type == "country_topic":
+            parts = scope_value.split("|")
+            country = parts[0] if len(parts) > 0 else "unknown"
+            topic = parts[1] if len(parts) > 1 else "unknown"
+            zset_key = f"trend:country_topic:{_safe_key_segment(country)}:{_safe_key_segment(topic)}:5h"
+        elif scope_type == "global_topic":
+            parts = scope_value.split("|")
+            topic = parts[1] if len(parts) > 1 else "unknown"
+            zset_key = f"trend:global_topic:global:{_safe_key_segment(topic)}:5h"
         else:
             continue
 
@@ -91,14 +105,19 @@ def write_trends_to_redis(
         written += 1
 
     # Set TTL and trim sorted sets
-    top_n_map = {"global": top_n_global, "country": top_n_country, "topic": top_n_topic}
     for zk in zset_keys:
         pipe.expire(zk, TREND_TTL_SECONDS)
         # Determine scope type from key to choose top_n
-        if zk.startswith("trend:global"):
+        if zk.startswith("trend:global:"):
             limit = top_n_global
-        elif zk.startswith("trend:country"):
+        elif zk.startswith("trend:country:"):
             limit = top_n_country
+        elif zk.startswith("trend:topic:"):
+            limit = top_n_topic
+        elif zk.startswith("trend:country_topic:"):
+            limit = top_n_country_topic
+        elif zk.startswith("trend:global_topic:"):
+            limit = top_n_global_topic
         else:
             limit = top_n_topic
         # Keep only top N by score (remove everything below rank -limit from the end)

@@ -304,7 +304,7 @@ export function FeedList({ mode, topicId, query }: FeedListProps) {
 
   return (
     <div className="flex flex-col">
-      <TopicCarousel className="hidden lg:flex sticky top-0 z-30" />
+      {mode !== 'explore' && <TopicCarousel className="hidden lg:flex sticky top-0 z-30" />}
       {mode === 'explore' && <ExploreHeader />}
       {mode === 'search' && (
         <div className="px-6 py-8 md:px-8 border-b border-editorial-border bg-editorial-surface/30">
