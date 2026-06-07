@@ -12,7 +12,7 @@ logger = get_logger("RedisProjector")
 
 CANONICAL_TOPIC = "imperium.canonical-articles"
 CLASSIFIED_TOPIC = "imperium.news.classified"
-TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days from crawled_at
+TTL_SECONDS = 14 * 24 * 60 * 60  # 14 days from crawled_at
 TTL_MIN_SECONDS = 60             # floor: keep at least 1 min even for old articles
 
 
@@ -44,7 +44,7 @@ def _crawled_at_to_unix(val: Any) -> float:
 
 
 def ttl_from_crawled_at(crawled_at: Any) -> int:
-    """Remaining TTL in seconds = 7 days - elapsed since crawled_at. Floor: TTL_MIN_SECONDS."""
+    """Remaining TTL in seconds = 14 days - elapsed since crawled_at. Floor: TTL_MIN_SECONDS."""
     try:
         crawled_ts = _crawled_at_to_unix(crawled_at)
         now = time.time()

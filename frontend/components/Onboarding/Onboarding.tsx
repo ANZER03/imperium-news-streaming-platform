@@ -10,8 +10,17 @@ import { topicService } from '@/lib/services/topic.service';
 import { userService } from '@/lib/services/user.service';
 import { Country, Topic } from '@/lib/types';
 
-const toFlag = (code: string) =>
-  code.toUpperCase().replace(/[A-Z]/g, c => String.fromCodePoint(0x1F1E6 - 65 + c.charCodeAt(0)));
+const FlagImage = ({ code, alt }: { code: string; alt: string }) => (
+  // eslint-disable-next-line @next/next/no-img-element
+  <img
+    src={`https://flagcdn.com/${code.toLowerCase()}.svg`}
+    width="18"
+    height="13"
+    alt={alt}
+    className="inline-block object-cover rounded-[2px] shadow-sm"
+    style={{ width: '18px', height: '13px' }}
+  />
+);
 
 export function Onboarding() {
   const router = useRouter();
@@ -175,7 +184,7 @@ export function Onboarding() {
                 if (!c) return null;
                 return (
                   <span key={id} className="flex items-center gap-1.5 bg-brand-500 text-white text-sm font-medium px-3 py-1 rounded-full">
-                    <span className="text-base leading-none">{toFlag(c.abbreviation)}</span>
+                    <FlagImage code={c.abbreviation} alt={c.countryName} />
                     {c.countryName}
                     <button type="button" onClick={() => toggleCountry(id)} className="ml-1 hover:opacity-70">
                       <X className="w-3 h-3" />
@@ -241,7 +250,7 @@ export function Onboarding() {
                             className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-editorial-surface
                               ${selected ? 'bg-brand-500/10 text-brand-500 font-semibold' : 'text-editorial-ink'}`}
                           >
-                            <span className="text-lg leading-none">{toFlag(c.abbreviation)}</span>
+                            <FlagImage code={c.abbreviation} alt={c.countryName} />
                             {c.countryName}
                             {selected && <Check className="w-4 h-4 ml-auto" />}
                           </button>

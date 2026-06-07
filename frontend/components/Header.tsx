@@ -108,6 +108,7 @@ export function TopicCarousel({ className = '' }: { className?: string }) {
 export function Header({ onMenuClick }: HeaderProps) {
   const { setSearchOpen } = useAppStore();
   const visible = useScrollDirection();
+  const pathname = usePathname();
 
   return (
     <header
@@ -133,7 +134,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      <TopicCarousel />
+      {pathname !== '/explore' && <TopicCarousel />}
     </header>
   );
 }
