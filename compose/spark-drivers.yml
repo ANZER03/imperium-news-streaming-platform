@@ -308,10 +308,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
       CLASSIFIED_TOPIC: imperium.news.classified
-      TRENDING_STARTING_OFFSETS: 12h-ago
-      TRENDING_MAX_OFFSETS_PER_TRIGGER: "50000"
+      TRENDING_STARTING_OFFSETS: 5h-ago
+      TRENDING_MAX_OFFSETS_PER_TRIGGER: "10000"
       TRENDING_TRIGGER_PROCESSING_TIME: 60 seconds
-      TRENDING_WINDOW_SIZE: 12 hours
+      TRENDING_WINDOW_SIZE: 5 hours
       TRENDING_SLIDE_INTERVAL: 5 minutes
       TRENDING_WATERMARK: 30 minutes
       TRENDING_GLOBAL_MIN_COUNT: "5"
@@ -334,8 +334,8 @@ services:
       /opt/spark/bin/spark-submit
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
-      --conf spark.cores.max=4
-      --conf spark.executor.memory=4g
+      --conf spark.cores.max=3
+      --conf spark.executor.memory=3g
       --conf spark.driver.memory=5g
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src

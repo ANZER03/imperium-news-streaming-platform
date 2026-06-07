@@ -24,16 +24,18 @@ from pyspark.sql import DataFrame
 from pyspark.sql.functions import (
     array,
     coalesce,
-    collect_set,
+    collect_list,
     col,
+    countDistinct,
     explode,
     lit,
-    size,
+    row_number,
     struct,
     udf,
     when,
     window,
 )
+from pyspark.sql.window import Window
 from pyspark.sql.types import ArrayType, StringType, StructField, StructType
 
 from imperium_news_pipeline.phase3.trending.term_extractor import extract_candidates
@@ -44,6 +46,8 @@ from imperium_news_pipeline.phase3.trending.postgres_writer import (
 )
 
 logger = logging.getLogger("TrendingProcessor")
+
+_MAX_ARTICLE_IDS_PER_TREND = 25
 
 _CANDIDATE_SCHEMA = ArrayType(
     StructType(
@@ -202,22 +206,43 @@ def process_trending_batch(
         .otherwise(lit(topic_min_count))
     )
 
-    aggregated_rows = (
-        scoped_terms
-        .groupBy(
-            window(
-                col("event_time"),
-                _seconds_to_spark_interval(window_size_seconds),
-                _seconds_to_spark_interval(slide_interval_seconds),
-            ).alias("event_window"),
-            "scope_type",
-            "scope_value",
-            "term",
-            "term_type",
-        )
-        .agg(collect_set("article_id").alias("article_ids"))
-        .withColumn("current_count", size(col("article_ids")))
+    windowed_terms = scoped_terms.withColumn(
+        "event_window",
+        window(
+            col("event_time"),
+            _seconds_to_spark_interval(window_size_seconds),
+            _seconds_to_spark_interval(slide_interval_seconds),
+        ),
+    )
+    trend_group_cols = [
+        "event_window",
+        "scope_type",
+        "scope_value",
+        "term",
+        "term_type",
+    ]
+
+    counts = (
+        windowed_terms
+        .groupBy(*trend_group_cols)
+        .agg(countDistinct("article_id").alias("current_count"))
         .filter(col("current_count") >= min_count_col)
+    )
+
+    sample_window = Window.partitionBy(*trend_group_cols).orderBy("article_id")
+    article_id_samples = (
+        windowed_terms
+        .select(*trend_group_cols, "article_id")
+        .dropDuplicates([*trend_group_cols, "article_id"])
+        .withColumn("article_rank", row_number().over(sample_window))
+        .filter(col("article_rank") <= lit(_MAX_ARTICLE_IDS_PER_TREND))
+        .groupBy(*trend_group_cols)
+        .agg(collect_list("article_id").alias("article_ids"))
+    )
+
+    aggregated_rows = (
+        counts
+        .join(article_id_samples, trend_group_cols, "left")
         .select(
             col("event_window.start").alias("window_start"),
             col("event_window.end").alias("window_end"),
@@ -225,8 +250,8 @@ def process_trending_batch(
             "scope_value",
             "term",
             "term_type",
-            "article_ids",
             "current_count",
+            "article_ids",
         )
     )
 
