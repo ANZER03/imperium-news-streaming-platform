@@ -183,16 +183,16 @@ def fetch_all_previous_counts(
                         )
                         current_ws, current_we = prev_to_current.get(
                             prev_key, (str(db_ws), str(db_we))
-                    )
-                    results.append({
-                        "window_start": current_ws,
-                        "window_end": current_we,
-                        "scope_type": db_st,
-                        "scope_value": db_sv,
-                        "term": term,
-                        "term_type": term_type,
-                        "previous_count": int(count),
-                    })
+                        )
+                        results.append({
+                            "window_start": current_ws,
+                            "window_end": current_we,
+                            "scope_type": db_st,
+                            "scope_value": db_sv,
+                            "term": term,
+                            "term_type": term_type,
+                            "previous_count": int(count),
+                        })
     except psycopg.OperationalError:
         raise  # let retry handle it
     except Exception:
