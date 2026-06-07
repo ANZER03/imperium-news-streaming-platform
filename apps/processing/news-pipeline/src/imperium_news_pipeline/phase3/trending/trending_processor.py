@@ -4,10 +4,10 @@ Called from the Spark driver's ``foreachBatch``.  For each micro-batch of
 classified articles, it:
 
   1. Filters to ``classification_status == 'classified'``
-  2. Extracts candidate terms (title words, title bigrams, excerpt words)
+  2. Extracts candidate terms on executors
   3. Deduplicates per article
-  4. Groups into time windows (1h / 5min slide)
-  5. Aggregates counts per scope (global, country, topic)
+  4. Groups into time windows on executors
+  5. Aggregates counts per scope (global, country, topic) on executors
   6. Calculates trending score using velocity from Postgres
   7. Applies minimum thresholds and top-N ranking
   8. Writes results to Redis + Postgres
@@ -17,10 +17,24 @@ from __future__ import annotations
 import logging
 import math
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Mapping, Set
 
 from pyspark.sql import DataFrame
+from pyspark.sql.functions import (
+    array,
+    coalesce,
+    collect_set,
+    col,
+    explode,
+    lit,
+    size,
+    struct,
+    udf,
+    when,
+    window,
+)
+from pyspark.sql.types import ArrayType, StringType, StructField, StructType
 
 from imperium_news_pipeline.phase3.trending.term_extractor import extract_candidates
 from imperium_news_pipeline.phase3.trending.redis_writer import write_trends_to_redis
@@ -31,6 +45,15 @@ from imperium_news_pipeline.phase3.trending.postgres_writer import (
 
 logger = logging.getLogger("TrendingProcessor")
 
+_CANDIDATE_SCHEMA = ArrayType(
+    StructType(
+        [
+            StructField("term", StringType(), nullable=False),
+            StructField("term_type", StringType(), nullable=False),
+        ]
+    )
+)
+
 
 def _compute_score(current: int, previous: int) -> tuple[float, float]:
     """Return (velocity, score) per PRD §14."""
@@ -39,24 +62,45 @@ def _compute_score(current: int, previous: int) -> tuple[float, float]:
     return round(velocity, 4), round(score, 4)
 
 
-def _window_bounds(event_ts: float, window_seconds: int, slide_seconds: int):
-    """Yield (window_start, window_end) datetime pairs that contain event_ts.
+def _seconds_to_spark_interval(seconds: int) -> str:
+    """Format seconds as a Spark SQL interval string."""
+    if seconds % 3600 == 0:
+        value = seconds // 3600
+        unit = "hour" if value == 1 else "hours"
+        return f"{value} {unit}"
+    if seconds % 60 == 0:
+        value = seconds // 60
+        unit = "minute" if value == 1 else "minutes"
+        return f"{value} {unit}"
+    unit = "second" if seconds == 1 else "seconds"
+    return f"{seconds} {unit}"
 
-    An event belongs to every window whose [start, end) range includes it.
-    Windows are aligned to the epoch.
-    """
-    # Find the latest window-start that is <= event_ts
-    latest_start = int(event_ts // slide_seconds) * slide_seconds
-    # Walk backwards to find all windows that contain this event
-    ws = latest_start
-    while ws + window_seconds > event_ts:
-        w_start = datetime.fromtimestamp(ws, tz=timezone.utc)
-        w_end = datetime.fromtimestamp(ws + window_seconds, tz=timezone.utc)
-        yield (w_start, w_end)
-        ws -= slide_seconds
-        # Safety: don't go back more than one full window
-        if latest_start - ws > window_seconds:
-            break
+
+def _iso_timestamp(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
+
+
+def _extract_candidate_rows(
+    title: str | None,
+    excerpt: str | None,
+    body_text_clean: str | None,
+    language_code: str | None,
+    stopwords_map: Mapping[str, Set[str]],
+    blocked_terms: Set[str],
+) -> list[dict[str, str]]:
+    return [
+        {"term": term, "term_type": term_type}
+        for term, term_type in extract_candidates(
+            title=title or "",
+            excerpt=excerpt or "",
+            body_text_clean=body_text_clean or "",
+            language_code=language_code or "unknown",
+            stopwords_map=stopwords_map,
+            blocked_terms=blocked_terms,
+        )
+    ]
 
 
 def process_trending_batch(
@@ -78,118 +122,136 @@ def process_trending_batch(
     """Process one micro-batch of classified articles for trending."""
     t0 = time.time()
 
-    # Step 1: Filter classified articles only
+    # Step 1: Filter classified articles only. Everything through aggregation
+    # remains in Spark so CPU-heavy work is scheduled across executors.
     classified = batch_df.filter(
         batch_df["v.classification_status"] == "classified"
+    ).select(
+        col("event_time"),
+        col("v.article_id").alias("article_id"),
+        col("v.title").alias("title"),
+        col("v.excerpt").alias("excerpt"),
+        col("v.body_text_clean").alias("body_text_clean"),
+        col("v.language_code").alias("language_code"),
+        coalesce(col("v.country_name"), lit("unknown")).alias("country"),
+        coalesce(col("v.root_topic_label"), lit("unknown")).alias("topic"),
+    ).filter(
+        col("event_time").isNotNull() & col("article_id").isNotNull()
     )
-    count = classified.count()
-    if count == 0:
-        logger.info(f"batch={batch_id} classified=0 — skipping")
-        return
 
-    logger.info(f"batch={batch_id} classified={count} — extracting terms")
+    extract_candidates_udf = udf(
+        lambda title, excerpt, body, lang: _extract_candidate_rows(
+            title,
+            excerpt,
+            body,
+            lang,
+            stopwords_map,
+            blocked_terms,
+        ),
+        _CANDIDATE_SCHEMA,
+    )
 
-    # Step 2–3: Collect articles and extract candidates on the driver.
-    # This is intentional: trending extraction is CPU-light per article and
-    # the volume per micro-batch is bounded by maxOffsetsPerTrigger.
-    rows = classified.select(
-        "event_time",
-        "v.article_id",
-        "v.title",
-        "v.excerpt",
-        "v.body_text_clean",
-        "v.language_code",
-        "v.country_name",
-        "v.root_topic_label",
-    ).collect()
-
-    # term_records: list of dicts with all fields needed for aggregation
-    term_records: list[dict] = []
-    for row in rows:
-        article_id = row["article_id"]
-        event_time = row["event_time"]
-        if event_time is None:
-            continue
-            
-        event_ts = event_time.timestamp()
-
-        country = row["country_name"] or "unknown"
-        topic = row["root_topic_label"] or "unknown"
-        lang = row["language_code"] or "unknown"
-
-        candidates = extract_candidates(
-            title=row["title"] or "",
-            excerpt=row["excerpt"] or "",
-            body_text_clean=row["body_text_clean"] or "",
-            language_code=lang,
-            stopwords_map=stopwords_map,
-            blocked_terms=blocked_terms,
+    candidate_rows = (
+        classified
+        .withColumn(
+            "candidate",
+            explode(
+                extract_candidates_udf(
+                    col("title"),
+                    col("excerpt"),
+                    col("body_text_clean"),
+                    col("language_code"),
+                )
+            ),
         )
+        .select(
+            "event_time",
+            "article_id",
+            "country",
+            "topic",
+            col("candidate.term").alias("term"),
+            col("candidate.term_type").alias("term_type"),
+        )
+    )
 
-        for term, term_type in candidates:
-            term_records.append({
-                "article_id": article_id,
-                "event_ts": event_ts,
-                "country": country,
-                "topic": topic,
-                "term": term,
-                "term_type": term_type,
-            })
+    scoped_terms = (
+        candidate_rows
+        .withColumn(
+            "scope",
+            explode(
+                array(
+                    struct(lit("global").alias("scope_type"), lit("global").alias("scope_value")),
+                    struct(lit("country").alias("scope_type"), col("country").alias("scope_value")),
+                    struct(lit("topic").alias("scope_type"), col("topic").alias("scope_value")),
+                )
+            ),
+        )
+        .select(
+            "event_time",
+            "article_id",
+            col("scope.scope_type").alias("scope_type"),
+            col("scope.scope_value").alias("scope_value"),
+            "term",
+            "term_type",
+        )
+    )
 
-    if not term_records:
-        logger.info(f"batch={batch_id} no term candidates — skipping")
+    min_count_col = (
+        when(col("scope_type") == "global", lit(global_min_count))
+        .when(col("scope_type") == "country", lit(country_min_count))
+        .otherwise(lit(topic_min_count))
+    )
+
+    aggregated_rows = (
+        scoped_terms
+        .groupBy(
+            window(
+                col("event_time"),
+                _seconds_to_spark_interval(window_size_seconds),
+                _seconds_to_spark_interval(slide_interval_seconds),
+            ).alias("event_window"),
+            "scope_type",
+            "scope_value",
+            "term",
+            "term_type",
+        )
+        .agg(collect_set("article_id").alias("article_ids"))
+        .withColumn("current_count", size(col("article_ids")))
+        .filter(col("current_count") >= min_count_col)
+        .select(
+            col("event_window.start").alias("window_start"),
+            col("event_window.end").alias("window_end"),
+            "scope_type",
+            "scope_value",
+            "term",
+            "term_type",
+            "article_ids",
+            "current_count",
+        )
+    )
+
+    aggregated = [row.asDict(recursive=True) for row in aggregated_rows.collect()]
+    if not aggregated:
+        logger.info(f"batch={batch_id} no trends above threshold — skipping")
         return
 
-    logger.info(f"batch={batch_id} term_candidates={len(term_records)}")
+    logger.info(f"batch={batch_id} aggregated_trends={len(aggregated)} — scoring")
 
-    # Step 4: Assign windows and aggregate
-    # Aggregate structure: (window_start, window_end, scope_type, scope_value, term, term_type) → set of article_ids
-    agg: dict[tuple, set[str]] = {}
-
-    for rec in term_records:
-        event_ts = rec["event_ts"]
-        article_id = rec["article_id"]
-        term = rec["term"]
-        term_type = rec["term_type"]
-        country = rec["country"]
-        topic = rec["topic"]
-
-        for w_start, w_end in _window_bounds(event_ts, window_size_seconds, slide_interval_seconds):
-            ws_iso = w_start.isoformat()
-            we_iso = w_end.isoformat()
-
-            # Global
-            gkey = (ws_iso, we_iso, "global", "global", term, term_type)
-            agg.setdefault(gkey, set()).add(article_id)
-
-            # Country
-            ckey = (ws_iso, we_iso, "country", country, term, term_type)
-            agg.setdefault(ckey, set()).add(article_id)
-
-            # Topic
-            tkey = (ws_iso, we_iso, "topic", topic, term, term_type)
-            agg.setdefault(tkey, set()).add(article_id)
-
-    logger.info(f"batch={batch_id} aggregation_keys={len(agg)}")
-
-    # Step 5–6: Compute scores with velocity from previous window
+    # Step 5–6: Compute scores with velocity from previous window. This is done
+    # on the reduced aggregate output so the driver only handles sink payloads.
     # Cache previous-count lookups to avoid repeated PG queries
     prev_cache: dict[tuple, dict[str, int]] = {}
     all_trends: list[dict[str, Any]] = []
 
-    min_counts = {
-        "global": global_min_count,
-        "country": country_min_count,
-        "topic": topic_min_count,
-    }
-
-    for (ws_iso, we_iso, scope_type, scope_value, term, term_type), article_ids in agg.items():
-        current_count = len(article_ids)
-
-        # Apply minimum threshold
-        if current_count < min_counts.get(scope_type, 3):
-            continue
-
+    for row in aggregated:
+        ws_iso = _iso_timestamp(row["window_start"])
+        we_iso = _iso_timestamp(row["window_end"])
+        scope_type = row["scope_type"]
+        scope_value = row["scope_value"]
+        term = row["term"]
+        term_type = row["term_type"]
+        article_ids = row["article_ids"]
+        current_count = int(row["current_count"])
         # Fetch previous window counts (1 window back)
         prev_key = (scope_type, scope_value, ws_iso, we_iso)
         if prev_key not in prev_cache:
@@ -270,6 +332,6 @@ def process_trending_batch(
 
     elapsed_ms = int((time.time() - t0) * 1000)
     logger.info(
-        f"batch={batch_id} done articles={count} terms={len(term_records)} "
+        f"batch={batch_id} done aggregated_trends={len(aggregated)} "
         f"trends_written={len(final_trends)} elapsed_ms={elapsed_ms}"
     )

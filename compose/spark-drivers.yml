@@ -57,7 +57,6 @@ services:
     <<: *phase3-driver-defaults
     container_name: imperium-topic-embedding-driver
     hostname: imperium-topic-embedding-driver
-    restart: "no"
     depends_on:
       news-source-db:
         condition: service_healthy
@@ -203,7 +202,6 @@ services:
 
   imperium-canonical-enrichment-driver:
     <<: *phase3-driver-defaults
-    restart: "no"
     container_name: imperium-canonical-enrichment-driver
     hostname: imperium-canonical-enrichment-driver
     environment:
@@ -249,7 +247,6 @@ services:
 
   imperium-classification-driver:
     <<: *phase3-driver-defaults
-    restart: "no"
     container_name: imperium-classification-driver
     hostname: imperium-classification-driver
     environment:
@@ -337,9 +334,9 @@ services:
       /opt/spark/bin/spark-submit
       --master spark://spark-master:7077
       --conf spark.executor.cores=1
-      --conf spark.cores.max=2
-      --conf spark.executor.memory=1g
-      --conf spark.driver.memory=1g
+      --conf spark.cores.max=4
+      --conf spark.executor.memory=4g
+      --conf spark.driver.memory=5g
       --conf spark.driverEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       --conf spark.executorEnv.PYTHONPATH=/opt/imperium/news-pipeline/src
       /opt/imperium/news-pipeline/jobs/trending_driver.py
