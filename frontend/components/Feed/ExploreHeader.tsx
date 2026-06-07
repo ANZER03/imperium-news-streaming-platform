@@ -2,11 +2,12 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ChevronDown, Globe } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { topicService } from '@/lib/services/topic.service';
 import { countryService } from '@/lib/services/country.service';
-import { Topic, Country } from '@/lib/types';
+import { trendService } from '@/lib/services/trend.service';
+import { Topic, Country, TrendKeyword } from '@/lib/types';
 
 // Fallback image source for flags that work across all browsers & OS
 const FlagImage = ({ code, alt }: { code: string; alt: string }) => (
@@ -40,11 +41,17 @@ const EXPLORE_KEYWORDS: ReadonlyArray<string> = [
 ];
 
 export function ExploreHeader() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentCountry = searchParams.get('country') || 'global';
+  const currentTopic = searchParams.get('topic') || '';
+  const currentKeyword = searchParams.get('keyword') || '';
+
   const categoriesRef = useRef<HTMLDivElement>(null);
   const keywordsRef = useRef<HTMLDivElement>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
-  const [selectedCountry, setSelectedCountry] = useState<number | 'global'>('global');
+  const [keywords, setKeywords] = useState<TrendKeyword[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
@@ -56,6 +63,26 @@ export function ExploreHeader() {
       setCountries(cData);
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    trendService.getExploreTrends(currentCountry, currentTopic)
+      .then(setKeywords)
+      .catch((err) => console.error('Failed to fetch trends:', err));
+  }, [currentCountry, currentTopic]);
+
+  const updateUrlParam = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'global' || value === '') {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+    // If changing country or topic, clear the keyword selection
+    if (key === 'country' || key === 'topic') {
+      params.delete('keyword');
+    }
+    router.push(`?${params.toString()}`);
+  };
 
   const scrollCategories = (dir: 'left' | 'right') => {
     if (categoriesRef.current) {
@@ -82,11 +109,11 @@ export function ExploreHeader() {
             className="flex items-center gap-1.5 bg-editorial-bg hover:bg-editorial-border border border-editorial-border transition-colors rounded-full px-2.5 py-1.5 text-sm font-medium text-editorial-ink"
             aria-label="Select Country"
           >
-            {selectedCountry === 'global' ? (
+            {currentCountry === 'global' ? (
               <Globe className="w-4 h-4 text-[#1d9bf0]" />
             ) : (
               <FlagImage 
-                code={countries.find(c => c.countryId === selectedCountry)?.abbreviation || ''} 
+                code={countries.find(c => c.countryName === currentCountry)?.abbreviation || ''} 
                 alt="Selected Country Flag" 
               />
             )}
@@ -103,10 +130,10 @@ export function ExploreHeader() {
               <div className="absolute right-0 mt-2 w-48 bg-editorial-bg border border-editorial-border rounded-xl shadow-lg overflow-y-auto max-h-64 z-50">
                 <button
                   onClick={() => {
-                    setSelectedCountry('global');
+                    updateUrlParam('country', 'global');
                     setIsDropdownOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-editorial-surface transition-colors ${selectedCountry === 'global' ? 'bg-editorial-surface font-semibold' : ''}`}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-editorial-surface transition-colors ${currentCountry === 'global' ? 'bg-editorial-surface font-semibold' : ''}`}
                 >
                   <Globe className="w-4 h-4 text-[#1d9bf0]" />
                   <span className="text-editorial-ink">Global</span>
@@ -115,10 +142,10 @@ export function ExploreHeader() {
                   <button
                     key={c.countryId}
                     onClick={() => {
-                      setSelectedCountry(c.countryId);
+                      updateUrlParam('country', c.countryName);
                       setIsDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-editorial-surface transition-colors ${selectedCountry === c.countryId ? 'bg-editorial-surface font-semibold' : ''}`}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-editorial-surface transition-colors ${currentCountry === c.countryName ? 'bg-editorial-surface font-semibold' : ''}`}
                   >
                     <FlagImage code={c.abbreviation} alt={c.countryName} />
                     <span className="text-editorial-ink">{c.countryName}</span>
@@ -139,10 +166,10 @@ export function ExploreHeader() {
           {topics.map((topic, i) => {
             const image = FAKE_IMAGES[i % FAKE_IMAGES.length];
             return (
-              <Link
+              <button
                 key={topic.topicId}
-                href={`/topic/${topic.topicId}`}
-                className="relative min-w-[200px] h-[140px] shrink-0 rounded-2xl overflow-hidden snap-start cursor-pointer group/card block"
+                onClick={() => updateUrlParam('topic', currentTopic === topic.topicId ? '' : topic.topicId)}
+                className={`relative min-w-[200px] h-[140px] shrink-0 rounded-2xl overflow-hidden snap-start cursor-pointer group/card block text-left ${currentTopic === topic.topicId ? 'ring-2 ring-editorial-accent' : ''}`}
               >
                 <Image
                   src={image}
@@ -153,12 +180,12 @@ export function ExploreHeader() {
                   referrerPolicy="no-referrer"
                 />
                 {/* Dark overlay for readability */}
-                <div className="absolute inset-0 bg-black/40 group-hover/card:bg-black/20 transition-colors" />
+                <div className={`absolute inset-0 transition-colors ${currentTopic === topic.topicId ? 'bg-black/20' : 'bg-black/40 group-hover/card:bg-black/20'}`} />
                 {/* Title */}
                 <h3 className="absolute bottom-4 left-4 font-black text-white text-xl tracking-tight drop-shadow-md">
                   {topic.displayName}
                 </h3>
-              </Link>
+              </button>
             );
           })}
         </div>
@@ -184,17 +211,27 @@ export function ExploreHeader() {
           ref={keywordsRef}
           className="flex overflow-x-auto gap-2 no-scrollbar scroll-smooth snap-x pb-1"
         >
-          {EXPLORE_KEYWORDS.map((keyword) => (
-            <Link
-              key={keyword}
-              href={`/search?q=${encodeURIComponent(keyword)}`}
-              className="text-sm font-semibold text-editorial-ink bg-transparent hover:bg-editorial-surface px-4 py-1.5 rounded-full cursor-pointer transition-colors border border-editorial-border whitespace-nowrap snap-start"
-            >
-              {keyword}
-            </Link>
-          ))}
+          {keywords.length === 0 ? (
+            <span className="text-sm text-editorial-muted italic px-2 py-1.5">No trending topics right now...</span>
+          ) : (
+            keywords.map((keyword) => (
+              <button
+                key={keyword.term}
+                onClick={() => updateUrlParam('keyword', currentKeyword === keyword.term ? '' : keyword.term)}
+                className={`text-sm font-semibold px-4 py-1.5 rounded-full cursor-pointer transition-colors border whitespace-nowrap snap-start flex items-center gap-1.5 ${
+                  currentKeyword === keyword.term 
+                    ? 'bg-editorial-ink text-editorial-bg border-editorial-ink' 
+                    : 'bg-transparent text-editorial-ink border-editorial-border hover:bg-editorial-surface'
+                }`}
+              >
+                <span>{keyword.term}</span>
+                {keyword.velocity > 10 && <span className="text-red-500 text-[10px]">🔥</span>}
+              </button>
+            ))
+          )}
         </div>
       </div>
     </div>
   );
 }
+

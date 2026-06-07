@@ -6,3 +6,4 @@ export * from './article.service';
 export * from './bookmark.service';
 export * from './auth.service';
 export * from './search.service';
+export * from './trend.service';

@@ -84,4 +84,22 @@ export const feedService = {
     const res = await fetchApi<FeedScannerResponse>(`/api/v3/feed/latest?${params}`);
     return toPage(res);
   },
+
+  getExploreArticles: async (country?: string, topic?: string, keyword?: string, limit = 40): Promise<FeedPage> => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (country && country !== 'global') params.set('country', country);
+    if (topic) params.set('topic', topic);
+    if (keyword) params.set('keyword', keyword);
+
+    const res = await fetchApi<FeedScannerResponse>(`/api/v1/trends/explore/articles?${params}`);
+    // Explore feed is stateless, we just use nextCursor to determine if there is more
+    return {
+      data: res.data.map(mapCard),
+      sessionId: res.sessionId ?? '',
+      hasMore: (res as any).nextCursor != null, // The DTO uses nextCursor
+      source: res.source ?? 'primary',
+      newSinceLastSession: 0,
+      warnings: res.warnings ?? [],
+    };
+  },
 };

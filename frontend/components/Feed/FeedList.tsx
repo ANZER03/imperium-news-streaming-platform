@@ -26,6 +26,10 @@ interface FeedListProps {
   topicId?: string;
   /** Search/Explore query string. */
   query?: string;
+  /** Explore mode specific country. */
+  country?: string;
+  /** Explore mode specific keyword. */
+  keyword?: string;
 }
 
 const SCROLLABLE_MODES: ReadonlySet<FeedListMode> = new Set([
@@ -50,10 +54,10 @@ const REFRESHABLE_MODES: ReadonlySet<FeedListMode> = new Set([
  * - `latest`   → latest feed
  * - `topic`    → per-topic feed (uses raw backend `topicId`)
  * - `saved`    → user's bookmarks
- * - `explore`  → renders `ExploreHeader` + the For-You feed underneath
+ * - `explore`  → renders `ExploreHeader` + explore articles feed
  * - `search`   → For-You feed filtered in-memory by `query`
  */
-export function FeedList({ mode, topicId, query }: FeedListProps) {
+export function FeedList({ mode, topicId, query, country, keyword }: FeedListProps) {
   const { userId } = useAppStore();
 
   const [articles, setArticles] = useState<Article[]>([]);
@@ -64,36 +68,42 @@ export function FeedList({ mode, topicId, query }: FeedListProps) {
   const observerTarget = useRef<HTMLDivElement>(null);
   const activeKey = useRef('');
 
-  const fetchFeed = useCallback(
-    async (sid?: string): Promise<FeedPage | null> => {
-      if (!userId) return null;
-      try {
-        switch (mode) {
-          case 'latest':
-            return await feedService.getLatest(userId, sid);
-          case 'topic':
-            if (!topicId) return null;
-            return await feedService.getByTopic(userId, topicId, sid);
-          case 'foryou':
-          case 'explore':
-          case 'search':
-            // Explore + Search reuse the personalized feed and filter client-side.
-            return await feedService.getFeed(userId, sid);
-          default:
-            return null;
-        }
-      } catch (err) {
-        console.error('Feed fetch failed', err);
-        return null;
+  // Stable ref to always hold latest fetch logic without triggering effect re-runs
+  const fetchFeedRef = useRef<(sid?: string) => Promise<FeedPage | null>>(async () => null);
+  fetchFeedRef.current = async (sid?: string): Promise<FeedPage | null> => {
+    if (!userId) return null;
+    try {
+      switch (mode) {
+        case 'latest':
+          return await feedService.getLatest(userId, sid);
+        case 'topic':
+          if (!topicId) return null;
+          return await feedService.getByTopic(userId, topicId, sid);
+        case 'explore':
+          return await feedService.getExploreArticles(country, topicId, keyword, 40);
+        case 'foryou':
+          if (topicId) return await feedService.getByTopic(userId, topicId, sid);
+          return await feedService.getFeed(userId, sid);
+        case 'search':
+          // Search reuses the personalized feed and filters client-side.
+          return await feedService.getFeed(userId, sid);
+        default:
+          return null;
       }
-    },
-    [userId, mode, topicId],
-  );
+    } catch (err) {
+      console.error('Feed fetch failed', err);
+      return null;
+    }
+  };
 
-  // Initial / reset load (fires when mode/topic changes)
+  // Initial / reset load (fires only when the actual inputs change)
   useEffect(() => {
-    const key = `${mode}:${topicId ?? ''}`;
+    // Skip until Zustand has hydrated userId from localStorage
+    if (!userId) return;
+
+    const key = `${mode}:${topicId ?? ''}:${country ?? ''}:${keyword ?? ''}`;
     activeKey.current = key;
+    let aborted = false;
 
     try {
       window.scrollTo({ top: 0, behavior: 'instant' });
@@ -102,7 +112,6 @@ export function FeedList({ mode, topicId, query }: FeedListProps) {
     }
 
     if (mode === 'saved') {
-      if (!userId) return;
       setLoading(true);
       setArticles([]);
       setSessionId(undefined);
@@ -110,14 +119,14 @@ export function FeedList({ mode, topicId, query }: FeedListProps) {
       bookmarkService
         .getAll(userId)
         .then((data) => {
-          if (activeKey.current !== key) return;
+          if (aborted || activeKey.current !== key) return;
           setArticles(data);
         })
         .catch((err) => console.error('Bookmarks fetch failed', err))
         .finally(() => {
-          if (activeKey.current === key) setLoading(false);
+          if (!aborted && activeKey.current === key) setLoading(false);
         });
-      return;
+      return () => { aborted = true; };
     }
 
     setLoading(true);
@@ -125,23 +134,26 @@ export function FeedList({ mode, topicId, query }: FeedListProps) {
     setSessionId(undefined);
     setHasMore(true);
 
-    fetchFeed(undefined)
+    fetchFeedRef.current(undefined)
       .then((res) => {
-        if (!res || activeKey.current !== key) return;
+        if (aborted || !res || activeKey.current !== key) return;
         setArticles(res.data);
         setSessionId(res.sessionId);
         setHasMore(res.hasMore);
       })
       .finally(() => {
-        if (activeKey.current === key) setLoading(false);
+        if (!aborted && activeKey.current === key) setLoading(false);
       });
-  }, [userId, mode, topicId, fetchFeed]);
+
+    return () => { aborted = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, mode, topicId, country, keyword]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !sessionId) return;
     if (!SCROLLABLE_MODES.has(mode)) return;
     setLoadingMore(true);
-    const res = await fetchFeed(sessionId);
+    const res = await fetchFeedRef.current(sessionId);
     if (res) {
       setArticles((prev) => {
         const existingIds = new Set(prev.map((a) => a.id));
@@ -152,7 +164,7 @@ export function FeedList({ mode, topicId, query }: FeedListProps) {
       setHasMore(res.hasMore);
     }
     setLoadingMore(false);
-  }, [loadingMore, hasMore, sessionId, mode, fetchFeed]);
+  }, [loadingMore, hasMore, sessionId, mode]);
 
   const handleRefresh = useCallback(() => {
     if (!userId || !REFRESHABLE_MODES.has(mode)) return;
@@ -160,7 +172,7 @@ export function FeedList({ mode, topicId, query }: FeedListProps) {
     setArticles([]);
     setSessionId(undefined);
     setHasMore(true);
-    fetchFeed(undefined)
+    fetchFeedRef.current(undefined)
       .then((res) => {
         if (!res) return;
         setArticles(res.data);
@@ -168,7 +180,7 @@ export function FeedList({ mode, topicId, query }: FeedListProps) {
         setHasMore(res.hasMore);
       })
       .finally(() => setLoading(false));
-  }, [userId, mode, fetchFeed]);
+  }, [userId, mode]);
 
   // Infinite scroll sentinel
   useEffect(() => {

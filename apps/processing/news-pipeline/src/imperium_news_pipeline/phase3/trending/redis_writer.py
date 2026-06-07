@@ -80,7 +80,7 @@ def write_trends_to_redis(
         elif scope_type == "global_topic":
             parts = scope_value.split("|")
             topic = parts[1] if len(parts) > 1 else "unknown"
-            zset_key = f"trend:global_topic:global:{_safe_key_segment(topic)}:5h"
+            zset_key = f"trend:global_topic:{_safe_key_segment(topic)}:5h"
         else:
             continue
 

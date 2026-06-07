@@ -35,7 +35,7 @@ public class TrendServiceIT {
         connectionFactory.afterPropertiesSet();
         stringTemplate = new ReactiveStringRedisTemplate(connectionFactory);
 
-        trendService = new TrendService(stringTemplate);
+        trendService = new TrendService(stringTemplate, null, null, null);
     }
 
     @AfterAll
@@ -86,7 +86,7 @@ public class TrendServiceIT {
         String term = "olympics";
         stringTemplate.opsForZSet().add(zsetKey, term, 99.9).block();
 
-        String metaKey = "trend:meta:country_topic:france|sports_:olympics";
+        String metaKey = "trend:meta:country_topic:france_sports_:olympics";
         Map<String, String> meta = new HashMap<>();
         meta.put("term", term);
         meta.put("score", "99.9");
@@ -103,5 +103,28 @@ public class TrendServiceIT {
         assertThat(dtoList.get(0).getTerm()).isEqualTo(term);
         assertThat(dtoList.get(0).getScore()).isEqualTo(99.9);
         assertThat(dtoList.get(0).getTermType()).isEqualTo("event");
+    }
+
+    @Test
+    void testGetExploreTrends_GlobalTopic() {
+        String zsetKey = "trend:global_topic:entertainment_culture:5h";
+        String term = "cinema";
+        stringTemplate.opsForZSet().add(zsetKey, term, 88.8).block();
+
+        String metaKey = "trend:meta:global_topic:global_entertainment_culture:cinema";
+        Map<String, String> meta = new HashMap<>();
+        meta.put("term", term);
+        meta.put("score", "88.8");
+        meta.put("term_type", "keyword");
+        stringTemplate.<String, String>opsForHash().putAll(metaKey, meta).block();
+
+        Flux<TrendKeywordDto> results = trendService.getExploreTrends(null, "entertainment_culture");
+
+        java.util.List<TrendKeywordDto> dtoList = results.collectList().block();
+        assertThat(dtoList).isNotNull();
+        assertThat(dtoList).hasSize(1);
+        assertThat(dtoList.get(0).getTerm()).isEqualTo(term);
+        assertThat(dtoList.get(0).getScore()).isEqualTo(88.8);
+        assertThat(dtoList.get(0).getTermType()).isEqualTo("keyword");
     }
 }

@@ -29,6 +29,7 @@ from pyspark.sql.functions import (
     countDistinct,
     desc,
     explode,
+    expr,
     greatest,
     lit,
     log1p,
@@ -150,7 +151,7 @@ def process_trending_batch(
         col("v.body_text_clean").alias("body_text_clean"),
         col("v.language_code").alias("language_code"),
         coalesce(col("v.country_name"), lit("unknown")).alias("country"),
-        coalesce(col("v.root_topic_label"), lit("unknown")).alias("topic"),
+        coalesce(expr("regexp_replace(lower(v.root_topic_label), ' & ', '_')"), lit("unknown")).alias("topic"),
     ).filter(
         col("event_time").isNotNull() & col("article_id").isNotNull()
     )

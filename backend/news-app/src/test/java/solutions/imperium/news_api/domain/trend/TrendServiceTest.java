@@ -66,7 +66,7 @@ public class TrendServiceTest {
     @Test
     void testGetExploreTrends_CountryTopic() {
         String zsetKey = "trend:country_topic:france:sports_:5h";
-        String metaKey = "trend:meta:country_topic:france|sports_:olympics";
+        String metaKey = "trend:meta:country_topic:france_sports_:olympics";
         String term = "olympics";
 
         when(zSetOperations.reverseRange(eq(zsetKey), eq(org.springframework.data.domain.Range.closed(0L, 49L))))
@@ -82,6 +82,28 @@ public class TrendServiceTest {
 
         StepVerifier.create(result)
                 .expectNextMatches(dto -> dto.getTerm().equals(term) && dto.getScore() == 99.9)
+                .verifyComplete();
+    }
+
+    @Test
+    void testGetExploreTrends_GlobalTopic() {
+        String zsetKey = "trend:global_topic:entertainment_culture:5h";
+        String metaKey = "trend:meta:global_topic:global_entertainment_culture:cinema";
+        String term = "cinema";
+
+        when(zSetOperations.reverseRange(eq(zsetKey), eq(org.springframework.data.domain.Range.closed(0L, 49L))))
+                .thenReturn(Flux.just(term));
+
+        when(hashOperations.entries(eq(metaKey)))
+                .thenReturn(Flux.just(
+                        Map.entry("term", term),
+                        Map.entry("score", "88.8")
+                ));
+
+        Flux<TrendKeywordDto> result = trendService.getExploreTrends(null, "entertainment_culture");
+
+        StepVerifier.create(result)
+                .expectNextMatches(dto -> dto.getTerm().equals(term) && dto.getScore() == 88.8)
                 .verifyComplete();
     }
 }
