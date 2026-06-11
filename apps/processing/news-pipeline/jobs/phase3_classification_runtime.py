@@ -133,15 +133,29 @@ def process_batch(
     spark = batch_df.sparkSession
 
     enriched_df = batch_df.filter(col("value_json.classification_status") == "enriched")
-    count = enriched_df.count()
+    recent_enriched_df = enriched_df.filter(
+        expr(
+            "value_json.crawled_at is not null "
+            "and value_json.crawled_at > unix_timestamp(current_timestamp() - interval 14 days) * 1000"
+        )
+    )
+    enriched_count = enriched_df.count()
+    count = recent_enriched_df.count()
+    old_or_missing_crawled_at_count = enriched_count - count
     if count == 0:
-        logger.info(f"batch={batch_id} enriched=0 — skipping")
+        logger.info(
+            f"batch={batch_id} enriched={enriched_count} recent_enriched=0 "
+            f"old_or_missing_crawled_at={old_or_missing_crawled_at_count} — skipping"
+        )
         return
 
-    logger.info(f"batch={batch_id} enriched={count} — starting")
+    logger.info(
+        f"batch={batch_id} enriched={enriched_count} recent_enriched={count} "
+        f"old_or_missing_crawled_at={old_or_missing_crawled_at_count} — starting"
+    )
 
     enriched_df = (
-        enriched_df
+        recent_enriched_df
         .withColumn("body_words", expr("substring_index(value_json.body_text_clean, ' ', 40)"))
         .withColumn("input_text", expr("concat_ws('\\n', trim(value_json.title), trim(body_words))"))
         .withColumn("article_id", col("value_json.article_id"))
