@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Long-running scheduler: clones older table_news rows from prod every 5 minutes.
+Long-running scheduler: clones older table_news rows from prod every minute.
 Resumes automatically from the last saved minimum ID.
 
 Environment variables:
     CLONE_OLD_BATCH_SIZE   rows per cycle (default 100000)
-    CLONE_OLD_INTERVAL     seconds between cycles (default 300)
+    CLONE_OLD_INTERVAL     seconds between cycles (default 60)
     CLONE_OLD_SEED_ID      starting id if no state file exists (default 564990395)
 """
 
@@ -33,7 +33,7 @@ clone_batch = _mod.clone_batch
 
 SEED_ID = int(os.environ.get("CLONE_OLD_SEED_ID", 564990395))
 BATCH_SIZE = int(os.environ.get("CLONE_OLD_BATCH_SIZE", 100000))
-INTERVAL = int(os.environ.get("CLONE_OLD_INTERVAL", 300))
+INTERVAL = int(os.environ.get("CLONE_OLD_INTERVAL", 60))
 STATE_FILE = root_dir / "scripts" / "clone" / ".state" / "clone-old-news-min-id.json"
 
 

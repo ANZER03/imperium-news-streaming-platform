@@ -94,7 +94,7 @@ services:
       SOURCE_PG_CONTAINER: ${SOURCE_PG_CONTAINER:-imperium-news-source-db}
       CLONE_OLD_SEED_ID: ${CLONE_OLD_SEED_ID:-564990395}
       CLONE_OLD_BATCH_SIZE: ${CLONE_OLD_BATCH_SIZE:-100000}
-      CLONE_OLD_INTERVAL: ${CLONE_OLD_INTERVAL:-300}
+      CLONE_OLD_INTERVAL: ${CLONE_OLD_INTERVAL:-60}
     depends_on:
       news-source-db:
         condition: service_healthy

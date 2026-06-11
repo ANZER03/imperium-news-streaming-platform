@@ -127,7 +127,21 @@ class ElasticsearchHttpClient:
             headers={"Content-Type": "application/x-ndjson"},
             timeout=self.timeout,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            if response.status_code == 429 and len(operations) > 1:
+                midpoint = len(operations) // 2
+                left = operations[:midpoint]
+                right = operations[midpoint:]
+                logger.warning(
+                    "Elasticsearch bulk returned 429 for %s operations; retrying as %s + %s",
+                    len(operations),
+                    len(left),
+                    len(right),
+                )
+                return self.bulk(left) + self.bulk(right)
+            raise exc
         result = response.json()
         if result.get("errors"):
             failures = _bulk_failures(result, operations)
