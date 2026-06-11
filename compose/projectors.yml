@@ -52,10 +52,10 @@ services:
     <<: *service-defaults
     build:
       context: ../apps/processing/news-pipeline/jobs/projections
-    container_name: imperium-elasticsearch-projector
-    hostname: imperium-elasticsearch-projector
     profiles:
       - projectors
+    deploy:
+      replicas: 2
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
