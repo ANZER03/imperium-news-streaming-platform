@@ -136,26 +136,35 @@ def process_batch(
     recent_enriched_df = enriched_df.filter(
         expr(
             "value_json.crawled_at is not null "
-            "and value_json.crawled_at > unix_timestamp(current_timestamp() - interval 14 days) * 1000"
+            "and value_json.crawled_at > unix_timestamp(current_timestamp() - interval 14 days) * 1000000"
         )
     )
     enriched_count = enriched_df.count()
-    count = recent_enriched_df.count()
-    old_or_missing_crawled_at_count = enriched_count - count
-    if count == 0:
+    recent_enriched_count = recent_enriched_df.count()
+    old_or_missing_crawled_at_count = enriched_count - recent_enriched_count
+    if recent_enriched_count == 0:
         logger.info(
             f"batch={batch_id} enriched={enriched_count} recent_enriched=0 "
             f"old_or_missing_crawled_at={old_or_missing_crawled_at_count} — skipping"
         )
         return
 
+    max_articles_per_batch = int(os.environ.get("CLASSIFICATION_MAX_ARTICLES_PER_BATCH", "700"))
+    if max_articles_per_batch < 1:
+        max_articles_per_batch = 700
+    classification_input_df = recent_enriched_df.limit(max_articles_per_batch)
+    classification_input_count = classification_input_df.count()
+    over_cap_recent_count = recent_enriched_count - classification_input_count
+
     logger.info(
-        f"batch={batch_id} enriched={enriched_count} recent_enriched={count} "
+        f"batch={batch_id} enriched={enriched_count} recent_enriched={recent_enriched_count} "
+        f"classification_input={classification_input_count} "
+        f"over_cap_recent={over_cap_recent_count} "
         f"old_or_missing_crawled_at={old_or_missing_crawled_at_count} — starting"
     )
 
     enriched_df = (
-        recent_enriched_df
+        classification_input_df
         .withColumn("body_words", expr("substring_index(value_json.body_text_clean, ' ', 40)"))
         .withColumn("input_text", expr("concat_ws('\\n', trim(value_json.title), trim(body_words))"))
         .withColumn("article_id", col("value_json.article_id"))
@@ -180,7 +189,7 @@ def process_batch(
         return
 
     embed_count = len(result.embeddings)
-    skipped = count - embed_count
+    skipped = classification_input_count - embed_count
     if not result.embeddings:
         logger.error(f"batch={batch_id} embedding_empty — aborting batch")
         return
@@ -388,7 +397,11 @@ def process_batch(
     elapsed_ms = int((time.time() - t0) * 1000)
     logger.info(
         f"batch={batch_id} done "
-        f"enriched={count} embedded={embed_count} skipped={skipped} "
+        f"enriched={enriched_count} recent_enriched={recent_enriched_count} "
+        f"classification_input={classification_input_count} "
+        f"over_cap_recent={over_cap_recent_count} "
+        f"old_or_missing_crawled_at={old_or_missing_crawled_at_count} "
+        f"embedded={embed_count} skipped={skipped} "
         f"written={write_count} dlq={dlq_count} elapsed_ms={elapsed_ms}"
     )
     sys.stdout.flush()
@@ -446,9 +459,21 @@ def main() -> None:
         .option("subscribe", config.kafka.canonical_topic)
         .option("startingOffsets", config.stream_starting_offsets(env, "classification", "earliest"))
     )
+    kafka_group_id = os.environ.get("CLASSIFICATION_KAFKA_GROUP_ID", "").strip()
+    if kafka_group_id:
+        raw_reader = raw_reader.option("kafka.group.id", kafka_group_id)
     max_offsets = config.stream_max_offsets_per_trigger(env, "classification")
     if max_offsets:
         raw_reader = raw_reader.option("maxOffsetsPerTrigger", max_offsets)
+
+    logger.info(
+        "Classification Kafka source configured: topic=%s starting_offsets=%s "
+        "max_offsets_per_trigger=%s group_id=%s",
+        config.kafka.canonical_topic,
+        config.stream_starting_offsets(env, "classification", "earliest"),
+        max_offsets or "unset",
+        kafka_group_id or "spark-managed",
+    )
 
     raw = raw_reader.load()
     stream = raw.select(
@@ -456,7 +481,9 @@ def main() -> None:
         from_avro(expr("substring(value, 6)"), canonical_schema_json).alias("value_json"),
     )
 
-    checkpoint_path = config.checkpoints.for_job("classification")
+    checkpoint_job_name = os.environ.get("CLASSIFICATION_CHECKPOINT_NAME", "classification").strip()
+    checkpoint_path = config.checkpoints.for_job(checkpoint_job_name)
+    logger.info("Classification checkpoint path: %s", checkpoint_path)
 
     writer = stream.writeStream.foreachBatch(
         lambda rows, batch_id: process_batch(

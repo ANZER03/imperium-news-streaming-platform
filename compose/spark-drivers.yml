@@ -259,12 +259,15 @@ services:
       TOPIC_EMBEDDINGS_TABLE: imperium_topic_embeddings
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
-      CLASSIFICATION_STARTING_OFFSETS: earliest
-      CLASSIFICATION_MAX_OFFSETS_PER_TRIGGER: 700
+      CLASSIFICATION_STARTING_OFFSETS: latest
+      CLASSIFICATION_KAFKA_GROUP_ID: imperium-classification-driver-latest-v1
+      CLASSIFICATION_MAX_OFFSETS_PER_TRIGGER: 10000
       CLASSIFICATION_TRIGGER_PROCESSING_TIME: 10 seconds
+      CLASSIFICATION_MAX_ARTICLES_PER_BATCH: 700
       CLASSIFICATION_EMBEDDING_BATCH_SIZE: 100
       CLASSIFICATION_NVIDIA_RPM_BUDGET: 24
       CLASSIFIED_DLQ_TOPIC: imperium.news.classified.dlq
+      CLASSIFICATION_CHECKPOINT_NAME: classification-latest-v1
       CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
       JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"
       OTEL_SERVICE_NAME: spark-driver-classification
