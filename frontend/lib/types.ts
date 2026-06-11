@@ -23,3 +23,14 @@ export interface Topic {
   topicId: string;
   displayName: string;
 }
+
+export interface TrendKeyword {
+  term: string;
+  termType: string | null;
+  articleIds: string[] | null;
+  currentCount: number;
+  previousCount: number;
+  velocity: number;
+  score: number;
+  updatedAt: string | null;
+}

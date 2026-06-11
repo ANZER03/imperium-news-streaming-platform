@@ -20,9 +20,9 @@ type NavItem = (NavLink & { kind: 'link' }) | (NavButton & { kind: 'button' });
 const ITEMS: ReadonlyArray<NavItem> = [
   { kind: 'link',   id: 'feed',    icon: Home,     href: '/' },
   { kind: 'link',   id: 'explore', icon: Search,   href: '/explore' },
-  { kind: 'button', id: 'notif',   icon: Bell },
+  { kind: 'link',   id: 'notif',   icon: Bell,     href: '/notifications' },
   { kind: 'link',   id: 'saved',   icon: Bookmark, href: '/saved' },
-  { kind: 'button', id: 'profile', icon: User },
+  { kind: 'link',   id: 'profile', icon: User,     href: '/profile' },
 ];
 
 function isActiveRoute(pathname: string, href: string) {

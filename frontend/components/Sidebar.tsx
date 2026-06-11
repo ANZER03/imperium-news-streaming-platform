@@ -34,10 +34,10 @@ type NavItem = (NavLink & { kind: 'link' }) | (NavButton & { kind: 'button' });
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { kind: 'link', id: 'feed',     icon: Home,     label: 'Home',          href: '/' },
   { kind: 'link', id: 'explore',  icon: Search,   label: 'Explore',       href: '/explore' },
-  { kind: 'button', id: 'notif',  icon: Bell,     label: 'Notifications' },
+  { kind: 'link', id: 'notif',    icon: Bell,     label: 'Notifications', href: '/notifications' },
   { kind: 'link', id: 'saved',    icon: Bookmark, label: 'Saved',         href: '/saved' },
-  { kind: 'button', id: 'profile',icon: User,     label: 'Profile' },
-  { kind: 'button', id: 'settings',icon: Settings,label: 'Settings' },
+  { kind: 'link', id: 'profile',  icon: User,     label: 'Profile',       href: '/profile' },
+  { kind: 'link', id: 'settings', icon: Settings, label: 'Settings',      href: '/settings' },
 ];
 
 function shouldFillIcon(id: string) {
