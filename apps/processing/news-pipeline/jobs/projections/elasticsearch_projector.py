@@ -12,7 +12,7 @@ from utils import build_avro_deserializer, build_consumer, consume_microbatches,
 
 logger = get_logger("ElasticsearchProjector")
 
-CANONICAL_TOPIC = "imperium.canonical-articles"
+DEFAULT_CANONICAL_TOPIC = "imperium.canonical-articles"
 DEFAULT_INDEX_NAME = "imperium_articles_search"
 
 
@@ -182,13 +182,18 @@ def build_document(data: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in document.items() if value is not None}
 
 
-def process_batch(messages: List[Message], client: ElasticsearchHttpClient, avro_deserializer) -> None:
+def process_batch(
+    messages: List[Message],
+    client: ElasticsearchHttpClient,
+    avro_deserializer,
+    canonical_topic: str,
+) -> None:
     operations = []
     upserted_count = 0
     skipped_count = 0
 
     for msg in messages:
-        if msg.topic() != CANONICAL_TOPIC:
+        if msg.topic() != canonical_topic:
             continue
         try:
             data = avro_deserializer(msg.value(), None)
@@ -289,18 +294,23 @@ def _bounded_text(value: Any, max_len: int) -> str | None:
 def main() -> None:
     bootstrap_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
     schema_registry_url = os.environ.get("SCHEMA_REGISTRY_URL", "http://schema-registry:8081")
-    group_id = os.environ.get("KAFKA_GROUP_ID", "imperium-elasticsearch-projector-group")
+    canonical_topic = os.environ.get("CANONICAL_TOPIC", DEFAULT_CANONICAL_TOPIC)
+    group_id = os.environ.get("KAFKA_GROUP_ID", "imperium-elasticsearch-projector-canonical-group")
     elasticsearch_url = os.environ.get("ELASTICSEARCH_URL", "http://elasticsearch:9200")
     index_name = os.environ.get("ELASTICSEARCH_INDEX", DEFAULT_INDEX_NAME)
     batch_size = int(os.environ.get("ELASTICSEARCH_BATCH_SIZE", "5000"))
+    timeout_seconds = float(os.environ.get("ELASTICSEARCH_TIMEOUT_SECONDS", "60"))
 
-    logger.info("Initializing Elasticsearch Projector...")
+    logger.info(
+        f"Initializing Elasticsearch Projector for canonical_topic={canonical_topic} "
+        f"batch_size={batch_size} timeout_seconds={timeout_seconds}..."
+    )
     consumer = build_consumer(bootstrap_servers, group_id)
     avro_deserializer = build_avro_deserializer(schema_registry_url)
 
     while True:
         try:
-            client = ElasticsearchHttpClient(elasticsearch_url, index_name)
+            client = ElasticsearchHttpClient(elasticsearch_url, index_name, timeout=timeout_seconds)
             client.ping()
             client.ensure_index()
             logger.info("Connected to Elasticsearch successfully.")
@@ -310,11 +320,11 @@ def main() -> None:
             time.sleep(5)
 
     def batch_processor(messages: List[Message]) -> None:
-        process_batch(messages, client, avro_deserializer)
+        process_batch(messages, client, avro_deserializer, canonical_topic)
 
     consume_microbatches(
         consumer=consumer,
-        topics=[CANONICAL_TOPIC],
+        topics=[canonical_topic],
         process_batch=batch_processor,
         batch_size=batch_size,
         timeout_ms=1.0,

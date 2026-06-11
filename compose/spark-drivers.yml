@@ -213,7 +213,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       CANONICAL_STARTING_OFFSETS: earliest
-      CANONICAL_MAX_OFFSETS_PER_TRIGGER: 5000
+      CANONICAL_MAX_OFFSETS_PER_TRIGGER: 30000
       CANONICAL_TRIGGER_PROCESSING_TIME: 3 seconds
       CHECKPOINT_ROOT: /tmp/imperium/checkpoints/processing
       JAVA_TOOL_OPTIONS: "-javaagent:/otel/otel-javaagent.jar"

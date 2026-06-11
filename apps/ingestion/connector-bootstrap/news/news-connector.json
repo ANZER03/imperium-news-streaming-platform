@@ -21,9 +21,18 @@
     "signal.kafka.topic": "${NEWS_CDC_SIGNAL_TOPIC}",
     "tombstones.on.delete": "false",
     "heartbeat.interval.ms": "10000",
+    "max.queue.size": "65536",
+    "max.batch.size": "8192",
+    "poll.interval.ms": "500",
     "schema.history.internal.kafka.bootstrap.servers": "${KAFKA_BOOTSTRAP_SERVERS}",
     "schema.history.internal.kafka.topic": "${NEWS_CDC_SCHEMA_HISTORY_TOPIC}",
+    "producer.override.buffer.memory": "536870912",
+    "producer.override.batch.size": "524288",
+    "producer.override.linger.ms": "100",
     "producer.override.max.request.size": "2097152",
-    "producer.override.max.block.ms": "60000"
+    "producer.override.max.block.ms": "300000",
+    "producer.override.request.timeout.ms": "120000",
+    "producer.override.delivery.timeout.ms": "300000",
+    "producer.override.compression.type": "lz4"
   }
 }
