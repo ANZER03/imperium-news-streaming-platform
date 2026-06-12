@@ -76,3 +76,25 @@ services:
     depends_on:
       news-source-db:
         condition: service_healthy
+
+  clone-old-news:
+    <<: *service-defaults
+    build:
+      context: ../infrastructure/docker/clone-news
+    container_name: imperium-clone-old-news
+    restart: "no"
+    profiles:
+      - migration
+    command: ["python", "scripts/clone/old_scheduler.py"]
+    volumes:
+      - ..:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - clone-old-news-state:/app/scripts/clone/.state
+    environment:
+      SOURCE_PG_CONTAINER: ${SOURCE_PG_CONTAINER:-imperium-news-source-db}
+      CLONE_OLD_SEED_ID: ${CLONE_OLD_SEED_ID:-564990395}
+      CLONE_OLD_BATCH_SIZE: ${CLONE_OLD_BATCH_SIZE:-100000}
+      CLONE_OLD_INTERVAL: ${CLONE_OLD_INTERVAL:-60}
+    depends_on:
+      news-source-db:
+        condition: service_healthy

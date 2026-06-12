@@ -52,3 +52,5 @@ volumes:
     name: source-db
   clone-news-state:
     name: imperium-clone-news-state
+  clone-old-news-state:
+    name: imperium-clone-old-news-state

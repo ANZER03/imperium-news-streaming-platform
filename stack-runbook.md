@@ -173,6 +173,15 @@ Follow progress:
 docker logs -f imperium-clone-news
 ```
 
+Old-news backfill pulls historical rows where `id < 564990395`, in descending
+ID order, 100 000 rows every 5 minutes. It stores the last batch minimum ID in
+its own volume and stops when a batch returns zero rows:
+
+```bash
+docker-compose --profile backbone --profile source --profile migration up -d --no-deps clone-old-news
+docker logs -f imperium-clone-old-news
+```
+
 ---
 
 ### 8. UI (optional)

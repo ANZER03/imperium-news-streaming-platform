@@ -7,7 +7,7 @@ PROCESSING_SERVICES := imperium-canonical-enrichment-driver imperium-classificat
 BACKEND_SERVICES := kafka kafka-broker-2 schema-registry news-source-db redis qdrant imperium-redis-projector imperium-postgres-projector imperium-qdrant-projector redis-ui
 BACKEND_PROFILES := --profile backbone --profile source --profile serving --profile projectors --profile ui
 BACKEND_APP_PROFILES := --profile backend-app
-BACKEND_APP_SERVICE := news-app
+BACKEND_APP_SERVICE := news-app frontend
 
 .PHONY: infra-config foundation-up foundation-down foundation-logs smoke-test \
         cdc-up cdc-down cdc-clean cdc-verify cdc-validate cdc-reset-and-verify \
