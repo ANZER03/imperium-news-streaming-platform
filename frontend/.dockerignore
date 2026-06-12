@@ -1,0 +1,9 @@
+node_modules
+.next
+coverage
+.env*
+!.env.example
+.git
+.gitignore
+README.md
+*.log

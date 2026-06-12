@@ -5,7 +5,7 @@ import type {NextConfig} from 'next';
  * Defaults to the local Maven Spring Boot dev server on 8999.
  * In production, set BACKEND_URL on the deployment so rewrites proxy correctly.
  */
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8999';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://news-app:8999';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

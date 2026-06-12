@@ -42,3 +42,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+  frontend:
+    <<: *service-defaults
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: imperium-frontend
+    hostname: frontend
+    profiles:
+      - backend-app
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_URL: http://news-app:8999
+    depends_on:
+      news-app:
+        condition: service_healthy
+
