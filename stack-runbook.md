@@ -319,7 +319,7 @@ docker-compose --profile backbone --profile serving --profile source --profile p
 | `service "X" depends on undefined service "Y"` | Always include all required profiles in the `up` command |
 | Spark driver exits with `Permission denied` on `.py` file | Blank line inside `bash -lc '...'` YAML block — the `.py` path was being run as a separate shell command instead of passed to `spark-submit`. Fixed in `compose/spark-drivers.yml`. |
 | Qdrant `duplicate field max_segment_size` | Renamed env var to `MAX_SEGMENT_SIZE_KB` then removed it — see Issue 12 in `issues.md` |
-| News CDC connector FAILED with `RecordTooLargeException` | Connector config needs `producer.override.max.request.size=2097152` — see Issue 13 in `issues.md` |
+| News CDC connector FAILED with `RecordTooLargeException` | Connector config needs `producer.override.max.request.size=10485760` (10 MB, matching broker limit) — see Issue 13 in `issues.md` |
 | Postgres projector loops on `Temporary failure in name resolution` | Image is stale (still uses `PHASE3_POSTGRES_DSN`). Rebuild with `--build` — see Issue 14 |
 | Clone-news rebuild sends 400 MB of context | Build context now scoped to `infrastructure/docker/clone-news/` — see Issue 15 |
 
