@@ -11,6 +11,6 @@ RUN chown -R spark:spark /opt/imperium/news-pipeline
 USER spark
 
 # Set the PYTHONPATH env variable so Python can find your helper scripts
-ENV PYTHONPATH="/opt/imperium/news-pipeline/src:/opt/imperium/news-pipeline/jobs/enrichment"
+ENV PYTHONPATH="/opt/imperium/news-pipeline/src"
 
 # The command will be provided by Kubernetes or Docker Compose (e.g., via spark-submit)

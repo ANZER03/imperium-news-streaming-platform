@@ -319,13 +319,20 @@ def process_batch(
         f"topic={config.kafka.classified_topic} format=avro"
     )
 
-    output_df.write \
-        .format("kafka") \
-        .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
-        .option("topic", config.kafka.classified_topic) \
-        .option("kafka.max.request.size", "2097152") \
-        .option("kafka.compression.type", "zstd") \
-        .save()
+    try:
+        output_df.write \
+            .format("kafka") \
+            .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
+            .option("topic", config.kafka.classified_topic) \
+            .option("kafka.max.request.size", "2097152") \
+            .option("kafka.compression.type", "zstd") \
+            .save()
+        logger.info(f"batch={batch_id} Successfully wrote {write_count} records to {config.kafka.classified_topic}")
+    except Exception as e:
+        logger.exception(f"batch={batch_id} Failed to write to {config.kafka.classified_topic}: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
 
     dlq_count = 0
     if failed_ids:
@@ -386,13 +393,17 @@ def process_batch(
         logger.warning(
             f"batch={batch_id} dlq_writing={dlq_count} topic={config.kafka.classified_dlq_topic}"
         )
-        dlq_df.write \
-            .format("kafka") \
-            .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
-            .option("topic", config.kafka.classified_dlq_topic) \
-            .option("kafka.max.request.size", "2097152") \
-            .option("kafka.compression.type", "zstd") \
-            .save()
+        try:
+            dlq_df.write \
+                .format("kafka") \
+                .option("kafka.bootstrap.servers", config.kafka.bootstrap_servers) \
+                .option("topic", config.kafka.classified_dlq_topic) \
+                .option("kafka.max.request.size", "2097152") \
+                .option("kafka.compression.type", "zstd") \
+                .save()
+        except Exception as e:
+            logger.exception(f"batch={batch_id} Failed to write to DLQ {config.kafka.classified_dlq_topic}: {e}")
+            raise
 
     elapsed_ms = int((time.time() - t0) * 1000)
     logger.info(
