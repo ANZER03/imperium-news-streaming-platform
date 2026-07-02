@@ -13,6 +13,9 @@ RUN ./mvnw -q -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
+RUN mkdir /otel && \
+    curl -L -o /otel/otel-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
 COPY --from=build /app/target/news-app-0.0.1-SNAPSHOT.jar app.jar
 
 EXPOSE 8999
