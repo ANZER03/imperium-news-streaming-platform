@@ -133,19 +133,8 @@ spec:
                     git clone ${HELM_REPO_URL} helm-repo
                     cd helm-repo
 
-                    # Safely and precisely update the tag value in imperium-frontend/values.yaml
-                    python3 -c "
-import sys
-path = 'imperium-streaming-news-processing/charts/imperium-frontend/values.yaml'
-with open(path, 'r') as f:
-    lines = f.readlines()
-for i, line in enumerate(lines):
-    if line.strip().startswith('tag:'):
-        lines[i] = '  tag: \"' + sys.argv[1] + '\"\n'
-        break
-with open(path, 'w') as f:
-    f.writelines(lines)
-" "${SHORT_SHA}"
+                    # Safely and precisely update the tag value in imperium-frontend/values.yaml using sed
+                    sed -i 's/^[[:space:]]*tag:.*/  tag: "'${SHORT_SHA}'"/' imperium-streaming-news-processing/charts/imperium-frontend/values.yaml
 
                     # Commit and push changes back to the Helm repo
                     git add imperium-streaming-news-processing/charts/imperium-frontend/values.yaml
